@@ -155,7 +155,7 @@
             };
             
             try {
-                const url = `https://eu.api.connect.trimble.com/tc/v1/projects/${projectId}/items/${fileId}/properties`;
+                const url = `https://app21.connect.trimble.com/tc/v1/projects/${projectId}/items/${fileId}/properties`;
                 const response = await fetch(url, {
                     method: 'GET',
                     headers: { 'Authorization': `Bearer ${accessToken}` }
