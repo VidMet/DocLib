@@ -3,51 +3,126 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Metadata Utforsker</title>
+    <title>Metadata Utforsker v1.0</title>
     
     <script src="https://components.connect.trimble.com/trimble-connect-workspace-api/index.js"></script>
 
     <style>
-        body { font-family: 'Segoe UI', Arial, sans-serif; margin: 0; padding: 20px; background-color: #f8f9fa; color: #333; }
-        .header-actions { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; background: #fff; padding: 15px 20px; border-radius: 6px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
-        h2 { margin: 0; font-size: 1.2rem; color: #005f9e; }
-        .search-bar { padding: 8px 12px; width: 300px; border: 1px solid #ced4da; border-radius: 4px; font-size: 14px; }
+        @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Syne:wght@400;600;700;800&display=swap');
+
+        :root {
+            --bg:        #f3f4f6;      
+            --surface:   #ffffff;      
+            --border:    #d1d5db;      
+            --ink:       #111827;      
+            --muted:     #6b7280;      
+            --blue:      #1d4ed8;      
+            --ok:        #22a06b;
+            --warn:      #f79009;
+            --bad:       #d92d20;
+            --sans:      'Syne', sans-serif;
+        }
+
+        body { 
+            font-family: var(--sans), Arial, sans-serif; 
+            margin: 0; 
+            background-color: var(--bg); 
+            color: var(--ink); 
+            display: flex; 
+            flex-direction: column; 
+            height: 100vh;
+        }
+
+        /* --- HEADER STYLING --- */
+        .topbar {
+            height: 92px; background: #fff; border-bottom: 1px solid var(--border);
+            display: flex; align-items: center; gap: 18px; padding: 10px 18px; flex: 0 0 auto;
+        }
+        .logo-card {
+            width: 145px; height: 68px; border: 1px solid var(--border); border-radius: 12px;
+            background: #fff; display: flex; align-items: center; justify-content: center;
+            box-shadow: 0 4px 14px rgba(16,24,40,.08); overflow: hidden; flex-shrink: 0;
+        }
+        .logo-card img { max-width: 128px; max-height: 50px; object-fit: contain; }
+        .app-title { display: flex; flex-direction: column; line-height: 1.2; }
+        .app-title b { font-size: 18px; color: #0050b5; }
+        .app-title span { font-size: 14px; font-weight: 600; }
+        .app-title em { font-size: 12px; color: var(--muted); font-style: normal; }
+        
+        .header-right { margin-left: auto; display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
+        .status { display: flex; align-items: center; gap: 7px; color: var(--muted); font-size: 12px; font-weight: 600; white-space: nowrap; }
+        .dot { width: 9px; height: 9px; border-radius: 50%; background: #98a2b3; flex-shrink: 0; }
+        .dot.live { background: var(--ok); box-shadow: 0 0 8px var(--ok); }
+        .dot.warn { background: var(--warn); }
+        .dot.error { background: var(--bad); }
+
+        /* --- INNHOLD STYLING --- */
+        .main-content {
+            padding: 20px;
+            flex: 1 1 auto;
+            overflow-y: auto;
+        }
+
+        .toolbar { 
+            display: flex; justify-content: space-between; align-items: center; 
+            margin-bottom: 20px; background: #fff; padding: 15px 20px; 
+            border-radius: 6px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); 
+        }
+        .toolbar h3 { margin: 0; font-size: 1rem; color: var(--ink); }
+        .search-bar { padding: 8px 12px; width: 300px; border: 1px solid var(--border); border-radius: 4px; font-size: 14px; font-family: var(--sans); }
+        
         table { width: 100%; border-collapse: collapse; background-color: #ffffff; box-shadow: 0 1px 3px rgba(0,0,0,0.1); border-radius: 6px; overflow: hidden; }
         th, td { padding: 12px 15px; text-align: left; font-size: 13px; border-bottom: 1px solid #dee2e6; }
         th { background-color: #f1f3f5; color: #495057; font-weight: 600; }
         tr:hover { background-color: #f8f9fa; }
-        .loading { text-align: center; padding: 40px; font-style: italic; color: #6c757d; }
-        .file-link { font-weight: 600; color: #0066cc; cursor: pointer; text-decoration: none; }
+        .loading { text-align: center; padding: 40px; font-style: italic; color: var(--muted); }
+        .file-link { font-weight: 600; color: var(--blue); cursor: pointer; text-decoration: none; }
         .file-link:hover { text-decoration: underline; }
     </style>
 </head>
 <body>
 
-    <div class="header-actions">
-        <h2>Prosjektmodeller og Metadata</h2>
-        <input type="text" id="searchInput" class="search-bar" placeholder="Søk i modeller eller metadata...">
-    </div>
+    <header class="topbar">
+        <div class="logo-card">
+            <img src="norconsult-logo-black.png" alt="Norconsult" onerror="this.style.display='none'">
+        </div>
+        <div class="app-title">
+            <b>Metadata Utforsker v1.0</b>
+            <span>Norconsult Norge</span>
+            <em>Utviklet av Norconsult. Kontaktperson: Vidar.Metveit@norconsult.com</em>
+        </div>
+        <div class="header-right">
+            <div class="status">
+                <span id="statusText">Venter på API...</span>
+                <span id="statusDot" class="dot"></span>
+            </div>
+        </div>
+    </header>
 
-    <table id="metadataTable">
-        <thead>
-            <tr>
-                <th>Filnavn</th>
-                <th>Fag</th>
-                <th>MMI</th>
-                <th>Revisjon</th>
-                <th>Revisjonsdato</th>
-                <th>Revisjonen gjelder</th>
-                <th>Utarbeidet av</th>
-                <th>Kontrollert av</th>
-                <th>Godkjent av</th>
-            </tr>
-        </thead>
-        <tbody id="tableBody">
-            <tr>
-                <td colspan="9" class="loading" id="statusText">Kobler til Trimble Connect API...</td>
-            </tr>
-        </tbody>
-    </table>
+    <div class="main-content">
+        <div class="toolbar">
+            <h3>Filer og egenskaper</h3>
+            <input type="text" id="searchInput" class="search-bar" placeholder="Søk i modeller eller metadata...">
+        </div>
+
+        <table id="metadataTable">
+            <thead>
+                <tr>
+                    <th>Filnavn</th>
+                    <th>Fag</th>
+                    <th>MMI</th>
+                    <th>Revisjon</th>
+                    <th>Revisjonsdato</th>
+                    <th>Revisjonen gjelder</th>
+                    <th>Utarbeidet av</th>
+                    <th>Kontrollert av</th>
+                    <th>Godkjent av</th>
+                </tr>
+            </thead>
+            <tbody id="tableBody">
+                </tbody>
+        </table>
+    </div>
 
     <script>
         let API = null;
@@ -55,24 +130,30 @@
         let accessToken = null;
         let allFilesData = [];
 
+        // Hjelpefunksjon for å sette status og farge på prikken i headeren
+        const setStatus = (m, c='') => { 
+            document.getElementById('statusText').textContent = m; 
+            let dotClass = 'dot';
+            if (c === 'ok') dotClass = 'dot live';
+            else if (c === 'error') dotClass = 'dot error';
+            else if (c === 'warn') dotClass = 'dot warn';
+            document.getElementById('statusDot').className = dotClass; 
+        };
+
         async function initExtension() {
             try {
-                // Her bruker vi window.TrimbleConnectWorkspace slik du gjorde i RDS-utvidelsen
+                setStatus("Kobler til Trimble Connect...", "warn");
                 API = await window.TrimbleConnectWorkspace.connect(window.parent);
 
-                document.getElementById('statusText').innerText = "Tilkoblet! Setter opp meny...";
-
-                // Be prosjektvinduet tegne ikonet i venstremargen
                 if (API.ui && API.ui.setMenu) {
                     await API.ui.setMenu({
                         title: "Metadata Utforsker",
                         command: "open_explorer",
                         icon: "https://vidmet.github.io/model-explorer/google-docs.png",
-                        subMenus: [] // <-- Ofte strengt påkrevd av det nye API-et
+                        subMenus: [] 
                     });
                 }
 
-                // Lytter etter klikk på ikonet i venstremargen
                 if (API.ui && API.ui.onCommand) {
                     API.ui.onCommand(async (command) => {
                         if (command === "open_explorer") {
@@ -81,30 +162,25 @@
                     });
                 }
 
-                document.getElementById('statusText').innerText = "Henter prosjektinformasjon...";
-
-                // Hent prosjekt og token
+                setStatus("Henter prosjektinformasjon...", "warn");
                 currentProject = await API.project.getProject();
                 const tokenData = await API.extension.requestPermission("accesstoken");
                 accessToken = typeof tokenData === 'string' ? tokenData : (tokenData.token || tokenData);
                 
-                // Start uthenting av filene
                 fetchProjectFiles(currentProject.id);
 
             } catch (error) {
-                console.error("Kritisk feil under initialisering:", error);
-                document.getElementById('statusText').innerText = "Feil: Kunne ikke koble til Trimble Connect. (Sjekk konsollen F12)";
-                document.getElementById('statusText').style.color = "red";
+                console.error("Initialiseringsfeil:", error);
+                setStatus("Feil: Kunne ikke koble til Trimble API", "error");
             }
         }
 
-        // Start initialiseringen når siden er lastet
         window.onload = initExtension;
 
-        // 2. Hent filer fra prosjektet
         async function fetchProjectFiles(projectId) {
             try {
-                const url = `https://api.connect.trimble.com/tc/v1/projects/${projectId}/items`;
+                // Bruker app21 for europeiske prosjekter
+                const url = `https://app21.connect.trimble.com/tc/v1/projects/${projectId}/items`;
                 
                 const response = await fetch(url, {
                     method: 'GET',
@@ -114,19 +190,18 @@
                     }
                 });
                 
-                if (!response.ok) throw new Error("Kunne ikke hente fildata fra Trimble REST API");
+                if (!response.ok) throw new Error("API feilet");
 
                 const files = await response.json();
-                
-                // Hent kun ut filobjekter som er IFC
                 const modelFiles = files.filter(file => file.type === 'FILE' && file.name.toLowerCase().endsWith('.ifc'));
                 
                 if (modelFiles.length === 0) {
-                    document.getElementById('tableBody').innerHTML = `<tr><td colspan="9" class="loading">Ingen IFC-filer funnet i rotmappen.</td></tr>`;
+                    document.getElementById('tableBody').innerHTML = `<tr><td colspan="9" class="loading">Ingen IFC-filer funnet i prosjektets rotmappe.</td></tr>`;
+                    setStatus("Ferdig. Ingen IFC-filer.", "ok");
                     return;
                 }
 
-                document.getElementById('statusText').innerText = `Henter metadata for ${modelFiles.length} modeller...`;
+                setStatus(`Henter metadata for ${modelFiles.length} filer...`, "warn");
 
                 allFilesData = await Promise.all(modelFiles.map(async (file) => {
                     const metadata = await fetchFileMetadata(projectId, file.id);
@@ -139,15 +214,14 @@
                 
                 renderTable(allFilesData);
                 setupSearch();
+                setStatus("Data innlastet!", "ok");
                 
             } catch (error) {
-                console.error("Feil ved uthenting av filer:", error);
-                document.getElementById('statusText').innerText = "Feil ved nettverkskall mot filstrukturen.";
-                document.getElementById('statusText').style.color = "red";
+                console.error("Filhenting feilet:", error);
+                setStatus("Nettverksfeil mot filstrukturen", "error");
             }
         }
 
-        // 3. Hent Custom Properties (Metadata)
         async function fetchFileMetadata(projectId, fileId) {
             const defaultMeta = {
                 fag: "-", mmi: "-", revisjon: "-", revisjonsdato: "-", 
@@ -195,11 +269,10 @@
             return value;
         }
 
-        // 4. Tegn ut tabellen
         function renderTable(data) {
             const tbody = document.getElementById('tableBody');
             if (data.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="9" class="loading">Ingen modeller samsvarer med søket.</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="9" class="loading">Søket ga ingen treff.</td></tr>`;
                 return;
             }
             
@@ -221,7 +294,6 @@
             `).join('');
         }
 
-        // 5. Søkefunksjon
         function setupSearch() {
             const searchInput = document.getElementById('searchInput');
             searchInput.addEventListener('input', (e) => {
