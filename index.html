@@ -4,9 +4,12 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Metadata Utforsker</title>
+    
+    <script src="https://global.connect.trimble.com/tc/static/apidoc/workspace/v1/trimble-connect-workspace-api.js"></script>
+
     <style>
         body {
-            font-family: Arial, sans-serif;
+            font-family: 'Segoe UI', Arial, sans-serif;
             margin: 0;
             padding: 20px;
             background-color: #f8f9fa;
@@ -17,6 +20,15 @@
             justify-content: space-between;
             align-items: center;
             margin-bottom: 20px;
+            background: #fff;
+            padding: 15px 20px;
+            border-radius: 6px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+        h2 {
+            margin: 0;
+            font-size: 1.2rem;
+            color: #005f9e;
         }
         .search-bar {
             padding: 8px 12px;
@@ -30,7 +42,7 @@
             border-collapse: collapse;
             background-color: #ffffff;
             box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-            border-radius: 4px;
+            border-radius: 6px;
             overflow: hidden;
         }
         th, td {
@@ -43,11 +55,6 @@
             background-color: #f1f3f5;
             color: #495057;
             font-weight: 600;
-            cursor: pointer;
-            user-select: none;
-        }
-        th:hover {
-            background-color: #e9ecef;
         }
         tr:hover {
             background-color: #f8f9fa;
@@ -58,8 +65,16 @@
             font-style: italic;
             color: #6c757d;
         }
+        .file-link {
+            font-weight: 600; 
+            color: #0066cc; 
+            cursor: pointer;
+            text-decoration: none;
+        }
+        .file-link:hover {
+            text-decoration: underline;
+        }
     </style>
-    <script src="https://global.connect.trimble.com/tc/static/apidoc/workspace/v1/trimble-connect-workspace-api.js"></script>
 </head>
 <body>
 
@@ -84,11 +99,190 @@
         </thead>
         <tbody id="tableBody">
             <tr>
-                <td colspan="9" class="loading">Initialiserer og henter data fra Trimble Connect...</td>
+                <td colspan="9" class="loading" id="statusText">Initialiserer og henter data fra Trimble Connect...</td>
             </tr>
         </tbody>
     </table>
 
-    <script src="app.js"></script>
+    <script>
+        let currentProject = null;
+        let accessToken = null;
+        let allFilesData = [];
+
+        // 1. Initialiser Workspace API
+        TrimbleConnectWorkspace.connect(window.parent, (interaction, baseUrl) => {
+            
+            // Be Connect om å tegne meny-ikonet i venstremargen
+            interaction.request('setMenu', {
+                title: "Metadata Utforsker",
+                command: "open_explorer",
+                icon: "https://vidmet.github.io/model-explorer/google-docs.png"
+            });
+
+            // Lytter for når brukeren klikker på ikonet i menyen
+            interaction.on('command', (command) => {
+                if (command === "open_explorer") {
+                    interaction.request('setActiveMenuItem', "open_explorer");
+                }
+            });
+
+            // Hent prosjektinfo og token
+            Promise.all([
+                interaction.request('getProjectInfo'),
+                interaction.request('getAccessToken')
+            ]).then(([projectInfo, token]) => {
+                currentProject = projectInfo;
+                accessToken = token;
+                
+                fetchProjectFiles(currentProject.id);
+            }).catch(error => {
+                console.error("Feil ved innlasting av prosjektdata:", error);
+                document.getElementById('statusText').innerText = "Feil: Kunne ikke koble til Trimble Connect. Sørg for at utvidelsen kjører inne i et prosjekt.";
+                document.getElementById('statusText').style.color = "red";
+            });
+
+        }, "*");
+
+        // 2. Hent filer fra prosjektet
+        async function fetchProjectFiles(projectId) {
+            try {
+                // Henter filer fra rotnivå (kan utvides til å hente fra spesifikke mapper)
+                const url = `https://api.connect.trimble.com/tc/v1/projects/${projectId}/items`;
+                
+                const response = await fetch(url, {
+                    method: 'GET',
+                    headers: {
+                        'Authorization': `Bearer ${accessToken}`,
+                        'Accept': 'application/json'
+                    }
+                });
+                
+                if (!response.ok) throw new Error("Kunne ikke hente fildata");
+
+                const files = await response.json();
+                
+                // Filtrer kun filer (ignorer mapper) og eventuelt kun IFC
+                const modelFiles = files.filter(file => file.type === 'FILE' && file.name.toLowerCase().endsWith('.ifc'));
+                
+                if (modelFiles.length === 0) {
+                    document.getElementById('tableBody').innerHTML = `<tr><td colspan="9" class="loading">Ingen IFC-filer funnet i rotmappen.</td></tr>`;
+                    return;
+                }
+
+                // Oppdater status
+                document.getElementById('statusText').innerText = `Henter metadata for ${modelFiles.length} filer...`;
+
+                // Hent metadata for hver fil
+                allFilesData = await Promise.all(modelFiles.map(async (file) => {
+                    const metadata = await fetchFileMetadata(projectId, file.id);
+                    return {
+                        id: file.id,
+                        name: file.name,
+                        ...metadata
+                    };
+                }));
+                
+                renderTable(allFilesData);
+                setupSearch();
+                
+            } catch (error) {
+                console.error("Feil ved henting av filer:", error);
+                document.getElementById('statusText').innerText = "Feil ved uthenting av fildata fra API-et.";
+                document.getElementById('statusText').style.color = "red";
+            }
+        }
+
+        // 3. Hent Custom Properties (Metadata)
+        async function fetchFileMetadata(projectId, fileId) {
+            const defaultMeta = {
+                fag: "-", mmi: "-", revisjon: "-", revisjonsdato: "-", 
+                gjelder: "-", utarbeidet: "-", kontrollert: "-", godkjent: "-"
+            };
+            
+            try {
+                const url = `https://api.connect.trimble.com/tc/v1/projects/${projectId}/items/${fileId}/properties`;
+                const response = await fetch(url, {
+                    method: 'GET',
+                    headers: { 'Authorization': `Bearer ${accessToken}` }
+                });
+                
+                if (!response.ok) return defaultMeta;
+                
+                const propsData = await response.json();
+                
+                // Trimble Connect returnerer ofte properties i lister/objekter, vi forsøker et flatt oppslag.
+                // Tilpass nøklene her dersom de heter noe annet i deres Property Sets.
+                return {
+                    fag: extractProp(propsData, ["Underdisiplin", "Fag"]),
+                    mmi: extractProp(propsData, ["MMI"]),
+                    revisjon: extractProp(propsData, ["Revisjon"]),
+                    revisjonsdato: extractProp(propsData, ["Revisjonsdato", "Dato"]),
+                    gjelder: extractProp(propsData, ["Revisjonen gjelder", "Beskrivelse"]),
+                    utarbeidet: extractProp(propsData, ["Utarbeidet av", "Utarbeidet"]),
+                    kontrollert: extractProp(propsData, ["Kontrollert av", "Kontrollert"]),
+                    godkjent: extractProp(propsData, ["Godkjent av", "Godkjent"])
+                };
+            } catch (e) {
+                return defaultMeta;
+            }
+        }
+
+        // Hjelpefunksjon for å finne property-verdier uansett om det er et array av grupper eller et flatt objekt
+        function extractProp(data, possibleKeys) {
+            let value = "-";
+            possibleKeys.forEach(key => {
+                if (data[key]) value = data[key];
+                // Hvis data ligger inne i property sets (Array)
+                if (Array.isArray(data)) {
+                    data.forEach(propSet => {
+                        if (propSet.properties && propSet.properties[key]) {
+                            value = propSet.properties[key];
+                        }
+                    });
+                }
+            });
+            return value;
+        }
+
+        // 4. Tegn ut tabellen
+        function renderTable(data) {
+            const tbody = document.getElementById('tableBody');
+            if (data.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="9" class="loading">Ingen modeller samsvarer med søket.</td></tr>`;
+                return;
+            }
+            
+            tbody.innerHTML = data.map(fil => `
+                <tr>
+                    <td>
+                        <a href="https://connect.trimble.com/web/project/${currentProject.id}/data/detail/${fil.id}" 
+                           target="_blank" class="file-link" title="Åpne fil i Trimble Connect">${fil.name}</a>
+                    </td>
+                    <td>${fil.fag}</td>
+                    <td>${fil.mmi}</td>
+                    <td>${fil.revisjon}</td>
+                    <td>${fil.revisjonsdato}</td>
+                    <td>${fil.gjelder}</td>
+                    <td>${fil.utarbeidet}</td>
+                    <td>${fil.kontrollert}</td>
+                    <td>${fil.godkjent}</td>
+                </tr>
+            `).join('');
+        }
+
+        // 5. Søkefunksjon
+        function setupSearch() {
+            const searchInput = document.getElementById('searchInput');
+            searchInput.addEventListener('input', (e) => {
+                const term = e.target.value.toLowerCase();
+                const filtered = allFilesData.filter(fil => {
+                    return Object.values(fil).some(val => 
+                        String(val).toLowerCase().includes(term)
+                    );
+                });
+                renderTable(filtered);
+            });
+        }
+    </script>
 </body>
 </html>
