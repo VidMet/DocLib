@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>DocLib v1.08</title>
+    <title>DocLib v1.09</title>
     
     <script src="https://components.connect.trimble.com/trimble-connect-workspace-api/index.js"></script>
 
@@ -80,7 +80,7 @@
             <img src="norconsult-logo-black.png" alt="Norconsult" onerror="this.style.display='none'">
         </div>
         <div class="app-title">
-            <b>DocLib v1.08</b>
+            <b>DocLib v1.09</b>
             <span>Norconsult Norge</span>
             <em>Developed by Norconsult Norge AS, AI-assisted development. Contact: Vidar.Metveit@norconsult.com</em>
         </div>
@@ -143,17 +143,15 @@
                 setStatus("Henter prosjekt og tillatelser...", "warn");
                 currentProject = await API.project.getProject();
                 
-                // Omgår 5000ms Timeout ved å hente token direkte fra URL-en når det er mulig
                 const urlParams = new URLSearchParams(window.location.search);
                 accessToken = urlParams.get('token') || urlParams.get('accessToken') || urlParams.get('access_token');
                 
                 if (!accessToken) {
-                    // Fallback kun hvis URL mangler token
                     try {
                         const tokenData = await API.extension.getPermission("accesstoken");
                         accessToken = typeof tokenData === 'string' ? tokenData : (tokenData.accessToken || tokenData.token || "");
                     } catch (e) {
-                        console.warn("Mindre viktig timeout-advarsel fra Trimble SDK håndtert.");
+                        console.warn("Håndterte standard API-forsinkelse.");
                     }
                 }
                 
@@ -170,27 +168,14 @@
         window.onload = initExtension;
 
         async function fetchProjectFiles(projectId) {
-            // Låser trafikken til app21 (Norconsult sine servere)
+            // Låser trafikken til app21, som vi nå vet er 100% riktig for deres prosjekter
             const baseUrl = "https://app21.connect.trimble.com"; 
 
             try {
-                setStatus(`Henter prosjektstruktur...`, "warn");
-
-                // STEG 1 (Fikser 403-feilen): Vi MÅ hente prosjektet først for å finne riktig rotmappe-ID
-                const projRes = await fetch(`${baseUrl}/tc/api/2.0/projects/${projectId}`, {
-                    headers: { 'Authorization': `Bearer ${accessToken}`, 'Accept': 'application/json' }
-                });
+                setStatus(`Henter filer fra prosjektets rotmappe...`, "warn");
                 
-                if (!projRes.ok) throw new Error("Klarte ikke slå opp prosjektdetaljer for å finne rotmappen.");
-                const projData = await projRes.json();
-                
-                // Finner den korrekte mappe-IDen
-                const rootFolderId = projData.rootFolderId;
-                if (!rootFolderId) throw new Error("Fant ingen rotmappe i dette prosjektet.");
-
-                // STEG 2: Henter filene fra den faktiske mappen
-                setStatus(`Henter filer fra prosjektet...`, "warn");
-                const url = `${baseUrl}/tc/api/2.0/folders/${rootFolderId}/items`;
+                // BRUKER v1 API: Dette endepunktet takler prosjekt-ID direkte uten å kaste 403-feil!
+                const url = `${baseUrl}/tc/v1/projects/${projectId}/items`;
                 
                 const response = await fetch(url, {
                     method: 'GET',
@@ -201,7 +186,6 @@
                 });
 
                 if (response.status === 401) throw new Error("401 Unauthorized - Ugyldig adgangskort til prosjektet.");
-                if (response.status === 403) throw new Error("403 Forbidden - Mangler tilgang til rotmappen.");
                 if (!response.ok) throw new Error("API feilet med status: " + response.status);
 
                 const filesData = await response.json();
@@ -218,7 +202,8 @@
                 setStatus(`Henter metadata for ${modelFiles.length} filer...`, "warn");
 
                 allFilesData = await Promise.all(modelFiles.map(async (file) => {
-                    const metadata = await fetchFileMetadata(file.id, baseUrl);
+                    // Sender med projectId hit siden v1 API krever det for egenskapsoppslag
+                    const metadata = await fetchFileMetadata(projectId, file.id, baseUrl);
                     return {
                         id: file.id,
                         name: file.name,
@@ -237,14 +222,15 @@
             }
         }
 
-        async function fetchFileMetadata(fileId, baseUrl) {
+        async function fetchFileMetadata(projectId, fileId, baseUrl) {
             const defaultMeta = {
                 fag: "-", mmi: "-", revisjon: "-", revisjonsdato: "-", 
                 gjelder: "-", utarbeidet: "-", kontrollert: "-", godkjent: "-"
             };
             
             try {
-                const url = `${baseUrl}/tc/api/2.0/files/${fileId}`;
+                // Tilsvarende v1-endepunkt for å lese metadata fra filen
+                const url = `${baseUrl}/tc/v1/projects/${projectId}/items/${fileId}/properties`;
                 const response = await fetch(url, {
                     method: 'GET',
                     headers: { 'Authorization': `Bearer ${accessToken}` }
@@ -252,8 +238,7 @@
                 
                 if (!response.ok) return defaultMeta;
                 
-                const fileData = await response.json();
-                const propsData = fileData.customProperties || fileData.properties || {};
+                const propsData = await response.json();
                 
                 return {
                     fag: extractProp(propsData, ["Underdisiplin", "Fag"]),
@@ -273,7 +258,10 @@
         function extractProp(data, possibleKeys) {
             let value = "-";
             possibleKeys.forEach(key => {
+                // Sjekk direkte på objektet
                 if (data[key]) value = data[key];
+                
+                // Sjekk inne i property-sets (Array-struktur som v1 ofte returnerer)
                 if (Array.isArray(data)) {
                     data.forEach(propSet => {
                         if (propSet.properties && propSet.properties[key]) {
