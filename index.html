@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>DocLib v1.19</title>
+    <title>DocLib v1.18</title>
     
     <script src="https://components.connect.trimble.com/trimble-connect-workspace-api/index.js"></script>
 
@@ -60,18 +60,25 @@
             display: flex; justify-content: space-between; align-items: center; 
             margin-bottom: 20px; background: #fff; padding: 15px 20px; 
             border-radius: 6px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); 
+            flex-wrap: wrap; gap: 10px;
         }
         .toolbar h3 { margin: 0; font-size: 1rem; color: var(--ink); }
-        .search-container { display: flex; gap: 12px; }
+        .search-container { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
         .search-bar { padding: 8px 12px; border: 1px solid var(--border); border-radius: 4px; font-size: 14px; font-family: var(--sans); }
-        .search-input { width: 300px; }
-        .folder-select { width: 220px; cursor: pointer; display: none; }
+        .search-input { width: 250px; }
+        .folder-select { width: 180px; cursor: pointer; display: none; }
         
+        .btn { padding: 8px 16px; border-radius: 4px; font-family: var(--sans); font-size: 13px; font-weight: 600; cursor: pointer; border: none; transition: opacity 0.2s; }
+        .btn:hover { opacity: 0.8; }
+        .btn-primary { background: var(--blue); color: #fff; }
+
         table { width: 100%; border-collapse: collapse; background-color: #ffffff; box-shadow: 0 1px 3px rgba(0,0,0,0.1); border-radius: 6px; overflow: hidden; }
         th, td { padding: 12px 15px; text-align: left; font-size: 13px; border-bottom: 1px solid #dee2e6; }
         th { background-color: #f1f3f5; color: #495057; font-weight: 600; }
         tr:hover { background-color: #f8f9fa; }
         .loading { text-align: center; padding: 40px; font-style: italic; color: var(--muted); }
+        .file-link { font-weight: 600; color: var(--blue); cursor: pointer; text-decoration: none; }
+        .file-link:hover { text-decoration: underline; }
     </style>
 </head>
 <body>
@@ -81,7 +88,7 @@
             <img src="norconsult-logo-black.png" alt="Norconsult" onerror="this.style.display='none'">
         </div>
         <div class="app-title">
-            <b>DocLib v1.19</b>
+            <b>DocLib v1.18</b>
             <span>Norconsult Norge</span>
             <em>Developed by Norconsult Norge AS, AI-assisted development. Contact: Vidar.Metveit@norconsult.com</em>
         </div>
@@ -97,6 +104,12 @@
         <div class="toolbar">
             <h3>Filer og egenskaper</h3>
             <div class="search-container">
+                <label for="jsonFileInput" style="font-size: 12px; font-weight: bold; color: var(--muted);">Metadata-fil:</label>
+                <input type="text" id="jsonFileInput" class="search-bar" value="ifc_metadata.json" style="width: 140px;" title="Navn på JSON-filen som ligger i prosjektet">
+                <button class="btn btn-primary" id="refreshBtn">🔄 Oppdater</button>
+                
+                <div style="width: 1px; height: 24px; background: var(--border); margin: 0 8px;"></div>
+                
                 <select id="folderSelect" class="search-bar folder-select">
                     <option value="all">Alle mapper</option>
                 </select>
@@ -177,6 +190,7 @@
                 
                 if (!accessToken) throw new Error("Klarte ikke hente gyldig token fra Trimble.");
 
+                document.getElementById('refreshBtn').addEventListener('click', () => fetchProjectFiles(currentProject.id));
                 fetchProjectFiles(currentProject.id);
 
             } catch (error) {
@@ -187,8 +201,10 @@
 
         window.onload = initExtension;
 
-        async function hentAlleIfc(folderId, folderName, baseUrl) {
-            let funnet = [];
+        // Tråler gjennom mappene, samler både IFC-filer og JSON-filer og MAPPEN DE LIGGER I
+        async function hentAlleFiler(folderId, folderName, baseUrl, targetJsonName) {
+            let funnetIfc = [];
+            let funnetJson = [];
             try {
                 const url = `${baseUrl}/tc/api/2.0/folders/${folderId}/items`;
                 const response = await fetch(url, {
@@ -196,36 +212,87 @@
                     headers: { 'Authorization': `Bearer ${accessToken}`, 'Accept': 'application/json' }
                 });
 
-                if (!response.ok) return [];
+                if (!response.ok) return { ifc: [], json: [] };
 
                 const data = await response.json();
                 const items = Array.isArray(data) ? data : (data.items || []);
                 
                 const undermapper = [];
                 for (const item of items) {
-                    if (item.type === 'FILE' && item.name.toLowerCase().endsWith('.ifc')) {
-                        item.folderName = folderName; 
-                        funnet.push(item);
+                    if (item.type === 'FILE') {
+                        const nameLower = item.name.toLowerCase();
+                        if (nameLower.endsWith('.ifc')) {
+                            item.folderName = folderName; 
+                            item.folderId = folderId; // VIKTIG: Lagrer mappe-ID for lokal kobling
+                            funnetIfc.push(item);
+                        } else if (nameLower === targetJsonName.toLowerCase()) {
+                            item.folderName = folderName;
+                            item.folderId = folderId;
+                            funnetJson.push(item);
+                        }
                     } else if (item.type === 'FOLDER') {
                         undermapper.push(item);
                     }
                 }
                 
                 if (undermapper.length > 0) {
-                    const resultatArray = await Promise.all(undermapper.map(mappe => hentAlleIfc(mappe.id, mappe.name, baseUrl)));
+                    const resultatArray = await Promise.all(undermapper.map(mappe => hentAlleFiler(mappe.id, mappe.name, baseUrl, targetJsonName)));
                     for (const res of resultatArray) {
-                        funnet = funnet.concat(res);
+                        funnetIfc = funnetIfc.concat(res.ifc);
+                        funnetJson = funnetJson.concat(res.json);
                     }
                 }
                 
             } catch (e) {
                 console.warn("Klarte ikke å lese mappeinnholdet:", e);
             }
-            return funnet;
+            return { ifc: funnetIfc, json: funnetJson };
+        }
+
+        async function lastNedJsonData(fileId, baseUrl) {
+            try {
+                const response = await fetch(`${baseUrl}/tc/api/2.0/files/${fileId}/content`, {
+                    method: 'GET',
+                    headers: { 'Authorization': `Bearer ${accessToken}` }
+                });
+                
+                if (!response.ok) throw new Error("Fikk ikke tilgang til JSON-filen");
+                
+                const data = await response.json();
+                let lookup = {};
+                
+                if (Array.isArray(data)) {
+                    data.forEach(item => {
+                        const name = item.Filnavn || item.filnavn || item.Name || item.name || item.FileName || item.filename || item.File;
+                        if (name) lookup[name.toLowerCase()] = item;
+                    });
+                } else if (typeof data === 'object') {
+                    for (const [key, value] of Object.entries(data)) {
+                        lookup[key.toLowerCase()] = value;
+                    }
+                }
+                
+                return lookup;
+            } catch (e) {
+                console.error("Feil ved parsing av JSON-fil:", e);
+                return null;
+            }
+        }
+
+        function extractFromJson(lookupItem, possibleKeys) {
+            if (!lookupItem) return "-";
+            for (const key of possibleKeys) {
+                const foundKey = Object.keys(lookupItem).find(k => k.toLowerCase() === key.toLowerCase());
+                if (foundKey && lookupItem[foundKey]) return String(lookupItem[foundKey]);
+            }
+            return "-";
         }
 
         async function fetchProjectFiles(projectId) {
             const baseUrl = "https://app21.connect.trimble.com"; 
+            const targetJsonName = document.getElementById('jsonFileInput').value.trim() || "ifc_metadata.json";
+            
+            document.getElementById('tableBody').innerHTML = `<tr><td colspan="7" class="loading" id="loaderText">Skanner prosjektet...</td></tr>`;
 
             try {
                 setStatus(`Finner rotmappen for prosjektet...`, "warn");
@@ -242,9 +309,11 @@
                 
                 if (!rootFolderId) throw new Error("Fant ingen rotmappe.");
 
-                setStatus(`Skanner hele prosjektet for IFC-filer...`, "warn");
+                setStatus(`Skanner etter IFC-filer og ${targetJsonName}...`, "warn");
                 
-                const modelFiles = await hentAlleIfc(rootFolderId, "Rotmappe", baseUrl);
+                const filerFunnet = await hentAlleFiler(rootFolderId, "Rotmappe", baseUrl, targetJsonName);
+                const modelFiles = filerFunnet.ifc;
+                const jsonFiles = filerFunnet.json;
                 
                 if (modelFiles.length === 0) {
                     document.getElementById('tableBody').innerHTML = `<tr><td colspan="7" class="loading">Ingen IFC-filer funnet i prosjektet.</td></tr>`;
@@ -257,18 +326,45 @@
                 folderSelect.innerHTML = `<option value="all">Alle mapper</option>` + uniqueFolders.map(f => `<option value="${f}">${f}</option>`).join('');
                 folderSelect.style.display = 'block';
 
-                setStatus(`Laster ned metadata for ${modelFiles.length} filer...`, "warn");
+                // Dictionary for å lagre metadata per mappe-ID
+                let folderMetadataLookup = {}; 
+                
+                if (jsonFiles.length > 0) {
+                    setStatus(`Fant ${jsonFiles.length} stk ${targetJsonName}. Laster ned innhold...`, "warn");
+                    
+                    // Laster ned alle JSON-filer og lagrer dem på sin respektive mappe-ID
+                    for (const jsonFile of jsonFiles) {
+                        const parsedData = await lastNedJsonData(jsonFile.id, baseUrl);
+                        if (parsedData) {
+                            folderMetadataLookup[jsonFile.folderId] = parsedData;
+                        }
+                    }
+                } else {
+                    console.warn(`Fant ingen fil med navn ${targetJsonName} i prosjektet.`);
+                }
 
-                allFilesData = await Promise.all(modelFiles.map(async (file) => {
-                    // Sender med filnavnet slik at vi kan se det i konsollen
-                    const metadata = await fetchFileMetadata(file.id, file.name, baseUrl);
+                setStatus(`Kopler lokal mappedata for ${modelFiles.length} filer...`, "warn");
+
+                allFilesData = modelFiles.map(file => {
+                    const nameLower = file.name.toLowerCase();
+                    
+                    // Henter metadata-ordboken for akkurat denne filens mappe
+                    const thisFolderMeta = folderMetadataLookup[file.folderId] || {};
+                    
+                    // Finner data for denne spesifikke filen
+                    const metaRecord = thisFolderMeta[nameLower] || thisFolderMeta[nameLower.replace('.ifc', '')];
+                    
                     return {
                         id: file.id,
                         name: file.name,
                         folderName: file.folderName,
-                        ...metadata
+                        fag: extractFromJson(metaRecord, ["Fag", "Underdisiplin", "Disiplin"]),
+                        mmi: extractFromJson(metaRecord, ["MMI", "Status"]),
+                        revisjon: extractFromJson(metaRecord, ["Revisjon", "Rev"]),
+                        revisjonsdato: extractFromJson(metaRecord, ["Revisjonsdato", "Dato", "RevDato"]),
+                        gjelder: extractFromJson(metaRecord, ["Revisjonen gjelder", "Beskrivelse", "Gjelder"])
                     };
-                }));
+                });
                 
                 renderTable(allFilesData);
                 setupSearch();
@@ -279,88 +375,6 @@
                 document.getElementById('loaderText').innerHTML = `Nettverksfeil: ${error.message}`;
                 setStatus("Nettverksfeil", "error");
             }
-        }
-
-        async function fetchFileMetadata(fileId, fileName, baseUrl) {
-                    const defaultMeta = { fag: "-", mmi: "-", revisjon: "-", revisjonsdato: "-", gjelder: "-" };
-                    try {
-                        const url = `${baseUrl}/tc/api/2.0/files/${fileId}`;
-                        const response = await fetch(url, {
-                            method: 'GET',
-                            headers: { 'Authorization': `Bearer ${accessToken}` }
-                        });
-                        if (!response.ok) return defaultMeta;
-                        const fileData = await response.json();
-                        
-                        // Denne henter alt Trimble Connect har mappet som Custom Properties
-                        
-                        let props = fileData.customProperties || {};
-
-                        // 🔽 NY DEL (IFC fallback – endrer ikke eksisterende)
-                        if (!props || Object.keys(props).length === 0) {
-
-                            try {
-                                const modelId = fileData.modelId;
-
-                                if (modelId) {
-
-                                    const propRes = await fetch(`${baseUrl}/tc/api/2.0/models/${modelId}/properties`, {
-                                        method: 'GET',
-                                        headers: {
-                                            'Authorization': `Bearer ${accessToken}`,
-                                            'Accept': 'application/json'
-                                        }
-                                    });
-
-                                    if (propRes.ok) {
-
-                                        const propData = await propRes.json();
-
-                                        console.log("IFC PROPS:", fileName, propData);
-
-                                        // bruk eksisterende extractor
-                                        props = {
-                                            "Fag": extractProp(propData, ["Fag"]),
-                                            "MMI": extractProp(propData, ["MMI"]),
-                                            "Revisjon": extractProp(propData, ["Revisjon"]),
-                                            "Revisjonsdato": extractProp(propData, ["Revisjonsdato"]),
-                                            "Beskrivelse": extractProp(propData, ["Beskrivelse","Gjelder"])
-                                        };
-                                    }
-
-                                }
-
-                            } catch (e) {
-                                console.warn("IFC metadata feilet:", fileName, e);
-                            }
-                        }
-
-                        
-                        console.log(`Metadata for ${fileName}:`, props);
-                        
-                        return {
-                            fag: props["Fag"] || "-",
-                            mmi: props["MMI"] || "-",
-                            revisjon: props["Revisjon"] || "-",
-                            revisjonsdato: props["Revisjonsdato"] || "-",
-                            gjelder: props["Beskrivelse"] || props["Gjelder"] || "-"
-                        };
-                    } catch (e) { return defaultMeta; }
-                }
-
-        function extractProp(data, possibleKeys) {
-            let value = "-";
-            possibleKeys.forEach(key => {
-                if (data[key]) value = data[key];
-                if (Array.isArray(data)) {
-                    data.forEach(propSet => {
-                        if (propSet.properties && propSet.properties[key]) {
-                            value = propSet.properties[key];
-                        }
-                    });
-                }
-            });
-            return value;
         }
 
         function renderTable(data) {
@@ -399,11 +413,9 @@
                 renderTable(filtered);
             };
             
-            searchInput.addEventListener('input', applyFilters);
-            folderSelect.addEventListener('change', applyFilters);
+            searchInput.oninput = applyFilters;
+            folderSelect.onchange = applyFilters;
         }
-
-        console.log("FILE DATA:", fileData);
     </script>
 </body>
 </html>
