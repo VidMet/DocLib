@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>DocLib v1.16</title>
+    <title>DocLib v1.17</title>
     
     <script src="https://components.connect.trimble.com/trimble-connect-workspace-api/index.js"></script>
 
@@ -81,7 +81,7 @@
             <img src="norconsult-logo-black.png" alt="Norconsult" onerror="this.style.display='none'">
         </div>
         <div class="app-title">
-            <b>DocLib v1.16</b>
+            <b>DocLib v1.17</b>
             <span>Norconsult Norge</span>
             <em>Developed by Norconsult Norge AS, AI-assisted development. Contact: Vidar.Metveit@norconsult.com</em>
         </div>
@@ -125,242 +125,254 @@
     </div>
 
     <script>
-        let API = null;
-        let currentProject = null;
-        let accessToken = null;
-        let allFilesData = [];
+    let API = null;
+    let currentProject = null;
+    let accessToken = null;
+    let allFilesData = [];
 
-        const setStatus = (m, c='') => { 
-            document.getElementById('statusText').textContent = m; 
-            let dotClass = 'dot';
-            if (c === 'ok') dotClass = 'dot live';
-            else if (c === 'error') dotClass = 'dot error';
-            else if (c === 'warn') dotClass = 'dot warn';
-            document.getElementById('statusDot').className = dotClass; 
-        };
+    const setStatus = (m, c='') => {
+        document.getElementById('statusText').textContent = m;
+        let dotClass = 'dot';
+        if (c === 'ok') dotClass = 'dot live';
+        else if (c === 'error') dotClass = 'dot error';
+        else if (c === 'warn') dotClass = 'dot warn';
+        document.getElementById('statusDot').className = dotClass;
+    };
 
-        async function initExtension() {
-            try {
-                setStatus("Kobler til Trimble Connect...", "warn");
-                API = await window.TrimbleConnectWorkspace.connect(window.parent);
+    window.onload = initExtension;
 
-                if (API.ui && API.ui.setMenu) {
-                    API.ui.setMenu({
-                        title: "DocLib",
-                        command: "open_explorer",
-                        icon: "https://vidmet.github.io/DocLib/paper.png"
-                    }).catch(e => console.warn("Meny-oppsett ignorert (kjent timeout):", e));
-                }
+    async function initExtension() {
+        try {
+            setStatus("Kobler til Trimble Connect...", "warn");
 
-                if (API.ui && API.ui.onCommand) {
-                    API.ui.onCommand((command) => {
-                        if (command === "open_explorer") {
-                            API.ui.setActiveMenuItem("open_explorer").catch(e => console.warn(e));
-                        }
-                    });
-                }
+            API = await window.TrimbleConnectWorkspace.connect(window.parent);
+            currentProject = await API.project.getProject();
 
-                setStatus("Henter prosjekt og tillatelser...", "warn");
-                currentProject = await API.project.getProject();
-                
-                const urlParams = new URLSearchParams(window.location.search);
-                accessToken = urlParams.get('token') || urlParams.get('accessToken') || urlParams.get('access_token');
-                
-                if (!accessToken) {
-                    try {
-                        const tokenData = await API.extension.getPermission("accesstoken");
-                        accessToken = typeof tokenData === 'string' ? tokenData : (tokenData.accessToken || tokenData.token || "");
-                    } catch (e) {
-                        console.warn("Håndterte standard API-forsinkelse.");
-                    }
-                }
-                
-                if (!accessToken) throw new Error("Klarte ikke hente gyldig token fra Trimble.");
+            const urlParams = new URLSearchParams(window.location.search);
+            accessToken = urlParams.get('token') || urlParams.get('accessToken') || urlParams.get('access_token');
 
-                fetchProjectFiles(currentProject.id);
-
-            } catch (error) {
-                console.error("Initialiseringsfeil:", error);
-                setStatus("Feil: Kunne ikke koble til Trimble API", "error");
+            if (!accessToken) {
+                const tokenData = await API.extension.getPermission("accesstoken");
+                accessToken = typeof tokenData === 'string' ? tokenData : (tokenData.accessToken || "");
             }
+
+            if (!accessToken) throw new Error("Fant ikke access token");
+
+            fetchProjectFiles(currentProject.id);
+
+        } catch (err) {
+            console.error(err);
+            setStatus("API-feil", "error");
         }
+    }
 
-        window.onload = initExtension;
+    async function hentAlleIfc(folderId, folderName, baseUrl) {
+        let funnet = [];
 
-        async function hentAlleIfc(folderId, folderName, baseUrl) {
-            let funnet = [];
-            try {
-                const url = `${baseUrl}/tc/api/2.0/folders/${folderId}/items`;
-                const response = await fetch(url, {
-                    method: 'GET',
-                    headers: { 'Authorization': `Bearer ${accessToken}`, 'Accept': 'application/json' }
-                });
-
-                if (!response.ok) return [];
-
-                const data = await response.json();
-                const items = Array.isArray(data) ? data : (data.items || []);
-                
-                const undermapper = [];
-                for (const item of items) {
-                    if (item.type === 'FILE' && item.name.toLowerCase().endsWith('.ifc')) {
-                        item.folderName = folderName; 
-                        funnet.push(item);
-                    } else if (item.type === 'FOLDER') {
-                        undermapper.push(item);
-                    }
-                }
-                
-                if (undermapper.length > 0) {
-                    const resultatArray = await Promise.all(undermapper.map(mappe => hentAlleIfc(mappe.id, mappe.name, baseUrl)));
-                    for (const res of resultatArray) {
-                        funnet = funnet.concat(res);
-                    }
-                }
-                
-            } catch (e) {
-                console.warn("Klarte ikke å lese mappeinnholdet:", e);
-            }
-            return funnet;
-        }
-
-        async function fetchProjectFiles(projectId) {
-            const baseUrl = "https://app21.connect.trimble.com"; 
-
-            try {
-                setStatus(`Finner rotmappen for prosjektet...`, "warn");
-                
-                const projRes = await fetch(`${baseUrl}/tc/api/2.0/projects/${projectId}`, {
-                    method: 'GET',
-                    headers: { 'Authorization': `Bearer ${accessToken}`, 'Accept': 'application/json' }
-                });
-
-                if (!projRes.ok) throw new Error("Klarte ikke slå opp prosjektdetaljer.");
-                
-                const projData = await projRes.json();
-                const rootFolderId = projData.rootId || (projData.rootFolder && projData.rootFolder.id) || projData.rootFolderId || projData.folderId;
-                
-                if (!rootFolderId) throw new Error("Fant ingen rotmappe.");
-
-                setStatus(`Skanner hele prosjektet for IFC-filer...`, "warn");
-                
-                const modelFiles = await hentAlleIfc(rootFolderId, "Rotmappe", baseUrl);
-                
-                if (modelFiles.length === 0) {
-                    document.getElementById('tableBody').innerHTML = `<tr><td colspan="7" class="loading">Ingen IFC-filer funnet i prosjektet.</td></tr>`;
-                    setStatus("Ferdig. Ingen IFC-filer funnet.", "ok");
-                    return;
-                }
-
-                const uniqueFolders = [...new Set(modelFiles.map(f => f.folderName))].sort();
-                const folderSelect = document.getElementById('folderSelect');
-                folderSelect.innerHTML = `<option value="all">Alle mapper</option>` + uniqueFolders.map(f => `<option value="${f}">${f}</option>`).join('');
-                folderSelect.style.display = 'block';
-
-                setStatus(`Laster ned metadata for ${modelFiles.length} filer...`, "warn");
-
-                allFilesData = await Promise.all(modelFiles.map(async (file) => {
-                    // Sender med filnavnet slik at vi kan se det i konsollen
-                    const metadata = await fetchFileMetadata(file.id, file.name, baseUrl);
-                    return {
-                        id: file.id,
-                        name: file.name,
-                        folderName: file.folderName,
-                        ...metadata
-                    };
-                }));
-                
-                renderTable(allFilesData);
-                setupSearch();
-                setStatus(`Data lastet inn for ${modelFiles.length} filer!`, "ok");
-                
-            } catch (error) {
-                console.error("Filhenting feilet:", error);
-                document.getElementById('loaderText').innerHTML = `Nettverksfeil: ${error.message}`;
-                setStatus("Nettverksfeil", "error");
-            }
-        }
-
-        async function fetchFileMetadata(fileId, fileName, baseUrl) {
-                    const defaultMeta = { fag: "-", mmi: "-", revisjon: "-", revisjonsdato: "-", gjelder: "-" };
-                    try {
-                        const url = `${baseUrl}/tc/api/2.0/files/${fileId}`;
-                        const response = await fetch(url, {
-                            method: 'GET',
-                            headers: { 'Authorization': `Bearer ${accessToken}` }
-                        });
-                        if (!response.ok) return defaultMeta;
-                        const fileData = await response.json();
-                        
-                        // Denne henter alt Trimble Connect har mappet som Custom Properties
-                        const props = fileData.customProperties || {};
-                        
-                        console.log(`Metadata for ${fileName}:`, props);
-                        
-                        return {
-                            fag: props["Fag"] || "-",
-                            mmi: props["MMI"] || "-",
-                            revisjon: props["Revisjon"] || "-",
-                            revisjonsdato: props["Revisjonsdato"] || "-",
-                            gjelder: props["Beskrivelse"] || props["Gjelder"] || "-"
-                        };
-                    } catch (e) { return defaultMeta; }
-                }
-
-        function extractProp(data, possibleKeys) {
-            let value = "-";
-            possibleKeys.forEach(key => {
-                if (data[key]) value = data[key];
-                if (Array.isArray(data)) {
-                    data.forEach(propSet => {
-                        if (propSet.properties && propSet.properties[key]) {
-                            value = propSet.properties[key];
-                        }
-                    });
-                }
+        try {
+            const res = await fetch(`${baseUrl}/tc/api/2.0/folders/${folderId}/items`, {
+                headers: { Authorization: `Bearer ${accessToken}` }
             });
-            return value;
+
+            const data = await res.json();
+            const items = data.items || data;
+
+            for (const item of items) {
+                if (item.type === 'FILE' && item.name.toLowerCase().endsWith('.ifc')) {
+                    item.folderName = folderName;
+                    funnet.push(item);
+                }
+                else if (item.type === 'FOLDER') {
+                    const sub = await hentAlleIfc(item.id, item.name, baseUrl);
+                    funnet = funnet.concat(sub);
+                }
+            }
+
+        } catch (e) {
+            console.warn("Mappefeil:", e);
         }
 
-        function renderTable(data) {
-            const tbody = document.getElementById('tableBody');
-            if (data.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="7" class="loading">Søket ga ingen treff.</td></tr>`;
+        return funnet;
+    }
+
+    async function fetchProjectFiles(projectId) {
+        const baseUrl = "https://app21.connect.trimble.com";
+
+        try {
+            setStatus("Henter rotmappe...", "warn");
+
+            const projRes = await fetch(`${baseUrl}/tc/api/2.0/projects/${projectId}`, {
+                headers: { Authorization: `Bearer ${accessToken}` }
+            });
+
+            const projData = await projRes.json();
+            const rootFolderId = projData.rootId;
+
+            setStatus("Skanner IFC-filer...", "warn");
+
+            const modelFiles = await hentAlleIfc(rootFolderId, "Rot", baseUrl);
+
+            if (modelFiles.length === 0) {
+                renderTable([]);
+                setStatus("Ingen IFC funnet", "ok");
                 return;
             }
-            
-            tbody.innerHTML = data.map(fil => `
-                <tr>
-                    <td style="font-weight: 600;">${fil.name}</td>
-                    <td style="color: var(--muted); font-size: 12px;">${fil.folderName}</td>
-                    <td>${fil.fag}</td>
-                    <td>${fil.mmi}</td>
-                    <td>${fil.revisjon}</td>
-                    <td>${fil.revisjonsdato}</td>
-                    <td>${fil.gjelder}</td>
-                </tr>
-            `).join('');
+
+            // 🔹 Throttling av API kall
+            const limit = 5;
+            allFilesData = await mapWithLimit(modelFiles, limit, async (file) => {
+                const metadata = await fetchIfcMetadata(file.id, file.name, baseUrl);
+
+                return {
+                    id: file.id,
+                    name: file.name,
+                    folderName: file.folderName,
+                    ...metadata
+                };
+            });
+
+            renderTable(allFilesData);
+            setupSearch();
+
+            setStatus(`Ferdig (${modelFiles.length} filer)`, "ok");
+
+        } catch (e) {
+            console.error(e);
+            setStatus("Feil ved henting", "error");
+        }
+    }
+
+    async function fetchIfcMetadata(fileId, fileName, baseUrl) {
+
+        const defaultMeta = {
+            fag: "-",
+            mmi: "-",
+            revisjon: "-",
+            revisjonsdato: "-",
+            gjelder: "-"
+        };
+
+        try {
+            // 1️⃣ Hent fil -> modelId
+            const fileRes = await fetch(`${baseUrl}/tc/api/2.0/files/${fileId}`, {
+                headers: { Authorization: `Bearer ${accessToken}` }
+            });
+
+            if (!fileRes.ok) return defaultMeta;
+
+            const fileData = await fileRes.json();
+            const modelId = fileData.modelId || fileData.id;
+
+            // 2️⃣ Hent IFC properties
+            const propRes = await fetch(`${baseUrl}/tc/api/2.0/models/${modelId}/properties`, {
+                headers: { Authorization: `Bearer ${accessToken}` }
+            });
+
+            if (!propRes.ok) return defaultMeta;
+
+            const propData = await propRes.json();
+
+            console.log("IFC props:", fileName, propData);
+
+            return {
+                fag: extractProp(propData, ["Fag"]),
+                mmi: extractProp(propData, ["MMI"]),
+                revisjon: extractProp(propData, ["Revisjon"]),
+                revisjonsdato: extractProp(propData, ["Revisjonsdato"]),
+                gjelder: extractProp(propData, ["Beskrivelse", "Gjelder"])
+            };
+
+        } catch (e) {
+            console.warn("Metadata-feil:", fileName, e);
+            return defaultMeta;
+        }
+    }
+
+    function extractProp(data, keys) {
+        let value = "-";
+
+        if (!data) return value;
+
+        // Case 1: direkte objekt
+        for (const key of keys) {
+            if (data[key]) return data[key];
         }
 
-        function setupSearch() {
-            const searchInput = document.getElementById('searchInput');
-            const folderSelect = document.getElementById('folderSelect');
-            
-            const applyFilters = () => {
-                const term = searchInput.value.toLowerCase();
-                const selectedFolder = folderSelect.value;
-                
-                const filtered = allFilesData.filter(fil => {
-                    const matchSearch = Object.values(fil).some(val => String(val).toLowerCase().includes(term));
-                    const matchFolder = selectedFolder === 'all' || fil.folderName === selectedFolder;
-                    return matchSearch && matchFolder;
-                });
-                renderTable(filtered);
-            };
-            
-            searchInput.addEventListener('input', applyFilters);
-            folderSelect.addEventListener('change', applyFilters);
+        // Case 2: array av psets
+        if (Array.isArray(data)) {
+            for (const set of data) {
+                if (!set.properties) continue;
+
+                for (const key of keys) {
+                    if (set.properties[key]) return set.properties[key];
+                }
+            }
         }
+
+        return value;
+    }
+
+    // 🔹 Throttling helper
+    async function mapWithLimit(arr, limit, fn) {
+        const ret = [];
+        const executing = [];
+
+        for (const item of arr) {
+            const p = Promise.resolve().then(() => fn(item));
+            ret.push(p);
+
+            if (limit <= arr.length) {
+                const e = p.then(() => executing.splice(executing.indexOf(e), 1));
+                executing.push(e);
+
+                if (executing.length >= limit) {
+                    await Promise.race(executing);
+                }
+            }
+        }
+
+        return Promise.all(ret);
+    }
+
+    function renderTable(data) {
+        const tbody = document.getElementById('tableBody');
+
+        if (data.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="7">Ingen data</td></tr>`;
+            return;
+        }
+
+        tbody.innerHTML = data.map(f => `
+            <tr>
+                <td>${f.name}</td>
+                <td>${f.folderName}</td>
+                <td>${f.fag}</td>
+                <td>${f.mmi}</td>
+                <td>${f.revisjon}</td>
+                <td>${f.revisjonsdato}</td>
+                <td>${f.gjelder}</td>
+            </tr>
+        `).join('');
+    }
+
+    function setupSearch() {
+        const input = document.getElementById('searchInput');
+        const folder = document.getElementById('folderSelect');
+
+        const filter = () => {
+            const term = input.value.toLowerCase();
+
+            const filtered = allFilesData.filter(f =>
+                Object.values(f).some(v =>
+                    String(v).toLowerCase().includes(term)
+                )
+            );
+
+            renderTable(filtered);
+        };
+
+        input.addEventListener('input', filter);
+    }
     </script>
 </body>
 </html>
