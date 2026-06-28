@@ -146,6 +146,23 @@
             setStatus("Kobler til Trimble Connect...", "warn");
 
             API = await window.TrimbleConnectWorkspace.connect(window.parent);
+
+            if (API.ui && API.ui.setMenu) {
+                await API.ui.setMenu({
+                    title: "DocLib",
+                    command: "open_explorer",
+                    icon: "https://vidmet.github.io/DocLib/paper.png"
+                }).catch(e => console.warn("setMenu:", e));
+            }
+
+            if (API.ui && API.ui.onCommand) {
+                API.ui.onCommand((command) => {
+                    if (command === "open_explorer") {
+                        API.ui.setActiveMenuItem("open_explorer").catch(() => {});
+                    }
+                });
+            }
+
             currentProject = await API.project.getProject();
 
             const urlParams = new URLSearchParams(window.location.search);
