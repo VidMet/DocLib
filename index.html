@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>DocLib v1.09</title>
+    <title>DocLib v1.10</title>
     
     <script src="https://components.connect.trimble.com/trimble-connect-workspace-api/index.js"></script>
 
@@ -80,7 +80,7 @@
             <img src="norconsult-logo-black.png" alt="Norconsult" onerror="this.style.display='none'">
         </div>
         <div class="app-title">
-            <b>DocLib v1.09</b>
+            <b>DocLib v1.10</b>
             <span>Norconsult Norge</span>
             <em>Developed by Norconsult Norge AS, AI-assisted development. Contact: Vidar.Metveit@norconsult.com</em>
         </div>
@@ -168,24 +168,38 @@
         window.onload = initExtension;
 
         async function fetchProjectFiles(projectId) {
-            // Låser trafikken til app21, som vi nå vet er 100% riktig for deres prosjekter
             const baseUrl = "https://app21.connect.trimble.com"; 
 
             try {
-                setStatus(`Henter filer fra prosjektets rotmappe...`, "warn");
+                setStatus(`Finner rotmappen for prosjektet...`, "warn");
                 
-                // BRUKER v1 API: Dette endepunktet takler prosjekt-ID direkte uten å kaste 403-feil!
-                const url = `${baseUrl}/tc/v1/projects/${projectId}/items`;
+                // 1. Hent prosjektdetaljer for å finne den magiske mappe-IDen
+                const projRes = await fetch(`${baseUrl}/tc/api/2.0/projects/${projectId}`, {
+                    method: 'GET',
+                    headers: { 'Authorization': `Bearer ${accessToken}`, 'Accept': 'application/json' }
+                });
+
+                if (projRes.status === 401) throw new Error("401 Unauthorized - Adgangskortet ble avvist.");
+                if (!projRes.ok) throw new Error("Klarte ikke slå opp prosjektdetaljer (Status: " + projRes.status + ")");
+                
+                const projData = await projRes.json();
+                
+                // Helgardering for å fange opp mappe-IDen uansett API-versjonsformat
+                const rootFolderId = (projData.rootFolder && projData.rootFolder.id) || projData.rootFolderId || projData.folderId;
+                
+                if (!rootFolderId) {
+                    throw new Error("Fant ingen rotmappe. Data returnert: " + JSON.stringify(projData).substring(0, 80));
+                }
+
+                // 2. Hent filene direkte fra rotmappen
+                setStatus(`Henter filer fra rotmappen...`, "warn");
+                const url = `${baseUrl}/tc/api/2.0/folders/${rootFolderId}/items`;
                 
                 const response = await fetch(url, {
                     method: 'GET',
-                    headers: {
-                        'Authorization': `Bearer ${accessToken}`,
-                        'Accept': 'application/json'
-                    }
+                    headers: { 'Authorization': `Bearer ${accessToken}`, 'Accept': 'application/json' }
                 });
 
-                if (response.status === 401) throw new Error("401 Unauthorized - Ugyldig adgangskort til prosjektet.");
                 if (!response.ok) throw new Error("API feilet med status: " + response.status);
 
                 const filesData = await response.json();
@@ -202,8 +216,7 @@
                 setStatus(`Henter metadata for ${modelFiles.length} filer...`, "warn");
 
                 allFilesData = await Promise.all(modelFiles.map(async (file) => {
-                    // Sender med projectId hit siden v1 API krever det for egenskapsoppslag
-                    const metadata = await fetchFileMetadata(projectId, file.id, baseUrl);
+                    const metadata = await fetchFileMetadata(file.id, baseUrl);
                     return {
                         id: file.id,
                         name: file.name,
@@ -222,15 +235,14 @@
             }
         }
 
-        async function fetchFileMetadata(projectId, fileId, baseUrl) {
+        async function fetchFileMetadata(fileId, baseUrl) {
             const defaultMeta = {
                 fag: "-", mmi: "-", revisjon: "-", revisjonsdato: "-", 
                 gjelder: "-", utarbeidet: "-", kontrollert: "-", godkjent: "-"
             };
             
             try {
-                // Tilsvarende v1-endepunkt for å lese metadata fra filen
-                const url = `${baseUrl}/tc/v1/projects/${projectId}/items/${fileId}/properties`;
+                const url = `${baseUrl}/tc/api/2.0/files/${fileId}`;
                 const response = await fetch(url, {
                     method: 'GET',
                     headers: { 'Authorization': `Bearer ${accessToken}` }
@@ -238,7 +250,8 @@
                 
                 if (!response.ok) return defaultMeta;
                 
-                const propsData = await response.json();
+                const fileData = await response.json();
+                const propsData = fileData.customProperties || fileData.properties || {};
                 
                 return {
                     fag: extractProp(propsData, ["Underdisiplin", "Fag"]),
@@ -258,10 +271,7 @@
         function extractProp(data, possibleKeys) {
             let value = "-";
             possibleKeys.forEach(key => {
-                // Sjekk direkte på objektet
                 if (data[key]) value = data[key];
-                
-                // Sjekk inne i property-sets (Array-struktur som v1 ofte returnerer)
                 if (Array.isArray(data)) {
                     data.forEach(propSet => {
                         if (propSet.properties && propSet.properties[key]) {
