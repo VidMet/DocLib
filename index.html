@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>DocLib v1.05</title>
+    <title>DocLib v1.06</title>
     
     <script src="https://components.connect.trimble.com/trimble-connect-workspace-api/index.js"></script>
 
@@ -80,7 +80,7 @@
             <img src="norconsult-logo-black.png" alt="Norconsult" onerror="this.style.display='none'">
         </div>
         <div class="app-title">
-            <b>DocLib v1.05</b>
+            <b>DocLib v1.06</b>
             <span>Norconsult Norge</span>
             <em>Developed by Norconsult Norge AS, AI-assisted development. Contact: Vidar.Metveit@norconsult.com</em>
         </div>
@@ -140,12 +140,13 @@
                 setStatus("Kobler til Trimble Connect...", "warn");
                 API = await window.TrimbleConnectWorkspace.connect(window.parent);
 
+                // FIKS FOR TYPEERROR: Menyknappen krever en unik 'id' i det nye API-et
                 if (API.ui && API.ui.setMenu) {
                     await API.ui.setMenu({
+                        id: "doclib_main_menu",
                         title: "DocLib",
                         command: "open_explorer",
-                        icon: "https://vidmet.github.io/DocLib/paper.png",
-                        subMenus: [] 
+                        icon: "https://vidmet.github.io/DocLib/paper.png"
                     });
                 }
 
@@ -160,13 +161,16 @@
                 setStatus("Henter prosjekt og tillatelser...", "warn");
                 currentProject = await API.project.getProject();
                 
-                // FIKS: Riktig metode for å hente token, med sikring
-                const tokenData = await API.extension.getPermission("accesstoken");
-                accessToken = typeof tokenData === 'string' ? tokenData : (tokenData.accessToken || tokenData.token || "");
-                
-                if (!accessToken) {
-                    throw new Error("Klarte ikke hente gyldig token (adgangskort) fra Trimble.");
+                // Hent autorisasjonstoken sikkert
+                try {
+                    const tokenData = await API.extension.getPermission("accesstoken");
+                    accessToken = typeof tokenData === 'string' ? tokenData : (tokenData.accessToken || tokenData.token || "");
+                } catch (e) {
+                    const tokenData = await API.extension.requestPermission("accesstoken");
+                    accessToken = typeof tokenData === 'string' ? tokenData : (tokenData.accessToken || tokenData.token || "");
                 }
+                
+                if (!accessToken) throw new Error("Klarte ikke hente gyldig token fra Trimble.");
 
                 fetchProjectFiles(currentProject.id);
 
@@ -179,32 +183,18 @@
         window.onload = initExtension;
 
         async function fetchProjectFiles(projectId) {
-            let baseUrl = "https://app21.connect.trimble.com"; // Standard fallback til Europeisk server
-
-            try {
-                setStatus("Søker opp riktig API-region for prosjektet...", "warn");
-                const regionRes = await fetch("https://app.connect.trimble.com/tc/api/2.0/regions", {
-                    headers: { 'Authorization': `Bearer ${accessToken}` }
-                });
-                
-                if (regionRes.ok) {
-                    const regions = await regionRes.json();
-                    const myRegion = regions.find(r => r.id === currentProject.region);
-                    if (myRegion) baseUrl = myRegion.origin;
-                } else {
-                    console.warn("Region-oppslag feilet. Faller tilbake på standard server (app21).");
-                }
-            } catch (e) {
-                console.warn("Nettverksfeil ved region-oppslag. Bruker app21.", e);
-            }
+            // FIKS FOR 404: Ruter trafikken rett til Europa for å unngå default server mismatch
+            let baseUrl = "https://europe.api.connect.trimble.com"; 
+            if (currentProject && currentProject.region === "na") baseUrl = "https://api.connect.trimble.com";
+            else if (currentProject && currentProject.region === "asia") baseUrl = "https://asia.api.connect.trimble.com";
 
             try {
                 setStatus(`Kobler til server: ${baseUrl}...`, "warn");
 
                 const rootFolderId = currentProject.rootFolderId || currentProject.id;
-                const url = `${baseUrl}/tc/api/2.0/folders/${rootFolderId}/items`;
+                let url = `${baseUrl}/tc/api/2.0/folders/${rootFolderId}/items`;
                 
-                const response = await fetch(url, {
+                let response = await fetch(url, {
                     method: 'GET',
                     headers: {
                         'Authorization': `Bearer ${accessToken}`,
@@ -212,12 +202,19 @@
                     }
                 });
                 
-                if (response.status === 401) {
-                    throw new Error("401 Unauthorized - Ugyldig adgangskort til prosjektet.");
+                // Ekstra sikkerhetsnett: Hvis det offisielle EU-APIet gir 404, slå direkte opp i app21-databasen
+                if (response.status === 404) {
+                    console.warn("Hoved-API ga 404, forsøker app21-fallback...");
+                    baseUrl = "https://app21.connect.trimble.com";
+                    url = `${baseUrl}/tc/api/2.0/folders/${rootFolderId}/items`;
+                    response = await fetch(url, {
+                        method: 'GET',
+                        headers: { 'Authorization': `Bearer ${accessToken}`, 'Accept': 'application/json' }
+                    });
                 }
-                if (!response.ok) {
-                    throw new Error("API feilet med status: " + response.status);
-                }
+
+                if (response.status === 401) throw new Error("401 Unauthorized - Ugyldig adgangskort til prosjektet.");
+                if (!response.ok) throw new Error("API feilet med status: " + response.status);
 
                 const filesData = await response.json();
                 
