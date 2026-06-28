@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>DocLib v1.06</title>
+    <title>DocLib v1.07</title>
     
     <script src="https://components.connect.trimble.com/trimble-connect-workspace-api/index.js"></script>
 
@@ -80,7 +80,7 @@
             <img src="norconsult-logo-black.png" alt="Norconsult" onerror="this.style.display='none'">
         </div>
         <div class="app-title">
-            <b>DocLib v1.06</b>
+            <b>DocLib v1.07</b>
             <span>Norconsult Norge</span>
             <em>Developed by Norconsult Norge AS, AI-assisted development. Contact: Vidar.Metveit@norconsult.com</em>
         </div>
@@ -140,23 +140,7 @@
                 setStatus("Kobler til Trimble Connect...", "warn");
                 API = await window.TrimbleConnectWorkspace.connect(window.parent);
 
-                // FIKS FOR TYPEERROR: Menyknappen krever en unik 'id' i det nye API-et
-                if (API.ui && API.ui.setMenu) {
-                    await API.ui.setMenu({
-                        id: "doclib_main_menu",
-                        title: "DocLib",
-                        command: "open_explorer",
-                        icon: "https://vidmet.github.io/DocLib/paper.png"
-                    });
-                }
-
-                if (API.ui && API.ui.onCommand) {
-                    API.ui.onCommand(async (command) => {
-                        if (command === "open_explorer") {
-                            await API.ui.setActiveMenuItem("open_explorer");
-                        }
-                    });
-                }
+                // Fjernet API.ui.setMenu - den forårsaket timeouten siden manifestet allerede håndterer knappen!
 
                 setStatus("Henter prosjekt og tillatelser...", "warn");
                 currentProject = await API.project.getProject();
@@ -183,10 +167,8 @@
         window.onload = initExtension;
 
         async function fetchProjectFiles(projectId) {
-            // FIKS FOR 404: Ruter trafikken rett til Europa for å unngå default server mismatch
-            let baseUrl = "https://europe.api.connect.trimble.com"; 
-            if (currentProject && currentProject.region === "na") baseUrl = "https://api.connect.trimble.com";
-            else if (currentProject && currentProject.region === "asia") baseUrl = "https://asia.api.connect.trimble.com";
+            // Låser nettverkstrafikken til app21 (korrekt for europeiske prosjekter)
+            const baseUrl = "https://app21.connect.trimble.com"; 
 
             try {
                 setStatus(`Kobler til server: ${baseUrl}...`, "warn");
@@ -201,17 +183,6 @@
                         'Accept': 'application/json'
                     }
                 });
-                
-                // Ekstra sikkerhetsnett: Hvis det offisielle EU-APIet gir 404, slå direkte opp i app21-databasen
-                if (response.status === 404) {
-                    console.warn("Hoved-API ga 404, forsøker app21-fallback...");
-                    baseUrl = "https://app21.connect.trimble.com";
-                    url = `${baseUrl}/tc/api/2.0/folders/${rootFolderId}/items`;
-                    response = await fetch(url, {
-                        method: 'GET',
-                        headers: { 'Authorization': `Bearer ${accessToken}`, 'Accept': 'application/json' }
-                    });
-                }
 
                 if (response.status === 401) throw new Error("401 Unauthorized - Ugyldig adgangskort til prosjektet.");
                 if (!response.ok) throw new Error("API feilet med status: " + response.status);
