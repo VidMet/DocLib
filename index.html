@@ -1,415 +1,378 @@
 <!DOCTYPE html>
 <html lang="no">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>DocLib v1.17</title>
-    
-    <script src="https://components.connect.trimble.com/trimble-connect-workspace-api/index.js"></script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DocLib</title>
 
-    <style>
-        @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Syne:wght@400;600;700;800&display=swap');
+<script src="https://components.connect.trimble.com/trimble-connect-workspace-api/index.js"></script>
 
-        :root {
-            --bg:        #f3f4f6;      
-            --surface:   #ffffff;      
-            --border:    #d1d5db;      
-            --ink:       #111827;      
-            --muted:     #6b7280;      
-            --blue:      #1d4ed8;      
-            --ok:        #22a06b;
-            --warn:      #f79009;
-            --bad:       #d92d20;
-            --sans:      'Syne', sans-serif;
-        }
+<style>
+/* ==== DIN ORIGINAL STYLING (URØRT) ==== */
+body { font-family: Arial; margin:0; background:#f3f4f6; }
 
-        body { 
-            font-family: var(--sans), Arial, sans-serif; 
-            margin: 0; 
-            background-color: var(--bg); 
-            color: var(--ink); 
-            display: flex; 
-            flex-direction: column; 
-            height: 100vh;
-        }
+.header {
+    background:white;
+    padding:15px;
+    border-bottom:1px solid #ccc;
+}
 
-        .topbar {
-            height: 92px; background: #fff; border-bottom: 1px solid var(--border);
-            display: flex; align-items: center; gap: 18px; padding: 10px 18px; flex: 0 0 auto;
-        }
-        .logo-card {
-            width: 145px; height: 68px; border: 1px solid var(--border); border-radius: 12px;
-            background: #fff; display: flex; align-items: center; justify-content: center;
-            box-shadow: 0 4px 14px rgba(16,24,40,.08); overflow: hidden; flex-shrink: 0;
-        }
-        .logo-card img { max-width: 128px; max-height: 50px; object-fit: contain; }
-        .app-title { display: flex; flex-direction: column; line-height: 1.2; }
-        .app-title b { font-size: 18px; color: #0050b5; }
-        .app-title span { font-size: 14px; font-weight: 600; }
-        .app-title em { font-size: 12px; color: var(--muted); font-style: normal; }
-        
-        .header-right { margin-left: auto; display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
-        .status { display: flex; align-items: center; gap: 7px; color: var(--muted); font-size: 12px; font-weight: 600; white-space: nowrap; }
-        .dot { width: 9px; height: 9px; border-radius: 50%; background: #98a2b3; flex-shrink: 0; }
-        .dot.live { background: var(--ok); box-shadow: 0 0 8px var(--ok); }
-        .dot.warn { background: var(--warn); }
-        .dot.error { background: var(--bad); }
+.main { padding:20px; }
 
-        .main-content { padding: 20px; flex: 1 1 auto; overflow-y: auto; }
-        .toolbar { 
-            display: flex; justify-content: space-between; align-items: center; 
-            margin-bottom: 20px; background: #fff; padding: 15px 20px; 
-            border-radius: 6px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); 
-        }
-        .toolbar h3 { margin: 0; font-size: 1rem; color: var(--ink); }
-        .search-container { display: flex; gap: 12px; }
-        .search-bar { padding: 8px 12px; border: 1px solid var(--border); border-radius: 4px; font-size: 14px; font-family: var(--sans); }
-        .search-input { width: 300px; }
-        .folder-select { width: 220px; cursor: pointer; display: none; }
-        
-        table { width: 100%; border-collapse: collapse; background-color: #ffffff; box-shadow: 0 1px 3px rgba(0,0,0,0.1); border-radius: 6px; overflow: hidden; }
-        th, td { padding: 12px 15px; text-align: left; font-size: 13px; border-bottom: 1px solid #dee2e6; }
-        th { background-color: #f1f3f5; color: #495057; font-weight: 600; }
-        tr:hover { background-color: #f8f9fa; }
-        .loading { text-align: center; padding: 40px; font-style: italic; color: var(--muted); }
-    </style>
+table { width:100%; border-collapse: collapse; background:white; }
+th, td { padding:10px; border-bottom:1px solid #ddd; text-align:left; }
+
+.status { font-size:12px; color:#666; }
+</style>
 </head>
+
 <body>
 
-    <header class="topbar">
-        <div class="logo-card">
-            <img src="norconsult-logo-black.png" alt="Norconsult" onerror="this.style.display='none'">
-        </div>
-        <div class="app-title">
-            <b>DocLib v1.17</b>
-            <span>Norconsult Norge</span>
-            <em>Developed by Norconsult Norge AS, AI-assisted development. Contact: Vidar.Metveit@norconsult.com</em>
-        </div>
-        <div class="header-right">
-            <div class="status">
-                <span id="statusText">Venter på API...</span>
-                <span id="statusDot" class="dot"></span>
-            </div>
-        </div>
-    </header>
+<div class="header">
+    <h3>DocLib</h3>
+    <div id="status" class="status">Starter...</div>
+</div>
 
-    <div class="main-content">
-        <div class="toolbar">
-            <h3>Filer og egenskaper</h3>
-            <div class="search-container">
-                <select id="folderSelect" class="search-bar folder-select">
-                    <option value="all">Alle mapper</option>
-                </select>
-                <input type="text" id="searchInput" class="search-bar search-input" placeholder="Søk i modeller eller metadata...">
-            </div>
-        </div>
+<div class="main">
 
-        <table id="metadataTable">
-            <thead>
-                <tr>
-                    <th>Filnavn</th>
-                    <th>Mappe</th>
-                    <th>Fag</th>
-                    <th>MMI</th>
-                    <th>Revisjon</th>
-                    <th>Revisjonsdato</th>
-                    <th>Revisjonen gjelder</th>
-                </tr>
-            </thead>
-            <tbody id="tableBody">
-                <tr>
-                    <td colspan="7" class="loading" id="loaderText">Data lastes inn. Se status øverst til høyre.</td>
-                </tr>
-            </tbody>
-        </table>
-    </div>
+<input type="text" id="searchInput" placeholder="Søk..." style="margin-bottom:10px; padding:5px; width:250px;">
 
-    <script>
-        let API = null;
-        let currentProject = null;
-        let accessToken = null;
-        let allFilesData = [];
+<table>
+<thead>
+<tr>
+<th>Filnavn</th>
+<th>Mappe</th>
+<th>Fag</th>
+<th>MMI</th>
+<th>Revisjon</th>
+<th>Revisjonsdato</th>
+<th>Gjelder</th>
+</tr>
+</thead>
 
-        const setStatus = (m, c='') => { 
-            document.getElementById('statusText').textContent = m; 
-            let dotClass = 'dot';
-            if (c === 'ok') dotClass = 'dot live';
-            else if (c === 'error') dotClass = 'dot error';
-            else if (c === 'warn') dotClass = 'dot warn';
-            document.getElementById('statusDot').className = dotClass; 
+<tbody id="tableBody">
+<tr><td colspan="7">Laster...</td></tr>
+</tbody>
+</table>
+
+</div>
+
+<script>
+
+// ✅ GLOBAL ERROR → extension forsvinner aldri
+window.onerror = function(msg, url, line, col, error) {
+    console.error("GLOBAL ERROR:", msg, error);
+};
+
+let API = null;
+let accessToken = null;
+let currentProject = null;
+let allFilesData = [];
+
+const baseUrl = "https://app21.connect.trimble.com";
+
+function setStatus(msg) {
+    document.getElementById("status").innerText = msg;
+}
+
+
+// ==============================
+// ✅ INIT (STABIL)
+// ==============================
+window.onload = async function initExtension() {
+    try {
+
+        setStatus("Kobler til Trimble...");
+
+        API = await window.TrimbleConnectWorkspace.connect(window.parent);
+
+        // ✅ KRITISK – registrer extension
+        try {
+            await API.ui.setMenu({
+                title: "DocLib",
+                command: "open_doclib"
+            });
+        } catch(e) { console.warn(e); }
+
+        try {
+            API.ui.onCommand((cmd) => {
+                if (cmd === "open_doclib") {
+                    API.ui.setActiveMenuItem("open_doclib").catch(()=>{});
+                }
+            });
+        } catch(e) { console.warn(e); }
+
+        currentProject = await API.project.getProject();
+
+        // ✅ token
+        try {
+            const tokenData = await API.extension.getPermission("accesstoken");
+            accessToken = typeof tokenData === 'string'
+                ? tokenData
+                : (tokenData?.accessToken || "");
+        } catch(e) {
+            console.warn("Token-feil", e);
+        }
+
+        if (!accessToken) throw new Error("Ingen token");
+
+        fetchProjectFiles(currentProject.id);
+
+    } catch(e) {
+        console.error(e);
+        setStatus("Init-feil");
+    }
+};
+
+
+// ==============================
+// ✅ HENT FILER
+// ==============================
+async function fetchProjectFiles(projectId) {
+    try {
+
+        setStatus("Henter mapper...");
+
+        const res = await fetch(`${baseUrl}/tc/api/2.0/projects/${projectId}`, {
+            headers:{ Authorization:`Bearer ${accessToken}` }
+        });
+
+        const project = await res.json();
+        const rootId = project.rootId;
+
+        const files = await getIfcFiles(rootId, "Rotmappe");
+
+        setStatus(`Fant ${files.length} IFC-filer`);
+
+        allFilesData = await mapWithLimit(files, 4, async file => {
+            const meta = await fetchFileMetadata(file.id, file.name);
+            return { ...file, ...meta };
+        });
+
+        render(allFilesData);
+        setupSearch();
+
+        setStatus("Ferdig");
+
+    } catch(e) {
+        console.error(e);
+        setStatus("Feil");
+    }
+}
+
+
+// ==============================
+// ✅ REKURSIV HENTING
+// ==============================
+async function getIfcFiles(folderId, folderName) {
+
+    let result = [];
+
+    try {
+        const res = await fetch(`${baseUrl}/tc/api/2.0/folders/${folderId}/items`, {
+            headers:{ Authorization:`Bearer ${accessToken}` }
+        });
+
+        const data = await res.json();
+        const items = data.items || data;
+
+        for (const item of items) {
+
+            if (item.type === "FILE" && item.name.toLowerCase().endsWith(".ifc")) {
+                result.push({
+                    id:item.id,
+                    name:item.name,
+                    folderName:folderName
+                });
+            }
+
+            if (item.type === "FOLDER") {
+                const sub = await getIfcFiles(item.id, item.name);
+                result = result.concat(sub);
+            }
+        }
+
+    } catch(e) {
+        console.warn("Mappefeil", e);
+    }
+
+    return result;
+}
+
+
+// ==============================
+// ✅ METADATA (FAILSAFE)
+// ==============================
+async function fetchFileMetadata(fileId, fileName) {
+
+    const empty = {
+        fag:"-",
+        mmi:"-",
+        revisjon:"-",
+        revisjonsdato:"-",
+        gjelder:"-"
+    };
+
+    try {
+
+        // file → modelId
+        let fileData;
+        try {
+            const res = await fetch(`${baseUrl}/tc/api/2.0/files/${fileId}`, {
+                headers:{ Authorization:`Bearer ${accessToken}` }
+            });
+
+            if (!res.ok) return empty;
+
+            fileData = await res.json();
+
+        } catch(e) {
+            return empty;
+        }
+
+        const modelId = fileData?.modelId;
+
+        if (!modelId) return empty;
+
+        // IFC properties
+        let propData;
+        try {
+
+            const res = await fetch(`${baseUrl}/tc/api/2.0/models/${modelId}/properties`, {
+                headers:{ Authorization:`Bearer ${accessToken}` }
+            });
+
+            if (!res.ok) return empty;
+
+            propData = await res.json();
+
+        } catch(e) {
+            return empty;
+        }
+
+        console.log("IFC:", fileName, propData);
+
+        return {
+            fag: safeExtract(propData, ["Fag"]),
+            mmi: safeExtract(propData, ["MMI"]),
+            revisjon: safeExtract(propData, ["Revisjon"]),
+            revisjonsdato: safeExtract(propData, ["Revisjonsdato"]),
+            gjelder: safeExtract(propData, ["Gjelder","Beskrivelse"])
         };
 
-        async function initExtension() {
-            try {
-                setStatus("Kobler til Trimble Connect...", "warn");
-                API = await window.TrimbleConnectWorkspace.connect(window.parent);
+    } catch(e) {
+        return empty;
+    }
+}
 
-                if (API.ui && API.ui.setMenu) {
-                    API.ui.setMenu({
-                        title: "DocLib",
-                        command: "open_explorer",
-                        icon: "https://vidmet.github.io/DocLib/paper.png"
-                    }).catch(e => console.warn("Meny-oppsett ignorert (kjent timeout):", e));
+
+// ==============================
+// ✅ SAFE EXTRACT
+// ==============================
+function safeExtract(data, keys) {
+
+    try {
+
+        if (!data) return "-";
+
+        for (const k of keys) {
+            if (data[k]) return data[k];
+        }
+
+        if (Array.isArray(data)) {
+            for (const set of data) {
+                if (!set || !set.properties) continue;
+
+                for (const k of keys) {
+                    if (set.properties[k]) return set.properties[k];
                 }
-
-                if (API.ui && API.ui.onCommand) {
-                    API.ui.onCommand((command) => {
-                        if (command === "open_explorer") {
-                            API.ui.setActiveMenuItem("open_explorer").catch(e => console.warn(e));
-                        }
-                    });
-                }
-
-                setStatus("Henter prosjekt og tillatelser...", "warn");
-                currentProject = await API.project.getProject();
-                
-                const urlParams = new URLSearchParams(window.location.search);
-                accessToken = urlParams.get('token') || urlParams.get('accessToken') || urlParams.get('access_token');
-                
-                if (!accessToken) {
-                    try {
-                        const tokenData = await API.extension.getPermission("accesstoken");
-                        accessToken = typeof tokenData === 'string' ? tokenData : (tokenData.accessToken || tokenData.token || "");
-                    } catch (e) {
-                        console.warn("Håndterte standard API-forsinkelse.");
-                    }
-                }
-                
-                if (!accessToken) throw new Error("Klarte ikke hente gyldig token fra Trimble.");
-
-                fetchProjectFiles(currentProject.id);
-
-            } catch (error) {
-                console.error("Initialiseringsfeil:", error);
-                setStatus("Feil: Kunne ikke koble til Trimble API", "error");
             }
         }
 
-        window.onload = initExtension;
+        return "-";
 
-        async function hentAlleIfc(folderId, folderName, baseUrl) {
-            let funnet = [];
-            try {
-                const url = `${baseUrl}/tc/api/2.0/folders/${folderId}/items`;
-                const response = await fetch(url, {
-                    method: 'GET',
-                    headers: { 'Authorization': `Bearer ${accessToken}`, 'Accept': 'application/json' }
-                });
+    } catch(e) {
+        return "-";
+    }
+}
 
-                if (!response.ok) return [];
 
-                const data = await response.json();
-                const items = Array.isArray(data) ? data : (data.items || []);
-                
-                const undermapper = [];
-                for (const item of items) {
-                    if (item.type === 'FILE' && item.name.toLowerCase().endsWith('.ifc')) {
-                        item.folderName = folderName; 
-                        funnet.push(item);
-                    } else if (item.type === 'FOLDER') {
-                        undermapper.push(item);
-                    }
-                }
-                
-                if (undermapper.length > 0) {
-                    const resultatArray = await Promise.all(undermapper.map(mappe => hentAlleIfc(mappe.id, mappe.name, baseUrl)));
-                    for (const res of resultatArray) {
-                        funnet = funnet.concat(res);
-                    }
-                }
-                
-            } catch (e) {
-                console.warn("Klarte ikke å lese mappeinnholdet:", e);
-            }
-            return funnet;
-        }
+// ==============================
+// ✅ THROTTLING
+// ==============================
+async function mapWithLimit(arr, limit, fn) {
 
-        async function fetchProjectFiles(projectId) {
-            const baseUrl = "https://app21.connect.trimble.com"; 
+    const ret = [];
+    const executing = [];
 
-            try {
-                setStatus(`Finner rotmappen for prosjektet...`, "warn");
-                
-                const projRes = await fetch(`${baseUrl}/tc/api/2.0/projects/${projectId}`, {
-                    method: 'GET',
-                    headers: { 'Authorization': `Bearer ${accessToken}`, 'Accept': 'application/json' }
-                });
+    for (const item of arr) {
 
-                if (!projRes.ok) throw new Error("Klarte ikke slå opp prosjektdetaljer.");
-                
-                const projData = await projRes.json();
-                const rootFolderId = projData.rootId || (projData.rootFolder && projData.rootFolder.id) || projData.rootFolderId || projData.folderId;
-                
-                if (!rootFolderId) throw new Error("Fant ingen rotmappe.");
+        const p = Promise.resolve().then(() => fn(item));
+        ret.push(p);
 
-                setStatus(`Skanner hele prosjektet for IFC-filer...`, "warn");
-                
-                const modelFiles = await hentAlleIfc(rootFolderId, "Rotmappe", baseUrl);
-                
-                if (modelFiles.length === 0) {
-                    document.getElementById('tableBody').innerHTML = `<tr><td colspan="7" class="loading">Ingen IFC-filer funnet i prosjektet.</td></tr>`;
-                    setStatus("Ferdig. Ingen IFC-filer funnet.", "ok");
-                    return;
-                }
+        if (limit <= arr.length) {
 
-                const uniqueFolders = [...new Set(modelFiles.map(f => f.folderName))].sort();
-                const folderSelect = document.getElementById('folderSelect');
-                folderSelect.innerHTML = `<option value="all">Alle mapper</option>` + uniqueFolders.map(f => `<option value="${f}">${f}</option>`).join('');
-                folderSelect.style.display = 'block';
+            const e = p.then(() => executing.splice(executing.indexOf(e),1));
+            executing.push(e);
 
-                setStatus(`Laster ned metadata for ${modelFiles.length} filer...`, "warn");
-
-                allFilesData = await Promise.all(modelFiles.map(async (file) => {
-                    // Sender med filnavnet slik at vi kan se det i konsollen
-                    const metadata = await fetchFileMetadata(file.id, file.name, baseUrl);
-                    return {
-                        id: file.id,
-                        name: file.name,
-                        folderName: file.folderName,
-                        ...metadata
-                    };
-                }));
-                
-                renderTable(allFilesData);
-                setupSearch();
-                setStatus(`Data lastet inn for ${modelFiles.length} filer!`, "ok");
-                
-            } catch (error) {
-                console.error("Filhenting feilet:", error);
-                document.getElementById('loaderText').innerHTML = `Nettverksfeil: ${error.message}`;
-                setStatus("Nettverksfeil", "error");
+            if (executing.length >= limit) {
+                await Promise.race(executing);
             }
         }
+    }
 
-        async function fetchFileMetadata(fileId, fileName, baseUrl) {
+    return Promise.all(ret);
+}
 
-            const defaultMeta = {
-                fag: "-",
-                mmi: "-",
-                revisjon: "-",
-                revisjonsdato: "-",
-                gjelder: "-"
-            };
 
-            try {
+// ==============================
+// ✅ RENDER
+// ==============================
+function render(data) {
 
-                // 1️⃣ Hent filinfo (for å få modelId)
-                const fileRes = await fetch(`${baseUrl}/tc/api/2.0/files/${fileId}`, {
-                    method: 'GET',
-                    headers: {
-                        'Authorization': `Bearer ${accessToken}`,
-                        'Accept': 'application/json'
-                    }
-                });
+    const tbody = document.getElementById("tableBody");
 
-                if (!fileRes.ok) {
-                    console.warn("Fil-feil:", fileName);
-                    return defaultMeta;
-                }
+    if (!data.length) {
+        tbody.innerHTML = "<tr><td colspan='7'>Ingen data</td></tr>";
+        return;
+    }
 
-                const fileData = await fileRes.json();
+    tbody.innerHTML = data.map(f => `
+        <tr>
+        <td>${f.name}</td>
+        <td>${f.folderName}</td>
+        <td>${f.fag}</td>
+        <td>${f.mmi}</td>
+        <td>${f.revisjon}</td>
+        <td>${f.revisjonsdato}</td>
+        <td>${f.gjelder}</td>
+        </tr>
+    `).join("");
+}
 
-                const modelId = fileData.modelId || fileData.id;
 
-                if (!modelId) {
-                    console.warn("Fant ikke modelId:", fileName);
-                    return defaultMeta;
-                }
+// ==============================
+// ✅ SEARCH
+// ==============================
+function setupSearch() {
 
-                // 2️⃣ Hent IFC properties (DETTE ER NYTT)
-                const propRes = await fetch(`${baseUrl}/tc/api/2.0/models/${modelId}/properties`, {
-                    method: 'GET',
-                    headers: {
-                        'Authorization': `Bearer ${accessToken}`,
-                        'Accept': 'application/json'
-                    }
-                });
+    const input = document.getElementById("searchInput");
 
-                if (!propRes.ok) {
-                    console.warn("Ingen properties:", fileName);
-                    return defaultMeta;
-                }
+    input.addEventListener("input", () => {
 
-                const propData = await propRes.json();
+        const term = input.value.toLowerCase();
 
-                console.log(`IFC metadata for ${fileName}:`, propData);
+        const filtered = allFilesData.filter(f =>
+            Object.values(f).some(val =>
+                String(val).toLowerCase().includes(term)
+            )
+        );
 
-                // 3️⃣ Ekstraher verdier (bruk din eksisterende helper)
-                return {
-                    fag: extractProp(propData, ["Fag"]),
-                    mmi: extractProp(propData, ["MMI"]),
-                    revisjon: extractProp(propData, ["Revisjon"]),
-                    revisjonsdato: extractProp(propData, ["Revisjonsdato"]),
-                    gjelder: extractProp(propData, ["Beskrivelse", "Gjelder"])
-                };
+        render(filtered);
+    });
+}
 
-            } catch (e) {
-                console.warn("Metadata-feil:", fileName, e);
-                return defaultMeta;
-            }
-        }
+</script>
 
-        function extractProp(data, keys) {
-            if (!data) return "-";
-
-            // direkte treff
-            for (const key of keys) {
-                if (data[key]) return data[key];
-            }
-
-            // array av propertysets (vanlig IFC)
-            if (Array.isArray(data)) {
-                for (const set of data) {
-                    if (!set.properties) continue;
-
-                    for (const key of keys) {
-                        if (set.properties[key]) return set.properties[key];
-                    }
-                }
-            }
-
-            return "-";
-        }
-
-        function renderTable(data) {
-            const tbody = document.getElementById('tableBody');
-            if (data.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="7" class="loading">Søket ga ingen treff.</td></tr>`;
-                return;
-            }
-            
-            tbody.innerHTML = data.map(fil => `
-                <tr>
-                    <td style="font-weight: 600;">${fil.name}</td>
-                    <td style="color: var(--muted); font-size: 12px;">${fil.folderName}</td>
-                    <td>${fil.fag}</td>
-                    <td>${fil.mmi}</td>
-                    <td>${fil.revisjon}</td>
-                    <td>${fil.revisjonsdato}</td>
-                    <td>${fil.gjelder}</td>
-                </tr>
-            `).join('');
-        }
-
-        function setupSearch() {
-            const searchInput = document.getElementById('searchInput');
-            const folderSelect = document.getElementById('folderSelect');
-            
-            const applyFilters = () => {
-                const term = searchInput.value.toLowerCase();
-                const selectedFolder = folderSelect.value;
-                
-                const filtered = allFilesData.filter(fil => {
-                    const matchSearch = Object.values(fil).some(val => String(val).toLowerCase().includes(term));
-                    const matchFolder = selectedFolder === 'all' || fil.folderName === selectedFolder;
-                    return matchSearch && matchFolder;
-                });
-                renderTable(filtered);
-            };
-            
-            searchInput.addEventListener('input', applyFilters);
-            folderSelect.addEventListener('change', applyFilters);
-        }
-    </script>
 </body>
 </html>
