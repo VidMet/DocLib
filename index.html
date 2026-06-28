@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>DocLib v1.12</title>
+    <title>DocLib v1.13</title>
     
     <script src="https://components.connect.trimble.com/trimble-connect-workspace-api/index.js"></script>
 
@@ -62,15 +62,16 @@
             border-radius: 6px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); 
         }
         .toolbar h3 { margin: 0; font-size: 1rem; color: var(--ink); }
-        .search-bar { padding: 8px 12px; width: 300px; border: 1px solid var(--border); border-radius: 4px; font-size: 14px; font-family: var(--sans); }
+        .search-container { display: flex; gap: 12px; }
+        .search-bar { padding: 8px 12px; border: 1px solid var(--border); border-radius: 4px; font-size: 14px; font-family: var(--sans); }
+        .search-input { width: 300px; }
+        .folder-select { width: 220px; cursor: pointer; display: none; }
         
         table { width: 100%; border-collapse: collapse; background-color: #ffffff; box-shadow: 0 1px 3px rgba(0,0,0,0.1); border-radius: 6px; overflow: hidden; }
         th, td { padding: 12px 15px; text-align: left; font-size: 13px; border-bottom: 1px solid #dee2e6; }
         th { background-color: #f1f3f5; color: #495057; font-weight: 600; }
         tr:hover { background-color: #f8f9fa; }
         .loading { text-align: center; padding: 40px; font-style: italic; color: var(--muted); }
-        .file-link { font-weight: 600; color: var(--blue); cursor: pointer; text-decoration: none; }
-        .file-link:hover { text-decoration: underline; }
     </style>
 </head>
 <body>
@@ -80,7 +81,7 @@
             <img src="norconsult-logo-black.png" alt="Norconsult" onerror="this.style.display='none'">
         </div>
         <div class="app-title">
-            <b>DocLib v1.12</b>
+            <b>DocLib v1.13</b>
             <span>Norconsult Norge</span>
             <em>Developed by Norconsult Norge AS, AI-assisted development. Contact: Vidar.Metveit@norconsult.com</em>
         </div>
@@ -95,26 +96,29 @@
     <div class="main-content">
         <div class="toolbar">
             <h3>Filer og egenskaper</h3>
-            <input type="text" id="searchInput" class="search-bar" placeholder="Søk i modeller eller metadata...">
+            <div class="search-container">
+                <select id="folderSelect" class="search-bar folder-select">
+                    <option value="all">Alle mapper</option>
+                </select>
+                <input type="text" id="searchInput" class="search-bar search-input" placeholder="Søk i modeller eller metadata...">
+            </div>
         </div>
 
         <table id="metadataTable">
             <thead>
                 <tr>
                     <th>Filnavn</th>
+                    <th>Mappe</th>
                     <th>Fag</th>
                     <th>MMI</th>
                     <th>Revisjon</th>
                     <th>Revisjonsdato</th>
                     <th>Revisjonen gjelder</th>
-                    <th>Utarbeidet av</th>
-                    <th>Kontrollert av</th>
-                    <th>Godkjent av</th>
                 </tr>
             </thead>
             <tbody id="tableBody">
                 <tr>
-                    <td colspan="9" class="loading" id="loaderText">Data lastes inn. Se status øverst til høyre.</td>
+                    <td colspan="7" class="loading" id="loaderText">Data lastes inn. Se status øverst til høyre.</td>
                 </tr>
             </tbody>
         </table>
@@ -155,7 +159,7 @@
                     }
                 }
                 
-                if (!accessToken) throw new Error("Klarte ikke hente gyldig token (adgangskort) fra Trimble.");
+                if (!accessToken) throw new Error("Klarte ikke hente gyldig token fra Trimble.");
 
                 fetchProjectFiles(currentProject.id);
 
@@ -167,8 +171,8 @@
 
         window.onload = initExtension;
 
-        // Ny funksjon: Edderkoppen som skanner gjennom undermapper 
-        async function hentAlleIfc(folderId, baseUrl) {
+        // Funksjon som tråler prosjektet og lagrer mappenavnet for hver fil
+        async function hentAlleIfc(folderId, folderName, baseUrl) {
             let funnet = [];
             try {
                 const url = `${baseUrl}/tc/api/2.0/folders/${folderId}/items`;
@@ -185,15 +189,15 @@
                 const undermapper = [];
                 for (const item of items) {
                     if (item.type === 'FILE' && item.name.toLowerCase().endsWith('.ifc')) {
+                        item.folderName = folderName; // Lagrer mappenavnet på filobjektet
                         funnet.push(item);
                     } else if (item.type === 'FOLDER') {
                         undermapper.push(item);
                     }
                 }
                 
-                // Tråler gjennom alle funnede undermapper i parallell for å spare tid
                 if (undermapper.length > 0) {
-                    const resultatArray = await Promise.all(undermapper.map(mappe => hentAlleIfc(mappe.id, baseUrl)));
+                    const resultatArray = await Promise.all(undermapper.map(mappe => hentAlleIfc(mappe.id, mappe.name, baseUrl)));
                     for (const res of resultatArray) {
                         funnet = funnet.concat(res);
                     }
@@ -216,27 +220,29 @@
                     headers: { 'Authorization': `Bearer ${accessToken}`, 'Accept': 'application/json' }
                 });
 
-                if (projRes.status === 401) throw new Error("401 Unauthorized - Adgangskortet ble avvist.");
-                if (!projRes.ok) throw new Error("Klarte ikke slå opp prosjektdetaljer (Status: " + projRes.status + ")");
+                if (!projRes.ok) throw new Error("Klarte ikke slå opp prosjektdetaljer.");
                 
                 const projData = await projRes.json();
-                
                 const rootFolderId = projData.rootId || (projData.rootFolder && projData.rootFolder.id) || projData.rootFolderId || projData.folderId;
                 
-                if (!rootFolderId) {
-                    throw new Error("Fant ingen rotmappe. Data returnert: " + JSON.stringify(projData).substring(0, 150));
-                }
+                if (!rootFolderId) throw new Error("Fant ingen rotmappe.");
 
-                // Starter edderkoppen i rotmappen
-                setStatus(`Skanner hele prosjektet for IFC-filer. Dette kan ta noen sekunder...`, "warn");
+                setStatus(`Skanner hele prosjektet for IFC-filer...`, "warn");
                 
-                const modelFiles = await hentAlleIfc(rootFolderId, baseUrl);
+                // Starter søket i rotmappen
+                const modelFiles = await hentAlleIfc(rootFolderId, "Rotmappe", baseUrl);
                 
                 if (modelFiles.length === 0) {
-                    document.getElementById('tableBody').innerHTML = `<tr><td colspan="9" class="loading">Ingen IFC-filer funnet i prosjektet (inkludert undermapper).</td></tr>`;
+                    document.getElementById('tableBody').innerHTML = `<tr><td colspan="7" class="loading">Ingen IFC-filer funnet i prosjektet.</td></tr>`;
                     setStatus("Ferdig. Ingen IFC-filer funnet.", "ok");
                     return;
                 }
+
+                // Generer nedtrekksmeny basert på de unike mappene vi fant
+                const uniqueFolders = [...new Set(modelFiles.map(f => f.folderName))].sort();
+                const folderSelect = document.getElementById('folderSelect');
+                folderSelect.innerHTML = `<option value="all">Alle mapper</option>` + uniqueFolders.map(f => `<option value="${f}">${f}</option>`).join('');
+                folderSelect.style.display = 'block';
 
                 setStatus(`Laster ned metadata for ${modelFiles.length} filer...`, "warn");
 
@@ -245,6 +251,7 @@
                     return {
                         id: file.id,
                         name: file.name,
+                        folderName: file.folderName,
                         ...metadata
                     };
                 }));
@@ -255,15 +262,14 @@
                 
             } catch (error) {
                 console.error("Filhenting feilet:", error);
-                document.getElementById('loaderText').innerHTML = `Nettverksfeil: ${error.message}<br><br>Se konsoll (F12) for detaljer.`;
+                document.getElementById('loaderText').innerHTML = `Nettverksfeil: ${error.message}`;
                 setStatus("Nettverksfeil", "error");
             }
         }
 
         async function fetchFileMetadata(fileId, baseUrl) {
             const defaultMeta = {
-                fag: "-", mmi: "-", revisjon: "-", revisjonsdato: "-", 
-                gjelder: "-", utarbeidet: "-", kontrollert: "-", godkjent: "-"
+                fag: "-", mmi: "-", revisjon: "-", revisjonsdato: "-", gjelder: "-"
             };
             
             try {
@@ -283,10 +289,7 @@
                     mmi: extractProp(propsData, ["MMI"]),
                     revisjon: extractProp(propsData, ["Revisjon"]),
                     revisjonsdato: extractProp(propsData, ["Revisjonsdato", "Dato"]),
-                    gjelder: extractProp(propsData, ["Revisjonen gjelder", "Beskrivelse"]),
-                    utarbeidet: extractProp(propsData, ["Utarbeidet av", "Utarbeidet"]),
-                    kontrollert: extractProp(propsData, ["Kontrollert av", "Kontrollert"]),
-                    godkjent: extractProp(propsData, ["Godkjent av", "Godkjent"])
+                    gjelder: extractProp(propsData, ["Revisjonen gjelder", "Beskrivelse"])
                 };
             } catch (e) {
                 return defaultMeta;
@@ -311,39 +314,41 @@
         function renderTable(data) {
             const tbody = document.getElementById('tableBody');
             if (data.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="9" class="loading">Søket ga ingen treff.</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="7" class="loading">Søket ga ingen treff.</td></tr>`;
                 return;
             }
             
             tbody.innerHTML = data.map(fil => `
                 <tr>
-                    <td>
-                        <a href="https://connect.trimble.com/web/project/${currentProject.id}/data/detail/${fil.id}" 
-                           target="_blank" class="file-link" title="Åpne fil i Trimble Connect">${fil.name}</a>
-                    </td>
+                    <td style="font-weight: 600;">${fil.name}</td>
+                    <td style="color: var(--muted); font-size: 12px;">${fil.folderName}</td>
                     <td>${fil.fag}</td>
                     <td>${fil.mmi}</td>
                     <td>${fil.revisjon}</td>
                     <td>${fil.revisjonsdato}</td>
                     <td>${fil.gjelder}</td>
-                    <td>${fil.utarbeidet}</td>
-                    <td>${fil.kontrollert}</td>
-                    <td>${fil.godkjent}</td>
                 </tr>
             `).join('');
         }
 
         function setupSearch() {
             const searchInput = document.getElementById('searchInput');
-            searchInput.addEventListener('input', (e) => {
-                const term = e.target.value.toLowerCase();
+            const folderSelect = document.getElementById('folderSelect');
+            
+            const applyFilters = () => {
+                const term = searchInput.value.toLowerCase();
+                const selectedFolder = folderSelect.value;
+                
                 const filtered = allFilesData.filter(fil => {
-                    return Object.values(fil).some(val => 
-                        String(val).toLowerCase().includes(term)
-                    );
+                    const matchSearch = Object.values(fil).some(val => String(val).toLowerCase().includes(term));
+                    const matchFolder = selectedFolder === 'all' || fil.folderName === selectedFolder;
+                    return matchSearch && matchFolder;
                 });
                 renderTable(filtered);
-            });
+            };
+            
+            searchInput.addEventListener('input', applyFilters);
+            folderSelect.addEventListener('change', applyFilters);
         }
     </script>
 </body>
