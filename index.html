@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>DocLib v1.11</title>
+    <title>DocLib v1.12</title>
     
     <script src="https://components.connect.trimble.com/trimble-connect-workspace-api/index.js"></script>
 
@@ -80,7 +80,7 @@
             <img src="norconsult-logo-black.png" alt="Norconsult" onerror="this.style.display='none'">
         </div>
         <div class="app-title">
-            <b>DocLib v1.11</b>
+            <b>DocLib v1.12</b>
             <span>Norconsult Norge</span>
             <em>Developed by Norconsult Norge AS, AI-assisted development. Contact: Vidar.Metveit@norconsult.com</em>
         </div>
@@ -167,13 +167,50 @@
 
         window.onload = initExtension;
 
+        // Ny funksjon: Edderkoppen som skanner gjennom undermapper 
+        async function hentAlleIfc(folderId, baseUrl) {
+            let funnet = [];
+            try {
+                const url = `${baseUrl}/tc/api/2.0/folders/${folderId}/items`;
+                const response = await fetch(url, {
+                    method: 'GET',
+                    headers: { 'Authorization': `Bearer ${accessToken}`, 'Accept': 'application/json' }
+                });
+
+                if (!response.ok) return [];
+
+                const data = await response.json();
+                const items = Array.isArray(data) ? data : (data.items || []);
+                
+                const undermapper = [];
+                for (const item of items) {
+                    if (item.type === 'FILE' && item.name.toLowerCase().endsWith('.ifc')) {
+                        funnet.push(item);
+                    } else if (item.type === 'FOLDER') {
+                        undermapper.push(item);
+                    }
+                }
+                
+                // Tråler gjennom alle funnede undermapper i parallell for å spare tid
+                if (undermapper.length > 0) {
+                    const resultatArray = await Promise.all(undermapper.map(mappe => hentAlleIfc(mappe.id, baseUrl)));
+                    for (const res of resultatArray) {
+                        funnet = funnet.concat(res);
+                    }
+                }
+                
+            } catch (e) {
+                console.warn("Klarte ikke å lese mappeinnholdet:", e);
+            }
+            return funnet;
+        }
+
         async function fetchProjectFiles(projectId) {
             const baseUrl = "https://app21.connect.trimble.com"; 
 
             try {
                 setStatus(`Finner rotmappen for prosjektet...`, "warn");
                 
-                // 1. Hent prosjektdetaljer for å finne den magiske mappe-IDen
                 const projRes = await fetch(`${baseUrl}/tc/api/2.0/projects/${projectId}`, {
                     method: 'GET',
                     headers: { 'Authorization': `Bearer ${accessToken}`, 'Accept': 'application/json' }
@@ -184,36 +221,24 @@
                 
                 const projData = await projRes.json();
                 
-                // OPPDATERT: Her er fasiten direkte fra feilmeldingen din ("rootId") pluss de andre fallbackene
                 const rootFolderId = projData.rootId || (projData.rootFolder && projData.rootFolder.id) || projData.rootFolderId || projData.folderId;
                 
                 if (!rootFolderId) {
                     throw new Error("Fant ingen rotmappe. Data returnert: " + JSON.stringify(projData).substring(0, 150));
                 }
 
-                // 2. Hent filene direkte fra rotmappen
-                setStatus(`Henter filer fra rotmappen...`, "warn");
-                const url = `${baseUrl}/tc/api/2.0/folders/${rootFolderId}/items`;
+                // Starter edderkoppen i rotmappen
+                setStatus(`Skanner hele prosjektet for IFC-filer. Dette kan ta noen sekunder...`, "warn");
                 
-                const response = await fetch(url, {
-                    method: 'GET',
-                    headers: { 'Authorization': `Bearer ${accessToken}`, 'Accept': 'application/json' }
-                });
-
-                if (!response.ok) throw new Error("API feilet med status: " + response.status);
-
-                const filesData = await response.json();
-                
-                const itemsArray = Array.isArray(filesData) ? filesData : (filesData.items || []);
-                const modelFiles = itemsArray.filter(file => file.type === 'FILE' && file.name.toLowerCase().endsWith('.ifc'));
+                const modelFiles = await hentAlleIfc(rootFolderId, baseUrl);
                 
                 if (modelFiles.length === 0) {
-                    document.getElementById('tableBody').innerHTML = `<tr><td colspan="9" class="loading">Ingen IFC-filer funnet i prosjektets rotmappe.</td></tr>`;
-                    setStatus("Ferdig. Ingen IFC-filer.", "ok");
+                    document.getElementById('tableBody').innerHTML = `<tr><td colspan="9" class="loading">Ingen IFC-filer funnet i prosjektet (inkludert undermapper).</td></tr>`;
+                    setStatus("Ferdig. Ingen IFC-filer funnet.", "ok");
                     return;
                 }
 
-                setStatus(`Henter metadata for ${modelFiles.length} filer...`, "warn");
+                setStatus(`Laster ned metadata for ${modelFiles.length} filer...`, "warn");
 
                 allFilesData = await Promise.all(modelFiles.map(async (file) => {
                     const metadata = await fetchFileMetadata(file.id, baseUrl);
@@ -226,7 +251,7 @@
                 
                 renderTable(allFilesData);
                 setupSearch();
-                setStatus("Data innlastet!", "ok");
+                setStatus(`Data lastet inn for ${modelFiles.length} filer!`, "ok");
                 
             } catch (error) {
                 console.error("Filhenting feilet:", error);
