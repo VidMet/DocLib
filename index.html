@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>DocLib v1.20</title>
+    <title>DocLib v1.21</title>
     
     <script src="https://components.connect.trimble.com/trimble-connect-workspace-api/index.js"></script>
 
@@ -89,7 +89,7 @@
             <img src="norconsult-logo-black.png" alt="Norconsult" onerror="this.style.display='none'">
         </div>
         <div class="app-title">
-            <b>DocLib v1.20</b>
+            <b>DocLib v1.21</b>
             <span>Norconsult Norge</span>
             <em>Developed by Norconsult Norge AS, AI-assisted development. Contact: Vidar.Metveit@norconsult.com</em>
         </div>
@@ -143,7 +143,6 @@
         let accessToken = null;
         let allFilesData = [];
 
-        // Hjelpefunksjon for å unngå caching av selve utvidelsen
         if (!window.location.search.includes('v=')) {
             const newUrl = window.location.origin + window.location.pathname + '?v=' + new Date().getTime();
             window.history.replaceState(null, null, newUrl);
@@ -207,7 +206,6 @@
 
         window.onload = initExtension;
 
-        // Tråler prosjektet for IFC-filer
         async function hentAlleIfc(folderId, folderName, baseUrl) {
             let funnet = [];
             try {
@@ -245,7 +243,6 @@
             return funnet;
         }
 
-        // --- Den nye "Fartskontrollen" (Concurrency Limiter) for å håndtere 300+ filer ---
         async function mapWithLimit(arr, limit, fn) {
             const ret = [];
             const executing = [];
@@ -295,16 +292,14 @@
                     return;
                 }
 
-                // Generer nedtrekksmeny for mapper
                 const uniqueFolders = [...new Set(modelFiles.map(f => f.folderName))].sort();
                 const folderSelect = document.getElementById('folderSelect');
                 folderSelect.innerHTML = `<option value="all">Alle mapper</option>` + uniqueFolders.map(f => `<option value="${f}">${f}</option>`).join('');
                 folderSelect.style.display = 'block';
 
-                setStatus(`Henter modell-egenskaper...`, "warn");
+                setStatus(`Henter dybde-egenskaper fra IFC-filene...`, "warn");
                 let filerBehandlet = 0;
 
-                // Her bruker vi fartskontrollen: Vi prosesserer maks 5 filer samtidig for å unngå krasj
                 allFilesData = await mapWithLimit(modelFiles, 5, async (file) => {
                     const metadata = await fetchFileMetadata(file.id, file.name, baseUrl);
                     filerBehandlet++;
@@ -329,7 +324,6 @@
             }
         }
 
-        // --- Den nye "Pro-arkitektur"-funksjonen som henter data direkte fra modell-motoren ---
         async function fetchFileMetadata(fileId, fileName, baseUrl) {
             const defaultMeta = { fag: "-", mmi: "-", revisjon: "-", revisjonsdato: "-", gjelder: "-" };
             
@@ -344,7 +338,7 @@
                 const fileData = await fileRes.json();
                 const modelId = fileData.modelId || fileData.id;
 
-                // 2. Hent modell-egenskaper (dette er databasen vieweren bruker)
+                // 2. Hent modell-egenskaper (den dype databasen)
                 const propRes = await fetch(`${baseUrl}/tc/api/2.0/models/${modelId}/properties`, {
                     method: 'GET',
                     headers: { 'Authorization': `Bearer ${accessToken}` }
@@ -352,14 +346,20 @@
                 if (!propRes.ok) return defaultMeta;
                 
                 const propData = await propRes.json();
+                
+                // SKRIVER UT FOR FEILSØKING (Sjekk F12 hvis det feiler)
+                console.log(`RÅDATA FOR ${fileName}:`, propData);
 
-                // 3. Trekk ut egenskapene
+                // Tar bare de første 50 objektene for å hindre at nettleseren fryser
+                const searchData = Array.isArray(propData) ? propData.slice(0, 50) : propData;
+
+                // 3. Bruk super-søkeren
                 return {
-                    fag: extractProp(propData, ["Fag", "Underdisiplin", "Disiplin"]),
-                    mmi: extractProp(propData, ["MMI", "Status"]),
-                    revisjon: extractProp(propData, ["Revisjon", "Rev"]),
-                    revisjonsdato: extractProp(propData, ["Revisjonsdato", "Dato", "RevDato"]),
-                    gjelder: extractProp(propData, ["Revisjonen gjelder", "Beskrivelse", "Gjelder"])
+                    fag: findValueDeep(searchData, ["Fag", "Underdisiplin", "Disiplin"]) || "-",
+                    mmi: findValueDeep(searchData, ["MMI", "Status"]) || "-",
+                    revisjon: findValueDeep(searchData, ["Revisjon", "Rev"]) || "-",
+                    revisjonsdato: findValueDeep(searchData, ["Revisjonsdato", "Dato", "RevDato"]) || "-",
+                    gjelder: findValueDeep(searchData, ["Revisjonen gjelder", "Beskrivelse", "Gjelder"]) || "-"
                 };
             } catch (e) {
                 console.warn(`Metadata-feil for ${fileName}:`, e);
@@ -367,21 +367,26 @@
             }
         }
 
-        // Robust funksjon som leter gjennom Trimbel Connects eiendoms-struktur
-        function extractProp(data, possibleKeys) {
-            let value = "-";
-            possibleKeys.forEach(key => {
-                if (data[key]) value = data[key]; // Hvis den ligger direkte på rotnivået
-                if (Array.isArray(data)) {
-                    data.forEach(propSet => {
-                        if (propSet[key]) value = propSet[key]; // Hvis den ligger i et element i arrayet
-                        if (propSet.properties && propSet.properties[key]) {
-                            value = propSet.properties[key]; // Hvis den ligger i et sub-objekt som heter 'properties'
-                        }
-                    });
+        // --- Den nye "Spindelvev-søkeren" (Rekursiv dypdesøk) ---
+        function findValueDeep(obj, possibleKeys) {
+            // Avbryt hvis det ikke er et objekt å lete i
+            if (!obj || typeof obj !== 'object') return null;
+
+            // Sjekk direkte på dette nivået (case-insensitive for å sikre treff)
+            for (const [k, v] of Object.entries(obj)) {
+                if (possibleKeys.some(pk => pk.toLowerCase() === k.toLowerCase()) && typeof v === 'string' && v.trim() !== "") {
+                    return v;
                 }
-            });
-            return value;
+            }
+
+            // Hvis ikke funnet her, dykk ned i neste lag med undermapper/objekter
+            for (const v of Object.values(obj)) {
+                if (typeof v === 'object') {
+                    const found = findValueDeep(v, possibleKeys);
+                    if (found) return found;
+                }
+            }
+            return null;
         }
 
         function renderTable(data) {
