@@ -1,8 +1,8 @@
 {
   "title": "Dokumentutforsker med Metadata",
   "icon": "https://vidmet.github.io/DocLib/paper.png",
-  "url": "https://vidmet.github.io/DocLib/index.html?v=1.28.2",
-  "description": "DocLib v1.28.2 - synchronized folder filtering and model selection.",
+  "url": "https://vidmet.github.io/DocLib/index.html?v=1.29",
+  "description": "DocLib v1.29 - Viewer API model control, folder selection sync, all file formats and IFC metadata.",
   "extensionType": ["project"],
   "enabled": true
 }
