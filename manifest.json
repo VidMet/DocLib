@@ -3,5 +3,6 @@
   "icon": "https://vidmet.github.io/DocLib/paper.png",
   "url": "https://vidmet.github.io/DocLib/index.html?v=1.27",
   "description": "DocLib v1.27 - IFC metadata through pset index/value mapping.",
+  "extensionType": ["project"],
   "enabled": true
 }
