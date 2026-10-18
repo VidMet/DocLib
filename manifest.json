@@ -1,8 +1,8 @@
 {
   "title": "Dokumentutforsker med Metadata",
   "icon": "https://vidmet.github.io/DocLib/paper.png",
-  "url": "https://vidmet.github.io/DocLib/index.html?v=1.29",
-  "description": "DocLib v1.29 - Viewer API model control, folder selection sync, all file formats and IFC metadata.",
+  "url": "https://vidmet.github.io/DocLib/index.html?v=1.29.1",
+  "description": "DocLib v1.29.1 - Viewer context diagnostics and controlled single-model probe.",
   "extensionType": ["project"],
   "enabled": true
 }
