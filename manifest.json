@@ -1,8 +1,8 @@
 {
   "title": "Dokumentutforsker med Metadata",
   "icon": "https://vidmet.github.io/DocLib/paper.png",
-  "url": "https://vidmet.github.io/DocLib/index.html?v=1.27",
-  "description": "DocLib v1.27 - stable project menu and IFC pset index/value mapping.",
+  "url": "https://vidmet.github.io/DocLib/index.html?v=1.28",
+  "description": "DocLib v1.28 - folder tree, multi-selection and IFC metadata.",
   "extensionType": ["project"],
   "enabled": true
 }
