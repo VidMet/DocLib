@@ -1,7 +1,7 @@
 {
   "title": "Dokumentutforsker med Metadata",
   "icon": "https://vidmet.github.io/DocLib/paper.png",
-  "url": "https://vidmet.github.io/DocLib/index.html?v=1.26",
-  "description": "DocLib v1.26 - property value probe for p8-sv_f-veg_68200.ifc.",
+  "url": "https://vidmet.github.io/DocLib/index.html?v=1.27",
+  "description": "DocLib v1.27 - IFC metadata through pset index/value mapping.",
   "enabled": true
 }
