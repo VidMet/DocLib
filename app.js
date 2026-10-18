@@ -1,221 +1,56 @@
 'use strict';
 
-const VERSION = '1.22';
-const BASE_URL = 'https://app21.connect.trimble.com';
-let API = null;
-let currentProject = null;
-let accessToken = null;
-let allFilesData = [];
-let diagLines = [];
+const VERSION = '1.23';
+const CORE_BASE = 'https://app21.connect.trimble.com/tc/api/2.0';
+const MODEL_API_CANDIDATES = [
+  'https://model-api.connect.trimble.com/v1',
+  'https://model-api.eu.connect.trimble.com/v1',
+  'https://app21.connect.trimble.com/model/api/v1'
+];
+let API = null, currentProject = null, accessToken = null, allFilesData = [], diagLines = [];
+const DEFAULT_META={fag:'-',mmi:'-',revisjon:'-',revisjonsdato:'-',gjelder:'-'};
+const CANDIDATES={fag:['Underdisiplin','Fag','Disiplin'],mmi:['MMI'],revisjon:['Revisjon','Rev'],revisjonsdato:['Revisjonsdato','RevDato'],gjelder:['Revisjonen gjelder','Gjelder']};
 
-const DEFAULT_META = { fag:'-', mmi:'-', revisjon:'-', revisjonsdato:'-', gjelder:'-' };
-const CANDIDATES = {
-  fag: ['Underdisiplin','Fag','Disiplin'],
-  mmi: ['MMI'],
-  revisjon: ['Revisjon','Rev'],
-  revisjonsdato: ['Revisjonsdato','RevDato'],
-  gjelder: ['Revisjonen gjelder','Gjelder']
-};
+function setStatus(m,s=''){document.getElementById('statusText').textContent=m;document.getElementById('statusDot').className=s==='ok'?'dot live':s==='warn'?'dot warn':s==='error'?'dot error':'dot';}
+function safeJson(v){try{return JSON.stringify(v,null,2)}catch{return String(v)}}
+function redact(v){if(typeof v!=='string')return v;return v.replace(/Bearer\s+[A-Za-z0-9._~+\/-]+/gi,'Bearer [REDACTED]');}
+function diag(m,d){const line=`[${new Date().toISOString()}] ${m}`;console.log('[DOCLIB]',m,d===undefined?'':d);diagLines.push(d===undefined?line:`${line}\n${redact(safeJson(d))}`);if(diagLines.length>800)diagLines=diagLines.slice(-800);const o=document.getElementById('diagOutput');if(o){o.textContent=diagLines.join('\n\n');o.scrollTop=o.scrollHeight;}}
+function summarize(d){if(Array.isArray(d))return{type:'array',length:d.length,sample:d.slice(0,2)};if(d&&typeof d==='object')return{type:'object',keys:Object.keys(d).slice(0,50),sample:d};return d;}
+async function apiGet(url){diag(`GET ${url}`);let r;try{r=await fetch(url,{headers:{Authorization:`Bearer ${accessToken}`,Accept:'application/json'}})}catch(e){diag(`FETCH BLOCKED/NETWORK ERROR ${url}`,{name:e.name,message:e.message,likely:'CORS, DNS, host or browser policy'});return{ok:false,status:0,data:null,error:e.message}}const text=await r.text();let data;try{data=text?JSON.parse(text):null}catch{data=text}diag(`HTTP ${r.status} ${url}`,summarize(data));return{ok:r.ok,status:r.status,data,headers:Object.fromEntries(r.headers.entries())};}
 
-function setStatus(message, state='') {
-  document.getElementById('statusText').textContent = message;
-  document.getElementById('statusDot').className = state === 'ok' ? 'dot live' : state === 'warn' ? 'dot warn' : state === 'error' ? 'dot error' : 'dot';
-}
-function safeJson(value) { try { return JSON.stringify(value, null, 2); } catch { return String(value); } }
-function diag(message, data) {
-  const line = `[${new Date().toISOString()}] ${message}`;
-  console.log('[DOCLIB]', message, data === undefined ? '' : data);
-  diagLines.push(data === undefined ? line : `${line}\n${safeJson(data)}`);
-  if (diagLines.length > 500) diagLines = diagLines.slice(-500);
-  const out = document.getElementById('diagOutput');
-  if (out) { out.textContent = diagLines.join('\n\n'); out.scrollTop = out.scrollHeight; }
-}
-async function apiGet(url) {
-  diag(`GET ${url}`);
-  let response;
-  try {
-    response = await fetch(url, { method:'GET', headers:{ Authorization:`Bearer ${accessToken}`, Accept:'application/json' } });
-  } catch (e) {
-    diag(`NETWORK ERROR ${url}`, {name:e.name,message:e.message});
-    return {ok:false,status:0,data:null,error:e.message};
+function wireUi(){document.getElementById('refreshBtn').onclick=()=>currentProject&&fetchProjectFiles(currentProject.id);document.getElementById('diagBtn').onclick=()=>{const p=document.getElementById('diagPanel');p.style.display=p.style.display==='block'?'none':'block'};document.getElementById('clearDiagBtn').onclick=()=>{diagLines=[];document.getElementById('diagOutput').textContent=''};}
+async function initExtension(){try{wireUi();setStatus('Kobler til Trimble Connect...','warn');diag(`DocLib v${VERSION} MODEL_API_DIAGNOSTICS starter`);API=await window.TrimbleConnectWorkspace.connect(window.parent);currentProject=await API.project.getProject();diag('Workspace API/prosjekt OK',{id:currentProject?.id,name:currentProject?.name});const q=new URLSearchParams(location.search);accessToken=q.get('token')||q.get('accessToken')||q.get('access_token');if(!accessToken){try{const t=await API.extension.getPermission('accesstoken');accessToken=typeof t==='string'?t:(t?.accessToken||t?.token||'');diag('Access token forespurt',{received:Boolean(accessToken)})}catch(e){diag('Token-feil',e.message)}}if(!accessToken)throw new Error('Mangler access token');await fetchProjectFiles(currentProject.id)}catch(e){diag('INITIALISERINGSFEIL',{message:e.message,stack:e.stack});setStatus(`Feil: ${e.message}`,'error')}}
+
+async function hentAlleIfc(folderId,folderName){let found=[];const r=await apiGet(`${CORE_BASE}/folders/${folderId}/items`);if(!r.ok)return found;const items=Array.isArray(r.data)?r.data:(r.data?.items||[]),subs=[];for(const x of items){if(x.type==='FILE'&&String(x.name||'').toLowerCase().endsWith('.ifc'))found.push({...x,folderName});else if(x.type==='FOLDER')subs.push(x)}for(const list of await Promise.all(subs.map(x=>hentAlleIfc(x.id,x.name))))found=found.concat(list);return found;}
+async function mapWithLimit(a,n,fn){const out=new Array(a.length);let next=0;async function w(){while(true){const i=next++;if(i>=a.length)return;out[i]=await fn(a[i],i)}}await Promise.all(Array.from({length:Math.min(n,a.length)},w));return out;}
+
+async function fetchProjectFiles(projectId){const body=document.getElementById('tableBody'),prog=document.getElementById('progressIndicator');body.innerHTML='<tr><td colspan="7" class="loading">Skanner prosjektet for IFC-filer...</td></tr>';try{const p=await apiGet(`${CORE_BASE}/projects/${projectId}`);if(!p.ok)throw new Error(`Prosjektoppslag HTTP ${p.status}`);const root=p.data?.rootId||p.data?.rootFolder?.id||p.data?.rootFolderId||p.data?.folderId;if(!root)throw new Error('Fant ingen rotmappe');const files=await hentAlleIfc(root,'Rotmappe');diag('IFC-filer funnet',{count:files.length});setupFolders(files);let done=0;setStatus('Kjører Model API-diagnostikk...','warn');allFilesData=await mapWithLimit(files,2,async f=>{const m=await diagnoseModel(f);done++;prog.textContent=`(Diagnostikk: ${done} / ${files.length})`;return{id:f.id,name:f.name,folderName:f.folderName,...m}});prog.textContent='';renderTable(allFilesData);setupSearch();setStatus(`Diagnostikk ferdig for ${files.length} filer`,'ok')}catch(e){diag('PROSJEKTFEIL',{message:e.message});body.innerHTML=`<tr><td colspan="7" class="loading">Feil: ${escapeHtml(e.message)}</td></tr>`;setStatus('API-feil','error')}}
+
+async function diagnoseModel(file){diag(`=== MODEL API START: ${file.name} ===`,{fileId:file.id});const fr=await apiGet(`${CORE_BASE}/files/${file.id}`);if(!fr.ok)return{...DEFAULT_META};const modelId=file.id;diag('ModelId settes lik fileId',{modelId,versionId:fr.data?.versionId,status:fr.data?.status,trianglesCount:fr.data?.trianglesCount});
+  const routes=[
+    id=>`/models/${id}`,
+    id=>`/models/${id}/entities`,
+    id=>`/models/${id}/hierarchies`,
+    id=>`/models/${id}/psetdefs`,
+    id=>`/models/${id}/propertysetdefinitions`,
+    id=>`/models/${id}/properties`
+  ];
+  let best={...DEFAULT_META};
+  for(const base of MODEL_API_CANDIDATES){
+    diag('Prøver Model API host',{base,modelId});
+    for(const makePath of routes){const url=base+makePath(modelId);const r=await apiGet(url);if(r.ok&&r.data){const meta=extractMetadata(r.data);if(hasAnyMeta(meta)){best=mergeMeta(best,meta);diag('Metadata-kandidat fra Model API',{url,meta})}}}
   }
-  const text = await response.text();
-  let data = null;
-  try { data = text ? JSON.parse(text) : null; } catch { data = text; }
-  diag(`HTTP ${response.status} ${url}`, summarize(data));
-  return {ok:response.ok,status:response.status,data};
-}
-function summarize(data) {
-  if (Array.isArray(data)) return {type:'array',length:data.length,sample:data.slice(0,2)};
-  if (data && typeof data === 'object') return {type:'object',keys:Object.keys(data).slice(0,40),sample:data};
-  return data;
+  diag(`=== MODEL API SLUTT: ${file.name} ===`,{result:best});return best;
 }
 
-async function initExtension() {
-  try {
-    wireUi();
-    setStatus('Kobler til Trimble Connect...', 'warn');
-    diag(`DocLib v${VERSION} starter`);
-    API = await window.TrimbleConnectWorkspace.connect(window.parent);
-    diag('Workspace API tilkoblet');
-    if (API.ui?.setMenu) {
-      API.ui.setMenu({title:'DocLib',command:'open_explorer',icon:'https://vidmet.github.io/DocLib/paper.png'}).catch(e=>diag('setMenu warning',e.message));
-    }
-    if (API.ui?.onCommand) API.ui.onCommand(command=>{ if(command==='open_explorer') API.ui.setActiveMenuItem('open_explorer').catch(()=>{}); });
-    currentProject = await API.project.getProject();
-    diag('Prosjekt mottatt', currentProject);
-    const params = new URLSearchParams(location.search);
-    accessToken = params.get('token') || params.get('accessToken') || params.get('access_token');
-    if (!accessToken) {
-      try {
-        const td = await API.extension.getPermission('accesstoken');
-        accessToken = typeof td === 'string' ? td : (td?.accessToken || td?.token || '');
-        diag('Access token forespurt via extension permission', {received:Boolean(accessToken),type:typeof td});
-      } catch(e) { diag('Kunne ikke hente token via extension permission',e.message); }
-    }
-    if (!accessToken) throw new Error('Klarte ikke hente gyldig access token.');
-    await fetchProjectFiles(currentProject.id);
-  } catch(error) {
-    console.error(error); diag('INITIALISERINGSFEIL',{message:error.message,stack:error.stack});
-    setStatus(`Feil: ${error.message}`,'error');
-  }
-}
-function wireUi() {
-  document.getElementById('refreshBtn').onclick = ()=> currentProject && fetchProjectFiles(currentProject.id);
-  document.getElementById('diagBtn').onclick = ()=> { const p=document.getElementById('diagPanel'); p.style.display=p.style.display==='block'?'none':'block'; };
-  document.getElementById('clearDiagBtn').onclick = ()=> { diagLines=[];document.getElementById('diagOutput').textContent=''; };
-}
-
-async function hentAlleIfc(folderId, folderName) {
-  let found=[];
-  const result=await apiGet(`${BASE_URL}/tc/api/2.0/folders/${folderId}/items`);
-  if(!result.ok) { diag('Mappe kunne ikke leses',{folderId,folderName,status:result.status});return found; }
-  const items=Array.isArray(result.data)?result.data:(result.data?.items||[]);
-  const folders=[];
-  for(const item of items) {
-    if(item.type==='FILE' && String(item.name||'').toLowerCase().endsWith('.ifc')) found.push({...item,folderName});
-    else if(item.type==='FOLDER') folders.push(item);
-  }
-  diag(`Mappe skannet: ${folderName}`,{folderId,items:items.length,ifc:found.length,subfolders:folders.length});
-  const childResults=await Promise.all(folders.map(f=>hentAlleIfc(f.id,f.name)));
-  for(const list of childResults) found=found.concat(list);
-  return found;
-}
-async function mapWithLimit(arr,limit,fn) {
-  const results=new Array(arr.length); let next=0;
-  async function worker(){ while(true){ const i=next++; if(i>=arr.length)return; results[i]=await fn(arr[i],i); } }
-  await Promise.all(Array.from({length:Math.min(limit,arr.length)},worker)); return results;
-}
-
-async function fetchProjectFiles(projectId) {
-  const body=document.getElementById('tableBody'); const progress=document.getElementById('progressIndicator');
-  body.innerHTML='<tr><td colspan="7" class="loading">Skanner prosjektet for IFC-filer...</td></tr>'; progress.textContent='';
-  try {
-    setStatus('Finner rotmappen for prosjektet...','warn');
-    const p=await apiGet(`${BASE_URL}/tc/api/2.0/projects/${projectId}`);
-    if(!p.ok) throw new Error(`Prosjektoppslag feilet (HTTP ${p.status})`);
-    const rootId=p.data?.rootId || p.data?.rootFolder?.id || p.data?.rootFolderId || p.data?.folderId;
-    diag('Rotmappe identifisert',{rootId});
-    if(!rootId) throw new Error('Fant ingen rotmappe i prosjektresponsen.');
-    setStatus('Skanner hele prosjektet for IFC-filer...','warn');
-    const files=await hentAlleIfc(rootId,'Rotmappe');
-    diag('IFC-skanning ferdig',{count:files.length,files:files.map(f=>({id:f.id,name:f.name,folder:f.folderName}))});
-    if(!files.length){body.innerHTML='<tr><td colspan="7" class="loading">Ingen IFC-filer funnet.</td></tr>';setStatus('Ferdig. Ingen IFC-filer funnet.','ok');return;}
-    setupFolders(files);
-    setStatus('Diagnostiserer IFC-egenskaper...','warn');
-    let done=0;
-    allFilesData=await mapWithLimit(files,3,async file=>{
-      const metadata=await fetchFileMetadata(file);
-      done++; progress.textContent=`(Henter data: ${done} / ${files.length})`;
-      return {id:file.id,name:file.name,folderName:file.folderName,...metadata};
-    });
-    progress.textContent='';renderTable(allFilesData);setupSearch();setStatus(`Data lastet inn for ${files.length} filer`,'ok');
-    diag('Alle filer ferdig behandlet',allFilesData);
-  } catch(error) {
-    diag('FILHENTING FEILET',{message:error.message,stack:error.stack});
-    body.innerHTML=`<tr><td colspan="7" class="loading">Feil: ${escapeHtml(error.message)}</td></tr>`;progress.textContent='';setStatus('Nettverks-/API-feil','error');
-  }
-}
-
-async function fetchFileMetadata(file) {
-  diag(`=== METADATA START: ${file.name} ===`,{fileId:file.id,folder:file.folderName});
-  const fr=await apiGet(`${BASE_URL}/tc/api/2.0/files/${file.id}`);
-  if(!fr.ok){diag(`Filoppslag feilet: ${file.name}`,{status:fr.status});return {...DEFAULT_META};}
-  const fd=fr.data||{};
-  const modelIds=[fd.modelId,fd.model?.id,file.modelId,file.id].filter(Boolean).filter((v,i,a)=>a.indexOf(v)===i);
-  diag(`Mulige modelId for ${file.name}`,{modelIds,fileResponse:fd});
-  const attempts=[];
-  for(const modelId of modelIds){
-    const urls=[
-      `${BASE_URL}/tc/api/2.0/models/${modelId}/properties`,
-      `${BASE_URL}/tc/api/2.0/models/${modelId}`
-    ];
-    for(const url of urls){
-      const r=await apiGet(url); attempts.push({modelId,url,status:r.status,ok:r.ok});
-      if(r.ok && r.data){
-        const meta=extractMetadata(r.data);
-        diag(`Metadata-kandidater fra ${url}`,meta);
-        if(hasAnyMeta(meta)){diag(`=== METADATA TREFF: ${file.name} ===`,meta);return meta;}
-      }
-    }
-  }
-  diag(`Ingen kjente metadata funnet for ${file.name}`,{attempts});
-  diag(`=== METADATA SLUTT: ${file.name} ===`);
-  return {...DEFAULT_META};
-}
-function hasAnyMeta(m){return Object.values(m).some(v=>v && v!=='-');}
-function normalizeName(v){return String(v??'').trim().toLowerCase().replace(/[\s_\-.]/g,'');}
-function primitiveValue(v){
-  if(v===null||v===undefined)return null;
-  if(['string','number','boolean'].includes(typeof v)) return String(v).trim() || null;
-  if(typeof v==='object'){
-    for(const key of ['value','displayValue','text','stringValue','nominalValue']) if(v[key]!==undefined && typeof v[key]!=='object') return String(v[key]).trim()||null;
-  }
-  return null;
-}
-function findNamedValue(root,names){
-  const wanted=new Set(names.map(normalizeName)); const seen=new WeakSet();
-  function walk(node,path,depth){
-    if(depth>30 || node===null || node===undefined || typeof node!=='object') return null;
-    if(seen.has(node))return null; seen.add(node);
-    if(Array.isArray(node)){for(let i=0;i<node.length;i++){const hit=walk(node[i],`${path}[${i}]`,depth+1);if(hit)return hit;}return null;}
-    const nameKeys=['name','key','propertyName','displayName','label'];
-    const valueKeys=['value','displayValue','propertyValue','text','stringValue','nominalValue'];
-    for(const nk of nameKeys){
-      if(node[nk]!==undefined && wanted.has(normalizeName(node[nk]))){
-        for(const vk of valueKeys){const value=primitiveValue(node[vk]);if(value)return {value,path:`${path}.${nk}=${node[nk]}`,shape:'named-property'};}
-      }
-    }
-    for(const [key,val] of Object.entries(node)){
-      if(wanted.has(normalizeName(key))){const value=primitiveValue(val);if(value)return {value,path:`${path}.${key}`,shape:'direct-key'};}
-    }
-    for(const [key,val] of Object.entries(node)){if(val && typeof val==='object'){const hit=walk(val,`${path}.${key}`,depth+1);if(hit)return hit;}}
-    return null;
-  }
-  return walk(root,'$',0);
-}
-function extractMetadata(data){
-  const result={...DEFAULT_META};
-  for(const [field,names] of Object.entries(CANDIDATES)){
-    const hit=findNamedValue(data,names);
-    if(hit){result[field]=hit.value;diag(`TREFF ${field}`,{candidateNames:names,value:hit.value,path:hit.path,shape:hit.shape});}
-  }
-  return result;
-}
-function setupFolders(files){
-  const sel=document.getElementById('folderSelect');const folders=[...new Set(files.map(f=>f.folderName))].sort((a,b)=>a.localeCompare(b,'no'));
-  sel.innerHTML='<option value="all">Alle mapper</option>'+folders.map(f=>`<option value="${escapeHtml(f)}">${escapeHtml(f)}</option>`).join('');sel.style.display='block';
-}
-function escapeHtml(v){return String(v??'').replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));}
-function renderTable(data){
-  const body=document.getElementById('tableBody');
-  if(!data.length){body.innerHTML='<tr><td colspan="7" class="loading">Søket ga ingen treff.</td></tr>';return;}
-  body.innerHTML=data.map(f=>`<tr><td style="font-weight:600">${escapeHtml(f.name)}</td><td style="color:var(--muted);font-size:12px">${escapeHtml(f.folderName)}</td><td>${escapeHtml(f.fag)}</td><td>${escapeHtml(f.mmi)}</td><td>${escapeHtml(f.revisjon)}</td><td>${escapeHtml(f.revisjonsdato)}</td><td>${escapeHtml(f.gjelder)}</td></tr>`).join('');
-}
-function setupSearch(){
-  const input=document.getElementById('searchInput'),sel=document.getElementById('folderSelect');
-  const apply=()=>{const term=input.value.toLowerCase(),folder=sel.value;renderTable(allFilesData.filter(f=>Object.values(f).some(v=>String(v).toLowerCase().includes(term))&&(folder==='all'||f.folderName===folder)));};
-  input.oninput=apply;sel.onchange=apply;
-}
-
+function mergeMeta(a,b){const o={...a};for(const k of Object.keys(o))if(o[k]==='-'&&b[k]!=='-')o[k]=b[k];return o}
+function hasAnyMeta(m){return Object.values(m).some(v=>v&&v!=='-')}
+function norm(v){return String(v??'').trim().toLowerCase().replace(/[\s_\-.]/g,'')}
+function primitive(v){if(v==null)return null;if(['string','number','boolean'].includes(typeof v))return String(v).trim()||null;if(typeof v==='object')for(const k of ['value','displayValue','text','stringValue','nominalValue','propertyValue'])if(v[k]!=null&&typeof v[k]!=='object')return String(v[k]).trim()||null;return null}
+function findNamedValue(root,names){const wanted=new Set(names.map(norm)),seen=new WeakSet();function walk(n,path,depth){if(depth>35||!n||typeof n!=='object')return null;if(seen.has(n))return null;seen.add(n);if(Array.isArray(n)){for(let i=0;i<n.length;i++){const h=walk(n[i],`${path}[${i}]`,depth+1);if(h)return h}return null}for(const nk of ['name','key','propertyName','displayName','label'])if(n[nk]!=null&&wanted.has(norm(n[nk])))for(const vk of ['value','displayValue','propertyValue','text','stringValue','nominalValue']){const v=primitive(n[vk]);if(v)return{value:v,path:`${path}.${nk}=${n[nk]}`}}for(const[k,v]of Object.entries(n))if(wanted.has(norm(k))){const x=primitive(v);if(x)return{value:x,path:`${path}.${k}`}}for(const[k,v]of Object.entries(n))if(v&&typeof v==='object'){const h=walk(v,`${path}.${k}`,depth+1);if(h)return h}return null}return walk(root,'$',0)}
+function extractMetadata(data){const o={...DEFAULT_META};for(const[field,names]of Object.entries(CANDIDATES)){const h=findNamedValue(data,names);if(h){o[field]=h.value;diag(`TREFF ${field}`,{value:h.value,path:h.path})}}return o}
+function setupFolders(files){const s=document.getElementById('folderSelect'),fs=[...new Set(files.map(f=>f.folderName))].sort((a,b)=>a.localeCompare(b,'no'));s.innerHTML='<option value="all">Alle mapper</option>'+fs.map(f=>`<option value="${escapeHtml(f)}">${escapeHtml(f)}</option>`).join('');s.style.display='block'}
+function escapeHtml(v){return String(v??'').replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]))}
+function renderTable(data){const b=document.getElementById('tableBody');if(!data.length){b.innerHTML='<tr><td colspan="7" class="loading">Ingen treff.</td></tr>';return}b.innerHTML=data.map(f=>`<tr><td style="font-weight:600">${escapeHtml(f.name)}</td><td style="color:var(--muted);font-size:12px">${escapeHtml(f.folderName)}</td><td>${escapeHtml(f.fag)}</td><td>${escapeHtml(f.mmi)}</td><td>${escapeHtml(f.revisjon)}</td><td>${escapeHtml(f.revisjonsdato)}</td><td>${escapeHtml(f.gjelder)}</td></tr>`).join('')}
+function setupSearch(){const i=document.getElementById('searchInput'),s=document.getElementById('folderSelect');const f=()=>{const t=i.value.toLowerCase(),d=s.value;renderTable(allFilesData.filter(x=>Object.values(x).some(v=>String(v).toLowerCase().includes(t))&&(d==='all'||x.folderName===d)))};i.oninput=f;s.onchange=f}
 window.addEventListener('load',initExtension);
