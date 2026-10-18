@@ -1,7 +1,7 @@
 {
   "title": "Dokumentutforsker med Metadata",
   "icon": "https://vidmet.github.io/DocLib/paper.png",
-  "url": "https://vidmet.github.io/DocLib/index.html?v=1.23.1",
-  "description": "DocLib v1.23.1 - Model API diagnostics.",
+  "url": "https://vidmet.github.io/DocLib/index.html?v=1.24",
+  "description": "DocLib v1.24 - authenticated Trimble Connect Model API access.",
   "enabled": true
 }
