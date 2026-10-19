@@ -1,8 +1,8 @@
 {
   "title": "Dokumentutforsker med Metadata",
   "icon": "https://vidmet.github.io/DocLib/paper.png",
-  "url": "https://vidmet.github.io/DocLib/index.html?v=1.35",
-  "description": "DocLib v1.35 - import and export of portable column profiles.",
+  "url": "https://vidmet.github.io/DocLib/index.html?v=1.35.1",
+  "description": "DocLib v1.35.1 - import conflict handling with overwrite or copy choice.",
   "extensionType": ["project"],
   "enabled": true
 }
