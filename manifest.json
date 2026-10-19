@@ -1,8 +1,8 @@
 {
   "title": "Dokumentutforsker med Metadata",
   "icon": "https://vidmet.github.io/DocLib/paper.png",
-  "url": "https://vidmet.github.io/DocLib/index.html?v=1.35.1",
-  "description": "DocLib v1.35.1 - import conflict handling with overwrite or copy choice.",
+  "url": "https://vidmet.github.io/DocLib/index.html?v=1.35.2",
+  "description": "DocLib v1.35.2 - resets and normalizes value colorization when switching profiles.",
   "extensionType": ["project"],
   "enabled": true
 }
