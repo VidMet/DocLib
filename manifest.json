@@ -1,8 +1,8 @@
 {
   "title": "Dokumentutforsker med Metadata",
   "icon": "https://vidmet.github.io/DocLib/paper.png",
-  "url": "https://vidmet.github.io/DocLib/index.html?v=1.32",
-  "description": "DocLib v1.32 - local project-specific column profiles.",
+  "url": "https://vidmet.github.io/DocLib/index.html?v=1.32.1",
+  "description": "DocLib v1.32.1 - restores IFC property selection when metadata is loaded from cache.",
   "extensionType": ["project"],
   "enabled": true
 }
