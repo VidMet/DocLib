@@ -1,8 +1,8 @@
 {
   "title": "Dokumentutforsker med Metadata",
   "icon": "https://vidmet.github.io/DocLib/paper.png",
-  "url": "https://vidmet.github.io/DocLib/index.html?v=1.30",
-  "description": "DocLib v1.30 - column filtering and datatype-aware sorting.",
+  "url": "https://vidmet.github.io/DocLib/index.html?v=1.31",
+  "description": "DocLib v1.31 - configurable IFC property columns with project-local settings.",
   "extensionType": ["project"],
   "enabled": true
 }
