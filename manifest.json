@@ -1,8 +1,8 @@
 {
   "title": "Dokumentutforsker med Metadata",
   "icon": "https://vidmet.github.io/DocLib/paper.png",
-  "url": "https://vidmet.github.io/DocLib/index.html?v=1.29.4",
-  "description": "DocLib v1.29.4 - Viewer deep link with raw comma-separated modelId and versionId values.",
+  "url": "https://vidmet.github.io/DocLib/index.html?v=1.29.5",
+  "description": "DocLib v1.29.5 - deep-link diagnostics with versionless and single-model tests.",
   "extensionType": ["project"],
   "enabled": true
 }
