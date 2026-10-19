@@ -1,8 +1,8 @@
 {
   "title": "Dokumentutforsker med Metadata",
   "icon": "https://vidmet.github.io/DocLib/paper.png",
-  "url": "https://vidmet.github.io/DocLib/index.html?v=1.35.2",
-  "description": "DocLib v1.35.2 - resets and normalizes value colorization when switching profiles.",
+  "url": "https://vidmet.github.io/DocLib/index.html?v=1.35.3",
+  "description": "DocLib v1.35.3 - reads shared project profiles from Extension_config/DocLib.",
   "extensionType": ["project"],
   "enabled": true
 }
