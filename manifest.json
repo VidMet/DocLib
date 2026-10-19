@@ -1,8 +1,8 @@
 {
   "title": "Dokumentutforsker med Metadata",
   "icon": "https://vidmet.github.io/DocLib/paper.png",
-  "url": "https://vidmet.github.io/DocLib/index.html?v=1.35.3.2",
-  "description": "DocLib v1.35.3.2 - hides redundant unmodified personal Standard without deleting it.",
+  "url": "https://vidmet.github.io/DocLib/index.html?v=1.35.4-preview.1",
+  "description": "DocLib v1.35.4-preview.1 - manual publication package preparation and read-back verification. No automatic writes.",
   "extensionType": [
     "project"
   ],
