@@ -1,8 +1,8 @@
 {
   "title": "Dokumentutforsker med Metadata",
   "icon": "https://vidmet.github.io/DocLib/paper.png",
-  "url": "https://vidmet.github.io/DocLib/index.html?v=1.29.2",
-  "description": "DocLib v1.29.2 - dual-host project and 3D Viewer bridge.",
-  "extensionType": ["project", "3dviewer"],
+  "url": "https://vidmet.github.io/DocLib/index.html?v=1.29.3",
+  "description": "DocLib v1.29.3 - Viewer deep link with automatic loading of selected models.",
+  "extensionType": ["project"],
   "enabled": true
 }
