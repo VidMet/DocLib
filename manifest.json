@@ -1,8 +1,8 @@
 {
   "title": "Dokumentutforsker med Metadata",
   "icon": "https://vidmet.github.io/DocLib/paper.png",
-  "url": "https://vidmet.github.io/DocLib/index.html?v=1.29.5",
-  "description": "DocLib v1.29.5 - deep-link diagnostics with versionless and single-model tests.",
+  "url": "https://vidmet.github.io/DocLib/index.html?v=1.30",
+  "description": "DocLib v1.30 - column filtering and datatype-aware sorting.",
   "extensionType": ["project"],
   "enabled": true
 }
