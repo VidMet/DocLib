@@ -1,3 +1,16 @@
+DocLib v1.35.4-preview.3.1 IDENTITY_DIAGNOSTICS
+Bygget fra faktisk preview.3 ZIP. Erstatt app.js, index.html og manifest.json. Ingen nye avhengigheter.
+
+NYTT
+Identitetsdiagnostikk viser kun getUser().id, kilde, tidspunkt, kontrollfase, ID-format og kontrollresultat. Ingen navn, e-post, rå API-respons, token eller signert URL inngår i identitetsrapporten. Ingen av de to tidligere observerte ID-ene er hardkodet eller koblet sammen.
+Baseline settes ved oppstart. Kontroller ID nå henter getUser() på nytt. Opplasting kontrollerer ID ved preflight, før initiate, før PUT og før commit. ID-endring eller mislykket identitetskontroll sperrer nye opplastingskall resten av økten, selv om ID senere går tilbake. Siden må lastes på nytt etter at innloggingen er kontrollert. Allerede utførte kall rulles ikke tilbake; ingen automatisk sletting eller gjentakelse. Dette er klientkontroll, ikke en atomisk identitetsgaranti på serveren.
+Forrige oppstarts-ID lagres lokalt per prosjekt, kun for diagnostikk. Forskjell mellom innlastinger varsles i rapport/logg, men kobles ikke automatisk og sperrer ikke alene: det kan også være en annen innlogget bruker. Historikk følger ikke til annen nettleser. Den begynner med denne versjonen. Kopier rapporten fra begge innlastinger ved reproduksjon.
+Ingen mapper, eierfelt, eksisterende profiler eller ACL endres av diagnostikken. Koden avklarer ikke hvorfor ID varierer. Kopier identitetsrapporten, ikke hele nettverksdumpen. Rapporten inneholder bruker-ID og prosjekt-ID og bør bare deles ved behov.
+
+TEST
+Se TESTRESULTATER.txt for lokale simulerte tester. Ingen autentisert live-test eller full nettleserregresjon er utført.
+
+BEHOLDT FRA PREVIEW.3
 DocLib v1.35.4-preview.3 USER_PROFILE_STORAGE_MANUAL_ACL
 Komplette erstatningsfiler fra preview.2. Ingen live-test i prosjektet.
 
