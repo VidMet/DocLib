@@ -1,7 +1,8 @@
-PASS explicit local copy, metadata exclusion, no network writes, double-click guard
-PASS collision does not overwrite
-PASS consent required
-PASS identity mismatch blocks local save
-PASS invalid schema rejected
-PASS reserved profile name rejected
-PASS syntaks, HTML-referanser, versjonskonsistens og bevart identitetssperre. Ingen live-test.
+PASS own profiles, duplicate names retained by file ID, wrong owner ignored
+PASS local copy, no server writes, shared profiles excluded from local storage, double-click guard
+PASS repeated copy uses unique name
+PASS select stored profile
+PASS identity check failure blocks copy
+PASS folder failure clears only stored user profiles, preserves local/shared profiles
+PASS JavaScript-syntaks, HTML-ID-er, elementreferanser, versjonskonsistens og beholdt identitetskontroll.
+Ingen autentisert live-test eller full UI-regresjon.

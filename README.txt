@@ -1,3 +1,15 @@
+DocLib v1.35.4-preview.3.3 MY_PROFILE_MANAGER
+Bygget fra faktisk preview.3.2 ZIP. Erstatt app.js, index.html og manifest.json.
+
+NYTT
+Administrer Mine profiler viser brukerens innleste profilfiler, fil-ID, profil-ID, eier-ID, prosjekt-ID, kolonneantall og sortering. Like visningsnavn skilles med fil-ID. Oppdater bare Mine profiler leser brukerens mappe uten ny modellmetadata-skanning. Bruk lagret profil velger skrivebeskyttet oppsett. Lag lokal kopi for redigering oppretter et unikt lokalt navn uten overskriving. Lagre i Mine profiler er fortsatt en separat handling som lager ny UUID-fil. Ingen serveroppdatering, sletting, revisjonskjede eller standardprofilvalg er lagt til.
+Innlesing viser ignorerte filer med generell valideringsfeil; ingen rå serverfeil eller token logges av de nye funksjonene. Ved mappefeil fjernes gamle Mine-profiler fra visningen. Enkeltfiler som ikke kan leses/valideres ignoreres. Listen er et innlest øyeblikksbilde, ikke kontinuerlig synkronisering.
+Identitetsdiagnostikk, sperrer, manuell ACL-kontroll og gjenoppretting beholdes. Ingen identitetsaliaser. Kun innlogget brukers mappe vises; ingen adminoversikt. Faktisk tilgang styres fortsatt av Trimble Connect og må kontrolleres av admin.
+
+TEST
+Se TESTRESULTATER.txt. Lokale simulerte tester, ikke autentisert live-test eller full nettleserregresjon.
+
+Tidligere driftsveiledning:
 DocLib v1.35.4-preview.3.2 CONTROLLED_PROFILE_RECOVERY
 Bygget fra preview.3.1. Komplette app.js, index.html og manifest.json. Identitetsdiagnostikk og sperrer beholdes. Ingen hardkodet bruker-ID eller automatisk alias/migrering.
 
