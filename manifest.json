@@ -1,8 +1,8 @@
 {
   "title": "Dokumentutforsker med Metadata",
   "icon": "https://vidmet.github.io/DocLib/paper.png",
-  "url": "https://vidmet.github.io/DocLib/index.html?v=1.35.4-preview.2",
-  "description": "DocLib 1.35.4-preview.2 - controlled new profile file upload; no index writes. Legacy SDK upload flow.",
+  "url": "https://vidmet.github.io/DocLib/index.html?v=1.35.4-preview.3",
+  "description": "DocLib 1.35.4-preview.3 - user profile reader and upload to manually secured user folder; ACL not automatically verified.",
   "extensionType": [
     "project"
   ],

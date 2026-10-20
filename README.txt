@@ -1,12 +1,23 @@
-DocLib v1.35.4-preview.2
-Bygget fra de fire vedlagte preview.1-filene.
-Erstatt app.js, index.html og manifest.json. Ingen nye avhengigheter.
-Velg personlig profil, Last opp ny profilfil, bla til eksisterende testmappe, kontroller sammendrag, kryss av og last opp.
-Prosjektindeksen endres ikke. Filen blir ikke automatisk prosjektprofil.
-Eksisterende manuell publiseringspakke er beholdt.
-Opplasting: POST /files/fs/initiate med parentId,parentType:FOLDER,name; PUT uploadURL; POST /files/fs/commit med uploadId. Basert paa TCPS.uploadFileContent i offisiell trimble-connect-sdk 4.0.12. Initiate/commit er deprecated i Core API. Ingen alternative endepunkter proeves.
-Ingen innebygde hemmeligheter; eksisterende brukertoken brukes bare mot Core API, ikke PUT-adressen. Signert uploadURL logges eller lagres ikke.
-Kvittering med forventet profilinnhold lagres lokalt foer skriving. Kontroller siste forsoek gjoer bare lesekall. Ingen automatisk gjentakelse eller sletting.
-Unikt UUID-filnavn og kollisjonskontroll reduserer kollisjonsrisiko, men er ikke en atomisk create-only-garanti. Ikke en produksjonsklar flerbrukerpublisher.
-Ingen autentisert live-test er utfoert. Nettleser-CORS, rettigheter og legacy-endepunktenes tilgjengelighet maa testes i testmappe.
-Ved uklar feil: ikke start ny opplasting foer mappen og siste forsoek er kontrollert. Kvitteringen lagres per prosjekt i nettleseren; ikke del logg eller nettverksdump med token/signerte URL-er.
+DocLib v1.35.4-preview.3 USER_PROFILE_STORAGE_MANUAL_ACL
+Komplette erstatningsfiler fra preview.2. Ingen live-test i prosjektet.
+
+SIKKERHET OG AVGRENSNING
+Dette er en implementasjon med manuelt administrerte rettigheter, ikke automatisk ACL-verifikasjon. Bruker-ID, mappebane og ownerId er ikke tilgangsbeskyttelse. Faktiske rettigheter i Trimble Connect beskytter innholdet. Ingen automatisk mappeoppretting eller rettighetsendring. Ikke bruk til privat lagring før admin har kontrollert tilgangen. Eksisterende testopplasting er beholdt, tydelig merket ikke privat.
+
+ADMINOPPSETT
+1. Installer filene og bruk Brukermappe - oppsett for bruker-ID fra Workspace API.user.getUser(). Ingen e-post eller JWT-utledning brukes.
+2. Opprett Extension_config/DocLib/users/<bruker-ID>/profiles i prosjektet. Ikke bruk brukerens navn i stedet for ID.
+3. I Connect for Browser: velg brukermappen, Edit folder permissions. Kontroller og ved behov deaktiver arving. Gi eier Full Access; fjern øvrige brukeres/gruppers tilgang. Kontroller også profiles-mappen og eventuelle ekstra filrettigheter. Prosjektadmins beholder tilgang gjennom rollen.
+4. Kontroller med eier, en annen vanlig prosjektbruker og prosjektadmin at faktisk tilgang er riktig. Gjenta etter rettighetsendringer. DocLib verifiserer ikke dette automatisk.
+
+BRUK
+Lokale profiler er nå nøkkelsatt med prosjekt og bruker-ID. Gamle lokale profiler migreres ikke automatisk, fordi de ikke har sikker eiertilknytning. Eksporter dem fra preview.2 og importer i preview.3.
+Velg lokal profil, Lagre i Mine profiler. Målet låses til brukerens eksisterende mappe. Bekreft manuelt at admin har kontrollert tilgang. Opplasting lager en ny UUID-fil, ingen overskriving. Filen leses tilbake og kontrolleres. Mine profiler lastes fra egen mappe ved oppstart/oppdatering, også i annen nettleser. Lag lokal kopi for redigering. Hver ny lagring lager separat profilfil; ingen automatisk revisjonserstatning/sletting.
+Eksisterende preview.2-filer uten ownerId og projectId importeres ikke automatisk som Mine profiler. Last opp på nytt via riktig funksjon etter tilgangskontroll.
+Prosjektindeksen endres ikke. Ingen adminoversikt i DocLib; admins bruker prosjektutforskeren for brukermappene. Innlesing er ikke en erstatning for serverrettigheter. Mine profiler caches ikke som prosjektprofiler.
+
+TEKNISK
+Beholder preview.2 initiate/PUT/commit-flyt (utgående endepunkter). Ingen reserveforsøk eller automatisk gjentakelse. Ingen token sendes til PUT-adressen. Brukerbasert lokal kvittering. Ved feil kontroller siste forsøk og målmappe før ny lagring.
+Kilder: https://help.trimble.com/doc/trimble-connect/trimble-connect/connect-for-browser/files-and-folders/folder-permissions
+https://help.trimble.com/doc/trimble-connect/trimble-connect/connect-for-browser/files-and-folders/folder-permissions/change-folder-permissions
+Workspace API types: trimble-connect-workspace-api 0.3.38 UserAPI.getUser / ConnectUser.id.
