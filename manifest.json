@@ -1,8 +1,8 @@
 {
   "title": "Dokumentutforsker med Metadata",
   "icon": "https://vidmet.github.io/DocLib/paper.png",
-  "url": "https://vidmet.github.io/DocLib/index.html?v=1.35.4-preview.3.3",
-  "description": "DocLib 1.35.4-preview.3.3 MY_PROFILE_MANAGER - refresh, inspect and create local editing copy; no server overwrite or deletion.",
+  "url": "https://vidmet.github.io/DocLib/index.html?v=1.35.4-preview.3.4",
+  "description": "DocLib 1.35.4-preview.3.4 UI_CLEANUP - responsive toolbar, grouped actions and separate status; unchanged storage logic.",
   "extensionType": [
     "project"
   ],

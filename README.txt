@@ -1,3 +1,18 @@
+DocLib v1.35.4-preview.3.4 UI_CLEANUP
+Bygget fra faktisk preview.3.3. Erstatt app.js, index.html og manifest.json. Ingen nye runtime-avhengigheter.
+
+TOPP
+Profilvelger, Profiler, Innstillinger, Oppdater metadata, Verktoy, Diagnostikk og Apne valgte i 3D. Egen rad for filformat og sok. Status er flyttet til egen linje. Knappene brytes til nye linjer ved smal bredde; tabellen har fortsatt egen horisontal skrolling ved mange kolonner.
+Profiler: Lagre som, Gi nytt navn, Slett, Lag personlig kopi, Administrer Mine profiler, Lagre i Mine profiler, Forbered prosjektprofil, Eksporter, Importer.
+Verktoy: IFC-egenskaper, Analyse, Tom modellvalg, Vis alle mapper, Nullstill filtre.
+Diagnostikk: vanlig logg, identitetsdiagnostikk, brukermappeoppsett, gjenoppretting, testopplasting, apning uten versjon og enkeltvis viewer-test.
+Menyer lukkes ved valg, klikk utenfor, Escape, fokus utenfor eller endret vindusstorrelse. Menyene kan apnes med tastatur. Menypaneler tilpasses vindusbredden og har vertikal skrolling ved behov.
+Alle eksisterende kontroll-ID-er og dialoger beholdes. Ingen endringer i opplasting, profilformat, identitetskontroll, ACL eller prosjektindeks. Kun UI-oppstartskall og menyfunksjoner er lagt til i app.js i tillegg til versjonsnummer.
+
+TEST
+Se TESTRESULTATER.txt. Ikke autentisert live-test i Trimble Connect.
+
+Tidligere driftsveiledning:
 DocLib v1.35.4-preview.3.3 MY_PROFILE_MANAGER
 Bygget fra faktisk preview.3.2 ZIP. Erstatt app.js, index.html og manifest.json.
 

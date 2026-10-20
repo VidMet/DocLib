@@ -1,8 +1,12 @@
-PASS own profiles, duplicate names retained by file ID, wrong owner ignored
-PASS local copy, no server writes, shared profiles excluded from local storage, double-click guard
-PASS repeated copy uses unique name
-PASS select stored profile
-PASS identity check failure blocks copy
-PASS folder failure clears only stored user profiles, preserves local/shared profiles
-PASS JavaScript-syntaks, HTML-ID-er, elementreferanser, versjonskonsistens og beholdt identitetskontroll.
-Ingen autentisert live-test eller full UI-regresjon.
+PASS responsive toolbar and menu bounds at 1920 px
+PASS responsive toolbar and menu bounds at 1366 px
+PASS responsive toolbar and menu bounds at 1024 px
+PASS responsive toolbar and menu bounds at 768 px
+PASS responsive toolbar and menu bounds at 480 px
+PASS responsive toolbar and menu bounds at 320 px
+PASS keyboard opening, single-open menu and outside click
+PASS original control handler invoked once and menu closes
+PASS disabled control preserved
+PASS JavaScript-syntaks, alle opprinnelige kontroll-ID-er beholdt, ingen duplikate ID-er og gyldige elementreferanser.
+PASS baseline app.js er identisk bortsett fra versjon, UI-oppstartskall og nye menyfunksjoner.
+Nettlesertest: lokal Chromium, uten autentisering og uten Trimble-prosjektforbindelse. Ingen full live-regresjon av API-operasjoner.
