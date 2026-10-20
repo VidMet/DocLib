@@ -1,13 +1,7 @@
-PASS stable identity and double-click protection
-PASS preflight change blocks all writes and preserves baseline
-PASS before-initiate change blocks POST
-PASS before-PUT change stops transfer
-PASS before-commit change stops commit without retry
-PASS session block remains latched after ID returns
-PASS startup failure fails closed without raw error
-PASS identity lookup failure blocks upload
-PASS previous-load difference recorded, not mapped or automatically blocked
-PASS allowlisted diagnostics and persisted history exclude extra API fields
-PASS invalid ID not logged
-PASS JavaScript syntax, unique HTML IDs, element references, version consistency and no hardcoded user IDs
-Simulerte lokale tester. Ingen autentisert live-test eller full UI-regresjon.
+PASS explicit local copy, metadata exclusion, no network writes, double-click guard
+PASS collision does not overwrite
+PASS consent required
+PASS identity mismatch blocks local save
+PASS invalid schema rejected
+PASS reserved profile name rejected
+PASS syntaks, HTML-referanser, versjonskonsistens og bevart identitetssperre. Ingen live-test.

@@ -1,8 +1,8 @@
 {
   "title": "Dokumentutforsker med Metadata",
   "icon": "https://vidmet.github.io/DocLib/paper.png",
-  "url": "https://vidmet.github.io/DocLib/index.html?v=1.35.4-preview.3.1",
-  "description": "DocLib 1.35.4-preview.3.1 IDENTITY_DIAGNOSTICS - session identity lock and pre-upload checks; no identity mapping or ACL changes.",
+  "url": "https://vidmet.github.io/DocLib/index.html?v=1.35.4-preview.3.2",
+  "description": "DocLib 1.35.4-preview.3.2 CONTROLLED_PROFILE_RECOVERY - review JSON as a new local copy; no owner mapping or automatic upload.",
   "extensionType": [
     "project"
   ],

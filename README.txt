@@ -1,3 +1,14 @@
+DocLib v1.35.4-preview.3.2 CONTROLLED_PROFILE_RECOVERY
+Bygget fra preview.3.1. Komplette app.js, index.html og manifest.json. Identitetsdiagnostikk og sperrer beholdes. Ingen hardkodet bruker-ID eller automatisk alias/migrering.
+
+NYTT: Gjenopprett profilfil
+Velg en JSON-profil som du allerede har lastet ned fra prosjektet. Kontroller kildeeier, kildeprosjekt, innlogget ID, kolonneantall og nytt navn. Kryss av og opprett lokal kopi. Ingen eksisterende profil overskrives. Kun validerte kolonner og gyldig sortering kopieres; ownerId, projectId, id og andre toppnivafelt overtas ikke. Profilen lagres lokalt under innlogget brukers eksisterende prosjektnoekkel. Ingen nettverksskriving ved gjenoppretting. Filstorrelse maks 2 MB. Ingen automatisk tilgang til gammel mappe.
+Etter kontroll av lokal kopi kan Lagre i Mine profiler brukes som en separat handling. Denne bruker eksisterende opplastingsflyt og gjeldende bruker-ID, ikke gammel eier-ID. Admin ma fortsatt kontrollere rettighetene til brukermappen. Ingen mapper eller ACL endres automatisk.
+
+TEST
+Lokale simulerte tester og syntakskontroll; ikke live-testet i prosjektet. Identitetsavvikets arsak er ikke lost. Denne versjonen gjor kontrollert gjenoppretting enklere, ikke identitetskobling.
+
+Tidligere driftsveiledning:
 DocLib v1.35.4-preview.3.1 IDENTITY_DIAGNOSTICS
 Bygget fra faktisk preview.3 ZIP. Erstatt app.js, index.html og manifest.json. Ingen nye avhengigheter.
 
