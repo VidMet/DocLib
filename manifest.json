@@ -1,8 +1,8 @@
 {
   "title": "Dokumentutforsker med Metadata",
   "icon": "https://vidmet.github.io/DocLib/paper.png",
-  "url": "https://vidmet.github.io/DocLib/index.html?v=1.36-preview.1",
-  "description": "DocLib 1.36-preview.1 WORKSPACE_MODES_AND_TREE - recursive explorer selection, file tree and mode navigation; validation/document plan placeholders.",
+  "url": "https://vidmet.github.io/DocLib/index.html?v=1.36-preview.2",
+  "description": "DocLib 1.36-preview.2 PROPERTY_VALIDATION - JSON rules, per-entity Model API validation, explicit incomplete status and JSON report.",
   "extensionType": [
     "project"
   ],
