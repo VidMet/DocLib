@@ -1,8 +1,8 @@
 {
   "title": "Dokumentutforsker med Metadata",
   "icon": "https://vidmet.github.io/DocLib/paper.png",
-  "url": "https://vidmet.github.io/DocLib/index.html?v=1.36-preview.4",
-  "description": "DocLib 1.36-preview.4 VALIDATION_REPORT_UI - status cards, file progress and grouped findings.",
+  "url": "https://vidmet.github.io/DocLib/index.html?v=1.36-preview.5",
+  "description": "DocLib 1.36-preview.5 VALIDATION_REPORT_UI - status cards, file progress and grouped findings.",
   "extensionType": [
     "project"
   ],
