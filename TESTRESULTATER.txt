@@ -1,12 +1,8 @@
-PASS responsive toolbar and menu bounds at 1920 px
-PASS responsive toolbar and menu bounds at 1366 px
-PASS responsive toolbar and menu bounds at 1024 px
-PASS responsive toolbar and menu bounds at 768 px
-PASS responsive toolbar and menu bounds at 480 px
-PASS responsive toolbar and menu bounds at 320 px
-PASS keyboard opening, single-open menu and outside click
-PASS original control handler invoked once and menu closes
-PASS disabled control preserved
-PASS JavaScript-syntaks, alle opprinnelige kontroll-ID-er beholdt, ingen duplikate ID-er og gyldige elementreferanser.
-PASS baseline app.js er identisk bortsett fra versjon, UI-oppstartskall og nye menyfunksjoner.
-Nettlesertest: lokal Chromium, uten autentisering og uten Trimble-prosjektforbindelse. Ingen full live-regresjon av API-operasjoner.
+PASS new profile dry-run, default change and immutable source index
+PASS update preserves ID and registered path
+PASS changed index or file ID rejected
+PASS invalid options rejected
+PASS report creation, double-click guard and invalidation
+PASS identity failure stops preflight
+PASS syntaks, HTML-referanser, unike ID-er, versjonsreferanse og uendret verktøylinje.
+Simulerte tester, ikke autentisert live-test.

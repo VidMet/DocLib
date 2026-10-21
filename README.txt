@@ -1,3 +1,13 @@
+DocLib v1.35.4-preview.3.5 PROJECT_PUBLISH_PREFLIGHT
+Bygget fra faktisk preview.3.4. Komplette erstatningsfiler.
+Profiler > Forbered prosjektprofil > fyll ut valg > Kontroller publiseringsgrunnlag.
+Resultatet ligger under Forhåndskontroll og kjente begrensninger.
+Kontrollen henter identitet og prosjektindeks på nytt, sammenligner indeksinnhold og fil-/mappe-ID med dialogens utgangspunkt, validerer en planlagt pakke lokalt og viser mål, kolonneantall og standardprofilendring. Valgendring ugyldiggjør rapporten. Samtidig pakkegenerering blokkeres mens kontrollen pågår.
+Dette er IKKE automatisk publisering. Ingen opplasting, mappeoppretting, indeksendring eller rettighetsendring utføres av kontrollen. Skrivetilgang og atomisk konflikthåndtering er ikke verifisert. Rapporten er et øyeblikksbilde, ikke et publiseringssertifikat. Foreløpig ID for ny profil gjenbrukes ikke av ZIP-generatoren.
+Eksisterende manuell ZIP-publisering og tilbakekontroll beholdes. Full automatisk prosjektpublisering gjenstår; denne versjonen aktiverer ingen udokumenterte skrivekall. v1.36 og egenskapsvalidering er ikke implementert.
+Lokale simulerte tester, ingen autentisert live-test. Se TESTRESULTATER.txt.
+
+Tidligere driftsveiledning:
 DocLib v1.35.4-preview.3.4 UI_CLEANUP
 Bygget fra faktisk preview.3.3. Erstatt app.js, index.html og manifest.json. Ingen nye runtime-avhengigheter.
 
