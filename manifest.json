@@ -1,8 +1,8 @@
 {
   "title": "Dokumentutforsker med Metadata",
   "icon": "https://vidmet.github.io/DocLib/paper.png",
-  "url": "https://vidmet.github.io/DocLib/index.html?v=1.35.4-preview.3.6",
-  "description": "DocLib 1.35.4-preview.3.6 ASSISTED_PROJECT_PUBLISHER - automatic new profile upload, manual shared index, durable verification. NOT fully automatic.",
+  "url": "https://vidmet.github.io/DocLib/index.html?v=1.36-preview.1",
+  "description": "DocLib 1.36-preview.1 WORKSPACE_MODES_AND_TREE - recursive explorer selection, file tree and mode navigation; validation/document plan placeholders.",
   "extensionType": [
     "project"
   ],

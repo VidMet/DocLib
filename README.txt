@@ -1,21 +1,18 @@
-DocLib v1.35.4-preview.3.6 ASSISTED_PROJECT_PUBLISHER
-DELVIS LEVERANSE: Fullautomatisk prosjektpublisering er IKKE ferdigstilt. Sikker atomisk indeksoppdatering er ikke verifisert og er ikke aktivert. Ingen skjult reserveflyt skriver til indeksen.
+DocLib v1.36-preview.1 WORKSPACE_MODES_AND_TREE
+Bygget fra faktisk v1.35.4-preview.3.6. Komplette erstatningsfiler app.js, index.html, manifest.json.
+Extension_config beholdes. Ingen nye konfigurasjonsfiler kreves i dette trinnet.
 
-BRUK
-Profiler > Forbered prosjektprofil. Velg ny/oppdatering, navn, beskrivelse og prosjektstandard. Åpne Assistert publisering - manuell indeks. Lag plan og kontroller mål og tilgang. Bekreft opplasting. DocLib laster opp én ny UUID-profilfil og leser innholdet tilbake. Last deretter ned indeksforslaget, samordne manuell indeksoppdatering med andre forvaltere og last opp doclib.config.json selv. Kontroller begge filer. Meldingen bekrefter bare samsvar ved kontrolltidspunktet, ikke en atomisk transaksjon.
-Ved oppdatering beholdes profil-ID, men ny revisjonsfil erstatter referansen i indeksforslaget. Gammel profilfil beholdes. Dette er et eksplisitt valg i dialogen og gjelder kun den assisterte flyten. Eksisterende manuell ZIP-flyt beholdes uendret.
-Eksisterende konfigurasjonsstruktur og indeks kreves. Ingen automatisk mappeoppretting, ACL-endring, sletting eller overskriving av profilfiler. Tilgang til ny profilfil kan følge mappen; kontroller at mål er egnet for felles profiler. Unikt navn og kollisjonskontroll er ikke atomisk create-only-garanti.
+IMPLEMENTERT
+De to syntetiske toppnivåene Alle IFC-filer og prosjektroten skjules. Mapper direkte under prosjektroten vises øverst. Eventuelle filer direkte i prosjektroten vises også, uten å skjules eller flyttes fysisk.
+Filer vises under mapper i treet. Pil eller mappenavn utvider/skjuler uten å velge innhold. Avhuking velger mappeinnhold rekursivt, inkludert direkte filer. Flere mapper og enkeltfiler kan velges. Utvalget er en mengde fil-ID-er: ingen duplikater ved overlapp. Fjerner du avhuking på undermappe, fjernes dens filer fra utvalget og overordnet mappe får mellomtilstand. Tomme mapper kan utvides, men ikke velges.
+Utforsker starter tom. Kun treutvalget vises til høyre, deretter brukes eksisterende filformat-, søke- og kolonnefiltre/sortering. Filene i treet skjules ikke av tabellfiltre. Tøm treutvalg gir tom arbeidsflate; Nullstill filtre endrer ikke treutvalget. Utvid/skjul endrer ikke utvalget.
+Treutvalg og tabellens 3D-avhukinger er separate: treet bestemmer arbeidsutvalget, tabellavhuking bestemmer modellene som åpnes i 3D. 3D-valg beholdes når treutvalget endres; Tøm 3D-valg nullstiller dette eksplisitt. Eksisterende viewerflyt beholdes.
+Nederst i venstrepanelet: Utforsker, Egenskapsvalidering og Dokumentplan. Utforsker og validering har separate treutvalg som beholdes ved modusbytte i samme økt. Utvalgene lagres ikke mellom sideinnlastinger. Metadataoppdatering beholder fortsatt eksisterende fil-ID-er og fjerner bortfalte ID-er.
+Dokumentplan toner ned og deaktiverer treet. Utforskerverktøy er deaktivert i de to andre modusene.
 
-FEIL OG GJENOPPTAK
-Kvittering med forventet profil og indeks lagres lokalt per prosjekt og bruker før første skrivekall. Token og signert opplastingsadresse lagres ikke. Ved feil: ingen automatisk gjentakelse eller sletting. Åpne dialogen og Kontroller begge filer / siste forsøk. Kvitteringen overlever sideoppdatering i samme nettleser, ikke tømming av lokal lagring eller bytte av nettleser. Uavklart kvittering blokkerer nytt forsøk. Manuell undersøkelse kan være nødvendig hvis initiate/PUT/commit feiler. Ikke tøm kvitteringen for å omgå dette. En tidligere kontrollert kvittering erstattes ved eksplisitt ny plan.
-
-SIKKERHET
-Initiate/PUT/commit følger eksisterende SDK-flyt fra trimble-connect-sdk 4.0.12. Identitet kontrolleres før hvert skrivekall. PUT får ikke bearer-token. Tilbakekontroll bruker no-store. Hele indeksinnholdet og profilinnholdet må samsvare; andre samtidige indeksendringer gir stopp, ikke automatisk fletting. Nedlasting av indeksforslag sjekker utgangspunktet på nytt, men beskytter ikke tidsrommet frem til manuell opplasting.
-Dokumentasjonen oppgir If-Match for PATCH /files og PATCH /folders. Dette dokumenterer ikke i seg selv betinget filinnholdsopplasting. Check-out beskrives som revisjonskontroll, men integrert låse-/opplastingsflyt er ikke implementert eller testet her. Ingen fullautomatisk flerbrukerpublisering påstås.
-Kilder: https://developer.trimble.com/docs/connect/reference/openapi/core/
-https://help.trimble.com/doc/trimble-connect/trimble-connect/connect-for-browser/files-and-folders/check-in-and-check-out
+IKKE IMPLEMENTERT ENNÅ
+Egenskapsvalidering viser bare antall valgte filer/IFC og en deaktivert Kjør validering-knapp. Ingen regler leses og ingen egenskaper kontrolleres. Dokumentplan viser kun en plassholder; ingen planfil leses eller leveranser matches. Ingen falske godkjenningsresultater.
+Ingen videre profil-, publiserings-, rettighets- eller synlighetsutvikling. Eksisterende dialoger beholdes. Skjuling av prosjektroten er kun presentasjon, ikke tilgangskontroll. Ingen filer eller mapper endres i prosjektet av de nye modusene.
 
 TEST
-Lokale simulerte tester. Ingen autentisert live-test i prosjektet. UI_CLEANUP, brukerprofiler og identitetsdiagnostikk beholdes.
-
-Begrensning: lokal kvittering og busy-sperre er ikke en distribuert lås mellom nettlesere/faner. Bruk én publiseringsøkt om gangen.
+Se TESTRESULTATER.txt. Lokale nettlesertester med syntetisk mappetre, ikke autentisert live-test i Trimble Connect.

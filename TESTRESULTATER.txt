@@ -1,11 +1,10 @@
-PASS profile-only upload, double-click guard, durable receipt without secrets, token-free PUT
-PASS unchanged index does not confirm publication
-PASS full profile and index equality confirms readback
-PASS concurrent index change invalidates previous verification
-PASS receipt prevents repeat upload
-PASS pre-upload index conflict blocks all writes
-PASS identity failure blocks writes
-PASS network failure retains unresolved receipt without retry
-PASS update preserves logical ID and old file, creates new revision reference
-PASS syntaks, unike HTML-ID-er, alle JS-referanser, dialogtilkobling, versjon og uendret toppmeny.
-Simulerte tester med stubbet nettverk. Ikke autentisert live-test. Fullautomatisk indeksoppdatering er IKKE implementert.
+PASS hidden synthetic roots, root files retained, empty initial workspace
+PASS recursive parent selection and partial deselection
+PASS multiple folders and overlap deduplication
+PASS individual root file and existing search filter
+PASS separate validation selection and honest disabled placeholder
+PASS document mode inert tree and selection restoration
+PASS independent 3D selection and empty folder disabled
+PASS responsive widths 480-1366 and navigation visibility
+PASS unike HTML-ID-er, alle eksisterende ID-er beholdt, JS-elementreferanser og versjonskonsistens.
+Testdata er syntetiske. Ingen autentisert live-test eller full regresjon av profil-/API-operasjoner.
