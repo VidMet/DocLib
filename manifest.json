@@ -1,8 +1,8 @@
 {
   "title": "Dokumentutforsker med Metadata",
   "icon": "https://vidmet.github.io/DocLib/paper.png",
-  "url": "https://vidmet.github.io/DocLib/index.html?v=1.35.4-preview.3.5",
-  "description": "DocLib 1.35.4-preview.3.5 PROJECT_PUBLISH_PREFLIGHT - read-only package validation and explicit automatic-publishing blockers.",
+  "url": "https://vidmet.github.io/DocLib/index.html?v=1.35.4-preview.3.6",
+  "description": "DocLib 1.35.4-preview.3.6 ASSISTED_PROJECT_PUBLISHER - automatic new profile upload, manual shared index, durable verification. NOT fully automatic.",
   "extensionType": [
     "project"
   ],

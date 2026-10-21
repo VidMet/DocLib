@@ -1,8 +1,11 @@
-PASS new profile dry-run, default change and immutable source index
-PASS update preserves ID and registered path
-PASS changed index or file ID rejected
-PASS invalid options rejected
-PASS report creation, double-click guard and invalidation
-PASS identity failure stops preflight
-PASS syntaks, HTML-referanser, unike ID-er, versjonsreferanse og uendret verktøylinje.
-Simulerte tester, ikke autentisert live-test.
+PASS profile-only upload, double-click guard, durable receipt without secrets, token-free PUT
+PASS unchanged index does not confirm publication
+PASS full profile and index equality confirms readback
+PASS concurrent index change invalidates previous verification
+PASS receipt prevents repeat upload
+PASS pre-upload index conflict blocks all writes
+PASS identity failure blocks writes
+PASS network failure retains unresolved receipt without retry
+PASS update preserves logical ID and old file, creates new revision reference
+PASS syntaks, unike HTML-ID-er, alle JS-referanser, dialogtilkobling, versjon og uendret toppmeny.
+Simulerte tester med stubbet nettverk. Ikke autentisert live-test. Fullautomatisk indeksoppdatering er IKKE implementert.
