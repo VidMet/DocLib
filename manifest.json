@@ -1,8 +1,8 @@
 {
   "title": "Dokumentutforsker med Metadata",
   "icon": "https://vidmet.github.io/DocLib/paper.png",
-  "url": "https://vidmet.github.io/DocLib/index.html?v=1.37-preview.1",
-  "description": "DocLib 1.37-preview.1 CONTROL_PLAN_FIRST_STEP - version-bound control documentation with explicit MMI source; Explorer, validation and profile publishing retained.",
+  "url": "https://vidmet.github.io/DocLib/index.html?v=1.37-preview.2",
+  "description": "DocLib 1.37-preview.2 CONTROL_LINK_SELECTION - delivery selection, explicit per-model control links and full configuration download; no automatic upload.",
   "extensionType": [
     "project"
   ],
