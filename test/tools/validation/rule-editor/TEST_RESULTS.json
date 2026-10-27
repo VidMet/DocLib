@@ -1,15 +1,16 @@
 {
-  "version": "2.02-preview.2-test",
-  "modelChecks": 4,
+  "version": "2.02-preview.4-test",
+  "modelChecks": 6,
+  "validatorContractChecks": 1,
   "browser": {
     "checks": [
-      "updated PSET placeholder",
-      "property name in summary",
-      "collapse and expand all",
-      "PSET MMI shown in summary",
-      "effective MMI inheritance in JSON",
-      "download matches preview",
-      "missing threshold blocks export"
+      "supported import and preserved-field warning",
+      "exact preview round-trip",
+      "edit preserves advanced fields",
+      "original filename and lossless export",
+      "unsupported hierarchy opens read-only with download",
+      "read-only import downloads exact rule",
+      "invalid JSON rejected"
     ],
     "errors": [],
     "synthetic": true
