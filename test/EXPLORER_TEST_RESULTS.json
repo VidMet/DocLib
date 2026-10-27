@@ -1,0 +1,81 @@
+{
+  "version": "2.01-preview.4-test",
+  "baselineComparison": {
+    "checks": [
+      "sort parity name 1",
+      "sort parity name -1",
+      "sort parity format 1",
+      "sort parity format -1",
+      "sort parity mmi 1",
+      "sort parity mmi -1",
+      "sort parity rev 1",
+      "sort parity rev -1",
+      "date parsing parity 27.10.2026",
+      "date parsing parity 2026-10-27",
+      "date parsing parity not a date",
+      "date parsing parity ",
+      "column filter parity",
+      "metadata pagination and MMI evidence parity",
+      "same version uses existing metadata cache",
+      "new version has separate metadata cache",
+      "MMI values from all object pages retained",
+      "explicit/alias column parity",
+      "explicit/alias column parity",
+      "recursive tree scan and hidden config parity",
+      "recursive folder selection parity",
+      "nested node lookup"
+    ],
+    "synthetic": true
+  },
+  "explorerBrowser": {
+    "checks": [
+      "Full startup and shared tree/metadata scan with 401 retry",
+      "Configuration folder remains hidden from shared tree",
+      "Explorer and metadata state no longer global",
+      "Recursive folder selection shows nested models",
+      "MMI alias values preserved in Explorer",
+      "Shared metadata service supplies ControlPlan MMI through context adapter",
+      "Search works after module extraction",
+      "Column sorting preserves ascending file order",
+      "3D selection remains independent of workspace scope",
+      "Clear selection toolbar action",
+      "Format menu filtering preserved",
+      "MMI column filter works through actual menu",
+      "Validator has a separate initially empty tree selection",
+      "Explorer selection retained independently of Validator",
+      "Repeated mounting retains format options and a single toggle handler",
+      "Search handlers restored after remount",
+      "Save local profile still works through compatibility port",
+      "Profile sort integration works after extraction",
+      "Non-forced reload reuses existing per-version test cache",
+      "Forced metadata refresh clears cache as before",
+      "Production storage isolation and network write guard retained",
+      "ControlPlan contract and Explorer remount coexist"
+    ],
+    "errors": [],
+    "synthetic": true,
+    "controlPlan": "contract test double"
+  },
+  "validatorIntegration": {
+    "checks": [
+      "Full bootstrap with simulated Workspace and 401 refresh",
+      "Validator functions and state no longer global",
+      "Registry mounts Validator with independent selection",
+      "End-to-end rules, object pagination and findings rendered",
+      "JSON export includes full results and coverage",
+      "Completed report survives mode switches",
+      "Version change marks report stale",
+      "Mode switching disabled during active validation",
+      "Cancellation produces incomplete report and releases busy state",
+      "Repeated mounting does not duplicate controls",
+      "Registry compatibility with ControlPlan contract test double",
+      "Existing network write guard retained"
+    ],
+    "errors": [],
+    "synthetic": true,
+    "controlPlan": "contract test double; unchanged real module not supplied"
+  },
+  "validatorFilesUnchanged": true,
+  "liveTested": false,
+  "controlPlanPdf": "Existing files not modified; browser integration used a contract test double, not the real module."
+}
