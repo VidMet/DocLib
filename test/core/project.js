@@ -3,9 +3,9 @@ export function createProjectController(host) {
   let flight = null;
   let destroyed = false;
   let current = Object.freeze({phase:'idle',stage:'',attempt:0,revision:0,stale:true,
-    fileCount:0,metadataDone:0,metadataFailed:0,lastSuccessfulAt:null,lastAttemptAt:null,issues:[]});
+    fileCount:0,metadataDone:0,metadataFailed:0,warnings:[],lastSuccessfulAt:null,lastAttemptAt:null,issues:[]});
   const listeners = new Set();
-  const snapshot = () => Object.freeze({...current,issues:[...current.issues]});
+  const snapshot = () => Object.freeze({...current,issues:[...current.issues],warnings:current.warnings.map(x=>({...x}))});
   function publish(patch) {
     current = Object.freeze({...current,...patch});
     host.present(snapshot());
@@ -16,13 +16,14 @@ export function createProjectController(host) {
   async function execute(force) {
     const projectId = host.projectId();
     const issues = [];
+    const warnings = [];
     let metadataDone = 0, metadataFailed = 0, cached = 0;
     const assertProject = () => {
       if (destroyed || host.projectId() !== projectId) throw Error('Prosjektgrunnlaget er endret. Last utvidelsen på nytt.');
     };
     const stage = (name) => {assertProject();publish({stage:name});};
     publish({phase:'loading',stage:'Prosjekt og mapper',attempt:current.attempt+1,stale:true,
-      lastAttemptAt:new Date().toISOString(),metadataDone:0,metadataFailed:0,issues:[]});
+      lastAttemptAt:new Date().toISOString(),metadataDone:0,metadataFailed:0,issues:[],warnings:[]});
     try {
       host.prepare(force);
       const response = await host.readProject(projectId);
@@ -59,14 +60,16 @@ export function createProjectController(host) {
           assertProject();
           if (result.m?.err || (file.format==='ifc'&&!file.versionId)) {
             metadataFailed++;
-            issues.push('Metadata kunne ikke bekreftes for '+file.name+'.');
+            warnings.push({fileId:String(file.id),versionId:String(file.versionId||''),name:file.name,folder:file.folderPath||'',status:result.m?.metadataError?.status??null,message:result.m?.metadataError?.message||(!file.versionId?'IFC-filen mangler versjons-ID.':'Metadata kunne ikke bekreftes.')});
           }
         } catch (error) {
           assertProject();
           metadataFailed++;
-          issues.push('Metadatafeil for '+file.name+': '+error.message);
-          result={c:false,m:{props:{},err:true}};
+          const detail={fileId:String(file.id),versionId:String(file.versionId||''),name:file.name,folder:file.folderPath||'',status:error.status??null,message:error.message||'Ukjent metadatafeil'};
+          warnings.push(detail);
+          result={c:false,m:{props:{},err:true,metadataError:detail}};
         }
+        if(warnings.length&&warnings[warnings.length-1].fileId===String(file.id)){const warning=warnings[warnings.length-1];result.m={...result.m,err:true,metadataError:warning};host.log('FILE_METADATA_WARNING',warning);}
         if (result.c) cached++;
         host.commitRow(index,file,result.m);
         metadataDone++;
@@ -74,20 +77,20 @@ export function createProjectController(host) {
         host.render();
       });
       assertProject();
-      host.metadataComplete(metadataFailed===0);
+      host.metadataComplete(true); // The attempt completed; per-file evidence may still be unavailable.
       const phase = issues.length ? 'incomplete' : 'ready';
       publish({phase,stage:'',revision:current.revision+1,stale:phase!=='ready',
-        fileCount:files.length,metadataDone,metadataFailed,issues:[...new Set(issues)],
+        fileCount:files.length,metadataDone,metadataFailed,warnings,issues:[...new Set(issues)],
         lastSuccessfulAt:phase==='ready'?new Date().toISOString():current.lastSuccessfulAt});
       host.progress(null);
       host.render();
-      host.status(phase==='ready'?`Ferdig: ${files.length} filer, ${cached} fra cache`:
+      host.status(phase==='ready'?`Ferdig: ${files.length} filer, ${cached} fra cache${warnings.length?`, ${warnings.length} metadataadvarsler`:""}`:
         `Ufullstendig prosjektgrunnlag: ${issues.length} registrerte problemer`,phase==='ready'?'ok':'bad');
       return snapshot();
     } catch (error) {
       host.metadataComplete(false);
       host.progress(null);
-      publish({phase:'error',stage:'',stale:true,metadataDone,metadataFailed,
+      publish({phase:'error',stage:'',stale:true,metadataDone,metadataFailed,warnings,
         issues:[error.message||'Ukjent innlastingsfeil']});
       host.log('PROJECT_LOAD_ERROR',{message:error.message});
       host.status('Prosjektinnlasting feilet: '+error.message,'bad');

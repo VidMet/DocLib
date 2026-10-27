@@ -1,7 +1,7 @@
-import {install as rules} from './rules.js?v=2.01-preview.5';
-import {install as engine} from './engine.js?v=2.01-preview.5';
-import {install as report} from './report.js?v=2.01-preview.5';
-import {initialize} from './state.js?v=2.01-preview.5';
+import {install as rules} from './rules.js?v=2.01-preview.5.1';
+import {install as engine} from './engine.js?v=2.01-preview.5.1';
+import {install as report} from './report.js?v=2.01-preview.5.1';
+import {initialize} from './state.js?v=2.01-preview.5.1';
 export default Object.freeze({id:'validation',title:'Egenskapsvalidering',legacyMode:'validation',status:'module',create:createValidation});
 export function createValidation(host){
  const state={},context=Object.create(null);let active=false,destroyed=false,container=null;

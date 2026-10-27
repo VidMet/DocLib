@@ -57,8 +57,8 @@ window.DocLibLegacyBridge=Object.freeze({
   present(state){
    const banner=$('projectLoadState');
    const labels={idle:'Venter på prosjekt',loading:'Laster prosjekt',ready:'Prosjektgrunnlag klart',incomplete:'Ufullstendig prosjektgrunnlag',error:'Prosjektinnlasting feilet'};
-   banner.dataset.phase=state.phase;banner.textContent=labels[state.phase]+(state.stage?' · '+state.stage:'')+(state.stale&&state.phase!=='idle'?' · Visningen er ikke bekreftet oppdatert.':'');
-   banner.title=state.issues.join('\n');banner.setAttribute('aria-busy',String(state.phase==='loading'));
+   banner.dataset.phase=state.phase;banner.dataset.warnings=String(state.warnings?.length||0);banner.textContent=labels[state.phase]+(state.stage?' · '+state.stage:'')+(state.stale&&state.phase!=='idle'?' · Visningen er ikke bekreftet oppdatert.':'')+(state.warnings?.length?' · '+state.warnings.length+' fil(er) med metadataadvarsel. Øvrige filer kan brukes.':'');
+   banner.title=[...state.issues,...(state.warnings||[]).map(x=>[x.folder,x.name,'ID: '+x.fileId,x.status?'HTTP '+x.status:'',x.message].filter(Boolean).join(' · '))].join('\n');banner.setAttribute('aria-busy',String(state.phase==='loading'));
    $('refresh').disabled=state.phase==='loading'||validationPort.valBusy;
    for(const id of ['profileSelect','profileSaveAs','profileRename','profileDelete','profileExport','profileImport','settingsBtn','discoveryBtn','analyticsBtn']){const el=$(id);if(el)el.disabled=state.phase==='loading'||workspaceMode!=='explorer';}
    workspaceModeUI();

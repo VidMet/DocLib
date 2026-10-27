@@ -1,12 +1,12 @@
-import {createProjectController} from './core/project.js?v=2.01-preview.5';
-import {createFileTree} from './shared/file-tree.js?v=2.01-preview.5';
-import {createProperties} from './shared/properties.js?v=2.01-preview.5';
-import {environment} from './config/environment.js?v=2.01-preview.5';
-import {createToolRegistry} from './core/tool-registry.js?v=2.01-preview.5';
-import explorer from './tools/explorer/index.js?v=2.01-preview.5';
-import validation from './tools/validation/index.js?v=2.01-preview.5';
-import controlPlan from './tools/control-plan/index.js?v=2.01-preview.5';
-import todos from './tools/todos/index.js?v=2.01-preview.5';
+import {createProjectController} from './core/project.js?v=2.01-preview.5.1';
+import {createFileTree} from './shared/file-tree.js?v=2.01-preview.5.1';
+import {createProperties} from './shared/properties.js?v=2.01-preview.5.1';
+import {environment} from './config/environment.js?v=2.01-preview.5.1';
+import {createToolRegistry} from './core/tool-registry.js?v=2.01-preview.5.1';
+import explorer from './tools/explorer/index.js?v=2.01-preview.5.1';
+import validation from './tools/validation/index.js?v=2.01-preview.5.1';
+import controlPlan from './tools/control-plan/index.js?v=2.01-preview.5.1';
+import todos from './tools/todos/index.js?v=2.01-preview.5.1';
 const registry=createToolRegistry();[explorer,validation,controlPlan,todos].forEach(t=>registry.register(t));
 function loadScript(path){return new Promise((resolve,reject)=>{const script=document.createElement('script');script.src=new URL(path+'?v='+environment.version,import.meta.url).href;script.onload=resolve;script.onerror=()=>reject(Error('Kunne ikke laste '+path));document.head.appendChild(script);});}
 async function start(){
