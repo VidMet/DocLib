@@ -80,7 +80,7 @@ export function install(cp,context){
    context.status(download?'PDF-nedlasting startet.':'Original PDF åpnet i ny fane.','ok');
   }catch(e){win?.close();throw e;}
  }
- cp.bindPdf=()=>document.addEventListener('click',async e=>{const b=e.target.closest('[data-pdf-action]');if(!b||b.disabled)return;b.disabled=true;try{const r=findReport(b.dataset.pdfReport,b.dataset.pdfReportVersion);if(b.dataset.pdfAction==='choose')choose(r);else await open(r,b.dataset.pdfAction==='download');}catch(err){if(cp.active)context.status(err?.name==='AbortError'?'PDF-henting tok for lang tid. Prøv igjen.':(err.message||'PDF kunne ikke åpnes.'),'bad');}finally{b.disabled=false;}},{signal:cp.viewController.signal});
+ cp.bindPdf=()=>document.addEventListener('click',async e=>{if(context.projectState?.phase!=='ready')return;const b=e.target.closest('[data-pdf-action]');if(!b||b.disabled)return;b.disabled=true;try{const r=findReport(b.dataset.pdfReport,b.dataset.pdfReportVersion);if(b.dataset.pdfAction==='choose')choose(r);else await open(r,b.dataset.pdfAction==='download');}catch(err){if(cp.active)context.status(err?.name==='AbortError'?'PDF-henting tok for lang tid. Prøv igjen.':(err.message||'PDF kunne ikke åpnes.'),'bad');}finally{b.disabled=false;}},{signal:cp.viewController.signal});
  cp.pdfDiagnostics=Object.freeze({pdfState,reportKey});
 })();
 

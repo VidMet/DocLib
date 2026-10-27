@@ -1,11 +1,12 @@
-import {createFileTree} from './shared/file-tree.js?v=2.01-preview.4';
-import {createProperties} from './shared/properties.js?v=2.01-preview.4';
-import {environment} from './config/environment.js?v=2.01-preview.4';
-import {createToolRegistry} from './core/tool-registry.js?v=2.01-preview.4';
-import explorer from './tools/explorer/index.js?v=2.01-preview.4';
-import validation from './tools/validation/index.js?v=2.01-preview.4';
-import controlPlan from './tools/control-plan/index.js?v=2.01-preview.4';
-import todos from './tools/todos/index.js?v=2.01-preview.4';
+import {createProjectController} from './core/project.js?v=2.01-preview.5';
+import {createFileTree} from './shared/file-tree.js?v=2.01-preview.5';
+import {createProperties} from './shared/properties.js?v=2.01-preview.5';
+import {environment} from './config/environment.js?v=2.01-preview.5';
+import {createToolRegistry} from './core/tool-registry.js?v=2.01-preview.5';
+import explorer from './tools/explorer/index.js?v=2.01-preview.5';
+import validation from './tools/validation/index.js?v=2.01-preview.5';
+import controlPlan from './tools/control-plan/index.js?v=2.01-preview.5';
+import todos from './tools/todos/index.js?v=2.01-preview.5';
 const registry=createToolRegistry();[explorer,validation,controlPlan,todos].forEach(t=>registry.register(t));
 function loadScript(path){return new Promise((resolve,reject)=>{const script=document.createElement('script');script.src=new URL(path+'?v='+environment.version,import.meta.url).href;script.onload=resolve;script.onerror=()=>reject(Error('Kunne ikke laste '+path));document.head.appendChild(script);});}
 async function start(){
@@ -19,9 +20,11 @@ async function start(){
   const control=controlPlan.create(bridge.createControlContext()),validator=validation.create(bridge.createValidationContext());
   registry.attach('control-plan',control,host);registry.attach('validation',validator,host);
   bridge.attachControlPlan(control.port,registry);bridge.attachValidation(validator.port);
+  const projectService=createProjectController(bridge.createProjectContext());bridge.attachProject(projectService);
+  projectService.subscribe(state=>registry.broadcast({type:'project-state',state}));
   registry.activate('explorer');
   window.addEventListener('beforeunload',e=>{if(control.snapshot().hasUnsavedChanges||validator.snapshot().busy){e.preventDefault();e.returnValue='';}});
-  window.DocLibTest=Object.freeze({environment,tools:registry.list(),bridge,controlPlan:control,validation:validator,explorer:explorerTool});
+  window.DocLibTest=Object.freeze({environment,tools:registry.list(),bridge,controlPlan:control,validation:validator,explorer:explorerTool,project:projectService});
   await bridge.start();
  }catch(error){const status=document.getElementById('status');if(status){status.textContent='Oppstartsfeil: '+error.message;status.className='status bad';}console.error('[DocLib TEST startup]',error);}
 }

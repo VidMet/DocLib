@@ -5,6 +5,8 @@ window.DocLibLegacyBridge=Object.freeze({
  attachControlPlan(port,lifecycle){controlPlanPort=port;toolLifecycle=lifecycle;},
  attachValidation(port){validationPort=port;},
  createValidationContext(){return Object.freeze({
+ capabilities:Object.freeze({networkWrites:false,linkStorage:'local',ruleEditor:false}),
+ get projectState(){return projectController?.snapshot()||{phase:'idle',stale:true};},
  get project(){return project;},get treeRoot(){return treeRoot;},get workspaceMode(){return workspaceMode;},
  get workspaceScopes(){return workspaceScopes;},get CORE(){return CORE;},get MODEL(){return MODEL;},get VERSION(){return VERSION;},
  $:id=>$(id),esc:v=>esc(v),norm:v=>norm(v),flatten:(...a)=>treePort.flatten(...a),
@@ -12,6 +14,56 @@ window.DocLibLegacyBridge=Object.freeze({
  });},
  attachShared(tree,properties){treePort=tree;propertiesPort=properties;},
  attachExplorer(port){explorerPort=port;},
+ attachProject(controller){projectController=controller;},
+ createProjectContext(){return Object.freeze({
+  projectId:()=>project?.id,
+  canReload(){
+   if(validationPort.valBusy||controlPlanPort.cpExportBusy)return false;
+   const pending=controlPlanPort.cpPendingLinks.length||document.getElementById('cpLinkDialog')?.open||document.getElementById('cpPdfChoose')?.open;
+   if(pending&&!confirm('Oppdatering lukker kontrollvalg og forkaster upubliserte koblingsutkast. Fortsette?'))return false;
+   for(const id of ['cpLinkDialog','cpPdfChoose']){const d=document.getElementById(id);if(d?.open)d.close();d?.remove();}
+   return true;
+  },
+  prepare(force){
+   controlPlanPort.cpMetadataComplete=false;controlPlanPort.cpMmiEvidence.clear();
+   if(force)for(let i=testStorage.length-1;i>=0;i--){const k=testStorage.key(i);if(k?.startsWith(CACHE))testStorage.removeItem(k);}
+  },
+  readProject:id=>req(CORE+'/projects/'+encodeURIComponent(id)),
+  scanTree:(id,name)=>treePort.scanFolder(id,name,'',null),flatten:tree=>treePort.flatten(tree),
+  commitTree(tree,files){
+   treeRoot=tree;const ids=new Set(files.map(f=>f.id));
+   for(const set of Object.values(workspaceScopes))for(const id of set)if(!ids.has(id))set.delete(id);
+   for(const id of explorerPort.selected)if(!ids.has(id))explorerPort.selected.delete(id);
+   explorerPort.allFormats=new Set(files.map(f=>f.format));explorerPort.formatFilters=new Set(explorerPort.allFormats);
+   explorerPort.renderFormats();explorerPort.updateSelection();
+  },
+  async loadProfiles(rootId){loadProfiles();await loadProjectProfiles(rootId);},
+  configurationIssues(){
+   const issues=[];
+   if(projectProfileStatus.includes('Kunne')||projectProfileStatus.includes('cache')||projectProfileStatus.includes('ignorert'))issues.push('Prosjektprofiler: '+projectProfileStatus);
+   if(projectConfiguration&&(projectConfiguration.schema!=='DocLibProjectConfiguration'||projectConfiguration.schemaVersion!==1||!Array.isArray(projectConfiguration.profiles)))issues.push('Ugyldig prosjektkonfigurasjon.');
+   return issues;
+  },
+  reloadControlPlan:()=>toolLifecycle.update('control-plan',{type:'reload'}),
+  controlIssues:()=>toolLifecycle.snapshot('control-plan')?.issues||[],
+  loadPersonalProfiles:rootId=>loadMineProfiles(rootId),
+  applyProfiles(){applyProfileState(false);renderProfileControls();},
+  prepareRows(files){rows=files.map(file=>({file,props:{}}));explorerPort.updateSelection();treePort.renderTree();explorerPort.renderTable();},
+  pool:(files,fn)=>pool(files,WORKERS,fn),metadata:file=>propertiesPort.meta(file),
+  commitRow(index,file,metadata){rows[index]={file,...metadata};},
+  metadataComplete:complete=>{controlPlanPort.cpMetadataComplete=complete;},
+  progress(done,total,cached){$('progress').textContent=done===null?'':`${done}/${total}, ${cached} fra cache`;},
+  render:()=>explorerPort.renderTable(),status:(...a)=>status(...a),log:(...a)=>log(...a),
+  present(state){
+   const banner=$('projectLoadState');
+   const labels={idle:'Venter på prosjekt',loading:'Laster prosjekt',ready:'Prosjektgrunnlag klart',incomplete:'Ufullstendig prosjektgrunnlag',error:'Prosjektinnlasting feilet'};
+   banner.dataset.phase=state.phase;banner.textContent=labels[state.phase]+(state.stage?' · '+state.stage:'')+(state.stale&&state.phase!=='idle'?' · Visningen er ikke bekreftet oppdatert.':'');
+   banner.title=state.issues.join('\n');banner.setAttribute('aria-busy',String(state.phase==='loading'));
+   $('refresh').disabled=state.phase==='loading'||validationPort.valBusy;
+   for(const id of ['profileSelect','profileSaveAs','profileRename','profileDelete','profileExport','profileImport','settingsBtn','discoveryBtn','analyticsBtn']){const el=$(id);if(el)el.disabled=state.phase==='loading'||workspaceMode!=='explorer';}
+   workspaceModeUI();
+  }
+ });},
  createTreeContext(){return Object.freeze({
   get CORE(){return CORE;},get treeRoot(){return treeRoot;},$:id=>$(id),esc:v=>esc(v),fileExt:v=>fileExt(v),norm:v=>norm(v),req:(...a)=>req(...a),
   workspaceModeUI:()=>workspaceModeUI(),workspaceScope:()=>workspaceScope(),workspaceSelectionChanged:()=>workspaceSelectionChanged()
@@ -25,6 +77,8 @@ window.DocLibLegacyBridge=Object.freeze({
   })
  });},
  createExplorerContext(){return Object.freeze({
+ capabilities:Object.freeze({networkWrites:false,linkStorage:'local',ruleEditor:false}),
+ get projectState(){return projectController?.snapshot()||{phase:'idle',stale:true};},
   get VALUE_COLORS(){return VALUE_COLORS;},get activeProfile(){return activeProfile;},get columnConfig(){return columnConfig;},get profiles(){return profiles;},
   get currentFolder(){return treePort.currentFolder;},get treeRoot(){return treeRoot;},get rows(){return rows;},get workspaceMode(){return workspaceMode;},
   $:id=>$(id),esc:v=>esc(v),norm:v=>norm(v),captureProfile:()=>captureProfile(),persistProfiles:()=>persistProfiles(),isProjectProfile:(...a)=>isProjectProfile(...a),
@@ -33,6 +87,8 @@ window.DocLibLegacyBridge=Object.freeze({
   controlMetadata:Object.freeze({get cpDeliveryFiles(){return controlPlanPort.cpDeliveryFiles;}})
  });},
  createControlContext(){return Object.freeze({
+ capabilities:Object.freeze({networkWrites:false,linkStorage:'local',ruleEditor:false}),
+ get projectState(){return projectController?.snapshot()||{phase:'idle',stale:true};},
   get project(){return project;},get mineUser(){return mineUser;},get treeRoot(){return treeRoot;},
   get projectConfiguration(){return projectConfiguration;},get projectConfigurationFile(){return projectConfigurationFile;},
   get workspaceMode(){return workspaceMode;},get list(){return list;},get CORE(){return CORE;},get VERSION(){return VERSION;},
