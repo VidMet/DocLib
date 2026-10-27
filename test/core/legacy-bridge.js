@@ -5,6 +5,7 @@ window.DocLibLegacyBridge=Object.freeze({
  attachControlPlan(port,lifecycle){controlPlanPort=port;toolLifecycle=lifecycle;},
  attachValidation(port){validationPort=port;},
  createValidationContext(){return Object.freeze({
+ get ruleEditorAccess(){const cfg=projectConfiguration?.ruleEditor||{};const ids=Array.isArray(cfg.adminUserIds)?cfg.adminUserIds.map(String):[];const mode=cfg.accessMode||'all';const userId=String(mineUser?.id||'');return Object.freeze({mode,userId,allowed:mode!=='admins'||ids.includes(userId)});},
  capabilities:Object.freeze({networkWrites:false,linkStorage:'local',ruleEditor:false}),
  get projectState(){return projectController?.snapshot()||{phase:'idle',stale:true};},
  get project(){return project;},get treeRoot(){return treeRoot;},get workspaceMode(){return workspaceMode;},
