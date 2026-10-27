@@ -1,0 +1,19 @@
+{
+  "version": "2.02-preview.1-test",
+  "modelChecks": 8,
+  "browser": {
+    "checks": [
+      "button and version marker",
+      "modal opens under validation",
+      "values regex types and dependencies in preview",
+      "complete JSON download",
+      "invalid regex blocked",
+      "names are HTML escaped",
+      "date mapping"
+    ],
+    "errors": [],
+    "synthetic": true
+  },
+  "liveTested": false,
+  "writesEnabled": false
+}

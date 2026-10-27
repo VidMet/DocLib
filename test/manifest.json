@@ -1,10 +1,8 @@
 {
   "title": "DocLib TEST",
   "icon": "https://vidmet.github.io/DocLib/paper.png",
-  "url": "https://vidmet.github.io/DocLib/test/index.html?v=2.01-preview.5.1-test",
-  "description": "DocLib TEST 2.01-preview.5.1: Egenskapsvalidering som egen modul; nettverksskriving sperret.",
-  "extensionType": [
-    "project"
-  ],
+  "url": "https://vidmet.github.io/DocLib/test/index.html?v=2.02-preview.1-test",
+  "description": "DocLib TEST v2.02-preview.1: Egenskapsinnstillinger med lokal JSON-eksport; ingen automatisk opplasting.",
+  "extensionType": ["project"],
   "enabled": true
 }
