@@ -1,8 +1,8 @@
 {
   "title": "DocLib TEST",
   "icon": "https://vidmet.github.io/DocLib/paper.png",
-  "url": "https://vidmet.github.io/DocLib/test/index.html?v=1.37-preview.3-test",
-  "description": "DocLib TEST v1.37-preview.3: phase dates/signatures, isolated local links, network writes blocked.",
+  "url": "https://vidmet.github.io/DocLib/test/index.html?v=1.37-preview.3.1-test",
+  "description": "DocLib TEST preview.3.1 authentication hotfix; retain existing preview.3 app.js.",
   "extensionType": [
     "project"
   ],
