@@ -1,12 +1,12 @@
 'use strict';
-async function req(url){
+async function req(url,options={}){
  const target=new URL(url);const allowed=[new URL(CORE).origin,new URL(MODEL).origin];
  if(target.protocol!=='https:'||!allowed.includes(target.origin))throw Error('Autentisert kall til ukjent API-adresse er sperret.');
  const started=performance.now();let used=doclibExtractToken(token);if(!used){used=await auth();token=used}
  for(let attempt=0;attempt<2;attempt++){
   let response;
-  try{response=await fetch(url,{method:'GET',headers:{Authorization:'Bearer '+used,Accept:'application/json'}})}
-  catch{log('FETCH ERROR',{url:target.origin+target.pathname,reason:'network_failure'});return{ok:false,status:0,data:null}}
+  try{response=await fetch(url,{method:'GET',signal:options.signal,headers:{Authorization:'Bearer '+used,Accept:'application/json'}})}
+  catch(error){if(error?.name==='AbortError')throw error;log('FETCH ERROR',{url:target.origin+target.pathname,reason:'network_failure'});return{ok:false,status:0,data:null}}
   log('HTTP',{status:response.status,attempt:attempt+1,ms:Math.round(performance.now()-started),url:target.origin+target.pathname});
   if(response.status===401&&attempt===0){
    try{await response.body?.cancel()}catch{}

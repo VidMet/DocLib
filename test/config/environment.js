@@ -1,1 +1,1 @@
-export const environment=Object.freeze({version:'2.01-preview.1-test',mode:'test',networkWritesEnabled:false,linkStorage:'local',storageNamespace:'doclib-test-v137:',showDeveloperMessages:true});
+export const environment=Object.freeze({version:'2.01-preview.2-test',mode:'test',networkWritesEnabled:false,linkStorage:'local',storageNamespace:'doclib-test-v137:',showDeveloperMessages:true});
