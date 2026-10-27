@@ -1,8 +1,8 @@
 {
   "title": "DocLib TEST",
   "icon": "https://vidmet.github.io/DocLib/paper.png",
-  "url": "https://vidmet.github.io/DocLib/test/index.html?v=2.02-preview.4-test",
-  "description": "DocLib TEST v2.02-preview.4: tapsfri lokal JSON-import og eksport; ingen automatisk opplasting.",
+  "url": "https://vidmet.github.io/DocLib/test/index.html?v=2.02-preview.5-test",
+  "description": "DocLib TEST v2.02-preview.5: listeverdier i tillatte kombinasjoner; ingen automatisk opplasting.",
   "extensionType": [
     "project"
   ],
