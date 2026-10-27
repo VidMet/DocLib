@@ -1,0 +1,49 @@
+{
+  "parity": {
+    "checks": [
+      "v2 findings parity 0",
+      "v2 findings parity 1",
+      "v2 findings parity 2",
+      "v2 findings parity 3",
+      "v2 findings parity 4",
+      "discipline hierarchy format parity 5",
+      "discipline hierarchy format parity 6",
+      "discipline hierarchy format parity 7",
+      "v1 parity 0",
+      "v1 parity 3",
+      "v1 parity 8",
+      "v1 parity null",
+      "calendar parity 29.02.2024",
+      "calendar parity 29.02.2025",
+      "calendar parity 2026-12-31",
+      "full file/coverage parity good",
+      "full file/coverage parity bad",
+      "full file/coverage parity empty",
+      "full file/coverage parity partial",
+      "full file/coverage parity zero",
+      "full file/coverage parity missing-version",
+      "invalid rule rejected",
+      "invalid rule rejected"
+    ],
+    "synthetic": true
+  },
+  "browser": {
+    "checks": [
+      "Full bootstrap with simulated Workspace and 401 refresh",
+      "Validator functions and state no longer global",
+      "Registry mounts Validator with independent selection",
+      "End-to-end rules, object pagination and findings rendered",
+      "JSON export includes full results and coverage",
+      "Completed report survives mode switches",
+      "Version change marks report stale",
+      "Mode switching disabled during active validation",
+      "Cancellation produces incomplete report and releases busy state",
+      "Repeated mounting does not duplicate controls",
+      "Registry compatibility with ControlPlan contract test double",
+      "Existing network write guard retained"
+    ],
+    "errors": [],
+    "synthetic": true,
+    "controlPlan": "contract test double; unchanged real module not supplied"
+  }
+}

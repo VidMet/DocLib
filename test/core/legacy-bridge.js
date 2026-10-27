@@ -3,6 +3,13 @@ window.DocLibLegacyBridge=Object.freeze({
  start:()=>init(),getProject:()=>project?{id:project.id}:null,getMode:()=>workspaceMode,
  getDiagnostics:()=>lines.slice(),getVersion:()=>VERSION,
  attachControlPlan(port,lifecycle){controlPlanPort=port;toolLifecycle=lifecycle;},
+ attachValidation(port){validationPort=port;},
+ createValidationContext(){return Object.freeze({
+ get project(){return project;},get treeRoot(){return treeRoot;},get workspaceMode(){return workspaceMode;},
+ get workspaceScopes(){return workspaceScopes;},get CORE(){return CORE;},get MODEL(){return MODEL;},get VERSION(){return VERSION;},
+ $:id=>$(id),esc:v=>esc(v),norm:v=>norm(v),flatten:(...a)=>flatten(...a),
+ apiRead:(...a)=>req(...a),fetchRead:(url,options)=>fetch(url,options),refreshUI:()=>workspaceModeUI()
+ });},
  createControlContext(){return Object.freeze({
   get project(){return project;},get mineUser(){return mineUser;},get treeRoot(){return treeRoot;},
   get projectConfiguration(){return projectConfiguration;},get projectConfigurationFile(){return projectConfigurationFile;},
