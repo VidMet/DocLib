@@ -1,8 +1,1 @@
-{
-  "title": "DocLib TEST",
-  "icon": "https://vidmet.github.io/DocLib/paper.png",
-  "url": "https://vidmet.github.io/DocLib/test/index.html?v=2.02-preview.1-test",
-  "description": "DocLib TEST v2.02-preview.1: Egenskapsinnstillinger med lokal JSON-eksport; ingen automatisk opplasting.",
-  "extensionType": ["project"],
-  "enabled": true
-}
+{"title":"DocLib TEST","icon":"https://vidmet.github.io/DocLib/paper.png","url":"https://vidmet.github.io/DocLib/test/index.html?v=2.02-preview.2-test","description":"DocLib TEST v2.02-preview.2: sammenleggbare egenskapsbolker og MMI-arv; ingen automatisk opplasting.","extensionType":["project"],"enabled":true}

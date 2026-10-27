@@ -1,15 +1,15 @@
 {
-  "version": "2.02-preview.1-test",
-  "modelChecks": 8,
+  "version": "2.02-preview.2-test",
+  "modelChecks": 4,
   "browser": {
     "checks": [
-      "button and version marker",
-      "modal opens under validation",
-      "values regex types and dependencies in preview",
-      "complete JSON download",
-      "invalid regex blocked",
-      "names are HTML escaped",
-      "date mapping"
+      "updated PSET placeholder",
+      "property name in summary",
+      "collapse and expand all",
+      "PSET MMI shown in summary",
+      "effective MMI inheritance in JSON",
+      "download matches preview",
+      "missing threshold blocks export"
     ],
     "errors": [],
     "synthetic": true
