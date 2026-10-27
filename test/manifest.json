@@ -1,8 +1,8 @@
 {
   "title": "DocLib TEST",
   "icon": "https://vidmet.github.io/DocLib/paper.png",
-  "url": "https://vidmet.github.io/DocLib/test/index.html?v=2.02-preview.5.1-test",
-  "description": "DocLib TEST v2.02-preview.5.1: rettet MMI-import og listeverdier i tillatte kombinasjoner.",
+  "url": "https://vidmet.github.io/DocLib/test/index.html?v=2.02-preview.6.1.1-test",
+  "description": "DocLib TEST v2.02-preview.6.1.1: rettet MMI-import og listeverdier i tillatte kombinasjoner.",
   "extensionType": [
     "project"
   ],
