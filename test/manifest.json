@@ -1,0 +1,10 @@
+{
+  "title": "DocLib TEST",
+  "icon": "https://vidmet.github.io/DocLib/paper.png",
+  "url": "https://vidmet.github.io/DocLib/test/index.html?v=1.37-preview.3-test",
+  "description": "DocLib TEST v1.37-preview.3: phase dates/signatures, isolated local links, network writes blocked.",
+  "extensionType": [
+    "project"
+  ],
+  "enabled": true
+}
