@@ -1,0 +1,18 @@
+{
+  "checks": [
+    "ES bootstrap and sequential core scripts loaded",
+    "Full startup with simulated Workspace, object token and 401 retry",
+    "Project root and empty tree loaded without startup error",
+    "Four tool descriptors registered; Todos reserved",
+    "Existing test storage retained and production storage untouched",
+    "Network writes blocked",
+    "Relocated PDF adapter loaded",
+    "Validator entry preserved",
+    "Token absent from diagnostics",
+    "All three existing workspace modes switch without error",
+    "Control table and locally saved model links work with synthetic data",
+    "Relocated PDF resolver finds same-name PDF in report folder"
+  ],
+  "errors": [],
+  "simulated": true
+}

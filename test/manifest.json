@@ -1,8 +1,8 @@
 {
   "title": "DocLib TEST",
   "icon": "https://vidmet.github.io/DocLib/paper.png",
-  "url": "https://vidmet.github.io/DocLib/test/index.html?v=1.37-preview.4-test",
-  "description": "DocLib TEST PDF links preview.4. Retain existing preview.3 app.js and auth-fix.js. Read-only network and local PDF bindings.",
+  "url": "https://vidmet.github.io/DocLib/test/index.html?v=2.01-preview.1-test",
+  "description": "DocLib TEST 2.01-preview.1: modular core foundation, legacy feature adapters, read-only network.",
   "extensionType": [
     "project"
   ],
