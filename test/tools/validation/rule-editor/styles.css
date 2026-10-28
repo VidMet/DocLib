@@ -2,3 +2,5 @@
 
 .re-import-status{padding:8px 10px;border-radius:5px;background:#f4f7fb}.re-import-status:empty{display:none}
 .re-dep-scroll{overflow-x:auto;margin:10px 0}.re-dep-table{width:100%;border-collapse:collapse;min-width:720px}.re-dep-table th,.re-dep-table td{border:1px solid #d8e0eb;padding:7px;vertical-align:top}.re-dep-table th{background:#eef3f8;text-align:left;font-size:12px}.re-dep-table input,.re-dep-table select{min-width:130px;margin:0!important}.re-dep-table td:nth-last-child(2) input{min-width:220px}.re-multicheck{margin:10px 0}
+
+.re-header-validation{border:1px solid #9fb1c8}.re-header-entity{border:1px solid #d8e0eb;border-radius:6px;margin:9px 0;padding:8px;background:#fff}.re-header-entity>summary{font-weight:700;cursor:pointer}.re-header-entity textarea{font-family:ui-monospace,monospace}
