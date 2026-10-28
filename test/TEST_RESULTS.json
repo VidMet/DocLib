@@ -1,0 +1,38 @@
+{
+  "browser": {
+    "checks": [
+      "ES bootstrap and sequential core scripts loaded",
+      "Full startup with simulated Workspace, object token and 401 retry",
+      "Project root and empty tree loaded without startup error",
+      "Four tool descriptors registered; Todos reserved",
+      "Existing test storage retained and production storage untouched",
+      "Network writes blocked",
+      "ControlPlan state and functions no longer global",
+      "Validator entry preserved",
+      "Token redaction retained",
+      "Registry mounts and unmounts ControlPlan",
+      "Reports load through context and MMI reaches extracted table",
+      "Per-model linking dialog stages a draft",
+      "Declining unsaved warning prevents navigation",
+      "Confirmed navigation preserves completed draft",
+      "Local repository save preserves phase signatures",
+      "No false TFK phase",
+      "Saved local links survive data reload",
+      "Repeated mode switching does not duplicate toolbar",
+      "Single PDF handler after repeated mounts",
+      "PDF binding saved in existing local namespace",
+      "PDF bytes open in a new tab with simulated API responses",
+      "Multiple independent reports retain paired dates and signatures",
+      "New delivery version does not inherit signatures",
+      "Explorer and Validator navigation retained"
+    ],
+    "errors": [],
+    "simulated": true
+  },
+  "static": {
+    "validatorFunctionsUnchanged": 41,
+    "featureGlobalAudit": "passed",
+    "legacyBytesBefore": 189956,
+    "legacyBytesAfter": 143535
+  }
+}
