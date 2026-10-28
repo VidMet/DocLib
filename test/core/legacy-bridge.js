@@ -11,7 +11,7 @@ window.DocLibLegacyBridge=Object.freeze({
  get project(){return project;},get treeRoot(){return treeRoot;},get workspaceMode(){return workspaceMode;},
  get workspaceScopes(){return workspaceScopes;},get CORE(){return CORE;},get MODEL(){return MODEL;},get VERSION(){return VERSION;},
  $:id=>$(id),esc:v=>esc(v),norm:v=>norm(v),flatten:(...a)=>treePort.flatten(...a),
- apiRead:(...a)=>req(...a),fetchRead:(url,options)=>fetch(url,options),refreshUI:()=>workspaceModeUI()
+ apiRead:(...a)=>req(...a),apiWrite:(url,options={})=>reqWrite(url,{...options,headers:{...(options.headers||{}),'X-DocLib-Write':'rule-json'}}),fetchRead:(url,options)=>fetch(url,options),refreshUI:()=>workspaceModeUI()
  });},
  attachShared(tree,properties){treePort=tree;propertiesPort=properties;},
  attachExplorer(port){explorerPort=port;},

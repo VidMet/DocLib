@@ -19,3 +19,20 @@ async function req(url,options={}){
   return{ok:response.ok,status:response.status,data};
  }
 };
+
+
+async function reqWrite(url,options={}){
+ const target=new URL(url);const allowed=[new URL(CORE).origin];
+ if(target.protocol!=='https:'||!allowed.includes(target.origin))throw Error('Skrivekall til ukjent API-adresse er sperret.');
+ let used=doclibExtractToken(token);if(!used){used=await auth();token=used}
+ for(let attempt=0;attempt<2;attempt++){
+  const headers=new Headers(options.headers||{});headers.set('Authorization','Bearer '+used);
+  if(!headers.has('Accept'))headers.set('Accept','application/json');
+  let response;
+  try{response=await fetch(url,{...options,method:String(options.method||'POST').toUpperCase(),headers})}
+  catch(error){if(error?.name==='AbortError')throw error;throw Error('Nettverksskriving feilet: '+error.message)}
+  if(response.status===401&&attempt===0){try{await response.body?.cancel()}catch{}used=await auth();token=used;continue}
+  const text=await response.text();let data;try{data=text?JSON.parse(text):null}catch{data=text}
+  return{ok:response.ok,status:response.status,data,headers:response.headers};
+ }
+}
