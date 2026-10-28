@@ -1,0 +1,14 @@
+{
+  "version": "2.02-rc.2",
+  "modelChecks": 5,
+  "browser": {
+    "checks": [
+      "UI expands list values",
+      "UI blocks empty target"
+    ],
+    "errors": [],
+    "synthetic": true
+  },
+  "liveTested": false,
+  "writesEnabled": false
+}
