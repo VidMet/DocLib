@@ -1,6 +1,6 @@
 import {install as rules} from './rules.js?v=2.01-preview.5.1';
 import {install as engine} from './engine.js?v=2.01-preview.5.1';
-import {install as conditional} from './conditional.js?v=2.02-preview.6.1';
+import {install as conditional} from './conditional.js?v=2.02-preview.6.1.1';
 import {install as report} from './report.js?v=2.01-preview.5.1';
 import {initialize} from './state.js?v=2.01-preview.5.1';
 import {createRuleEditor} from './rule-editor/index.js?v=2.02-preview.5.1';
