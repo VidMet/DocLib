@@ -4,7 +4,7 @@ import {install as conditional} from './conditional.js?v=2.02-preview.7';
 import {install as header} from './header.js?v=2.02-preview.7';
 import {install as report} from './report.js?v=2.01-preview.5.1';
 import {initialize} from './state.js?v=2.01-preview.5.1';
-import {createRuleEditor} from './rule-editor/index.js?v=2.02-preview.8';
+import {createRuleEditor} from './rule-editor/index.js?v=2.02-preview.11.2-test';
 import {createRuleDraftTester} from './rule-test.js?v=2.02-preview.9.1';
 import {createProjectRulePicker} from './project-rules.js?v=2.02-preview.11.2-test';
 export default Object.freeze({id:'validation',title:'Egenskapsvalidering',legacyMode:'validation',status:'module',create:createValidation});
