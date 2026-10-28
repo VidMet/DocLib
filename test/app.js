@@ -1,11 +1,11 @@
-import {VERSION,applyVersionDisplay,installVersionDisplay} from './config/version.js?v=2.02-preview.11.8-test';
+import {VERSION,applyVersionDisplay,installVersionDisplay} from './config/version.js?v=2.02-preview.11.9-test';
 import {createProjectController} from './core/project.js?v=2.01-preview.5.1';
 import {createFileTree} from './shared/file-tree.js?v=2.01-preview.5.1';
 import {createProperties} from './shared/properties.js?v=2.01-preview.5.1';
-import {environment} from './config/environment.js?v=2.02-preview.11.8-test';
+import {environment} from './config/environment.js?v=2.02-preview.11.9-test';
 import {createToolRegistry} from './core/tool-registry.js?v=2.01-preview.5.1';
 import explorer from './tools/explorer/index.js?v=2.01-preview.5.1';
-import validation from './tools/validation/index.js?v=2.02-preview.11.8-test';
+import validation from './tools/validation/index.js?v=2.02-preview.11.9-test';
 import controlPlan from './tools/control-plan/index.js?v=2.01-preview.5.1';
 import todos from './tools/todos/index.js?v=2.01-preview.5.1';
 const versionObserver=installVersionDisplay();

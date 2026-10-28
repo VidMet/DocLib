@@ -1,7 +1,7 @@
 export const VERSION = Object.freeze({
-  value: '2.02-preview.11.8-test',
-  label: 'DocLib TEST v2.02-preview.11.8-test',
-  cacheKey: '2.02-preview.11.8-test'
+  value: '2.02-preview.11.9-test',
+  label: 'DocLib TEST v2.02-preview.11.9-test',
+  cacheKey: '2.02-preview.11.9-test'
 });
 
 export function applyVersionDisplay(root = document) {

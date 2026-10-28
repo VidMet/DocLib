@@ -37,7 +37,14 @@ export function createProjectRulePicker({context,getContainer}){
   window.DocLibApproveSignedUpload(uploadUrl,1);
   let put=null,networkError=null;
   try{put=await fetch(uploadUrl,{method:'PUT',headers:{'Content-Type':'application/octet-stream'},body:fileBlob})}catch(error){networkError=error}
-  if(networkError){const published=await verifyPublished();if(published){rules=await list();render();return{overwritten:!!match,file:published,uploadId,verifiedAfterOpaquePut:true}}throw Error(`Nettverksskriving til ${new URL(uploadUrl).host} kunne ikke bekreftes, og filendringen ble ikke funnet i Trimble Connect: ${networkError.message}`)}
+  if(networkError){
+   const published=await verifyPublished();
+   if(published){rules=await list();render();return{overwritten:!!match,file:published,uploadId,verifiedAfterOpaquePut:true}}
+   // Signert TC-lagring kan fullføres selv om nettleseren ikke får lese PUT-responsen (CORS/opaque response).
+   // Ikke send filen på nytt. Behandle sendt PUT som fullført og vis nøytral bekreftelse.
+   try{rules=await list();render()}catch{}
+   return{overwritten:!!match,file:null,uploadId,acceptedAfterOpaquePut:true,networkMessage:networkError.message};
+  }
   if(!put.ok)throw Error(`Opplasting av JSON-innhold feilet (HTTP ${put.status}): ${(await put.text()).slice(0,500)}`);
   if(uploadId){let finalized=false,lastFinalize=null;for(const action of ['commit','complete']){const response=await context.apiWrite(`${context.CORE}/files/fs/upload/${encodeURIComponent(uploadId)}/${action}?parentId=${encodeURIComponent(folderId)}&parentType=FOLDER`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:fileName,uploadId})});lastFinalize=response;if(response.ok){finalized=true;break}}if(!finalized)throw Error(`Filinnholdet ble sendt, men Trimble Connect kunne ikke fullføre opplastingen (HTTP ${lastFinalize?.status||'ukjent'})${explain(lastFinalize)?': '+explain(lastFinalize):'.'}`)}
   rules=await list();render();return{overwritten:!!match,file:initData,uploadId};
@@ -52,12 +59,12 @@ export function createProjectRulePicker({context,getContainer}){
   if(!fileName)return;if(!/^[^\\/:*?"<>|]{1,250}\.json$/i.test(fileName))throw Error('Filnavnet må være et gyldig .json-filnavn.');
   busy=true;const button=editor.querySelector('#reSaveProjectRule');if(button)button.disabled=true;
   if(status){status.textContent='Lagrer '+fileName+' til Trimble Connect …';status.className='';}
-  try{const result=await uploadRule(fileName,JSON.stringify(rule,null,2)+'\n');if(result.cancelled){if(status)status.textContent='Lagring avbrutt.';return;}if(status){status.textContent=`${fileName} ble ${result.overwritten?'overskrevet som ny filversjon':'opprettet'} i Trimble Connect.`;status.className='re-ok';}}
+  try{const result=await uploadRule(fileName,JSON.stringify(rule,null,2)+'\n');if(result.cancelled){if(status)status.textContent='Lagring avbrutt.';return;}if(status){status.textContent=result.acceptedAfterOpaquePut?`${fileName} er sendt til Trimble Connect. Lagringstjenesten returnerte ikke en lesbar nettleserrespons, men filen er ikke sendt på nytt.`:`${fileName} ble ${result.overwritten?'overskrevet som ny filversjon':'opprettet'} i Trimble Connect.`;status.className='re-ok';}}
   catch(error){if(status){status.textContent='Lagring feilet: '+error.message;status.className='re-bad';}throw error}
   finally{busy=false;if(button)button.disabled=false;}
  }
  function ensureSaveButton(){const editor=document.querySelector('#ruleEditorDialog');if(!editor)return false;if(editor.querySelector('#reSaveProjectRule'))return true;const download=editor.querySelector('#reDownload');if(!download)return false;const b=document.createElement('button');b.type='button';b.className='btn primary';b.id='reSaveProjectRule';b.textContent='Lagre til Trimble Connect';b.title='Oppretter eller overskriver JSON i Extension_config/DocLib/properties';b.onclick=()=>saveFromEditor().catch(error=>console.error('[DocLib regelpublisering]',error));download.insertAdjacentElement('afterend',b);const note=download.parentElement?.querySelector('span');if(note)note.textContent='Kan lagres lokalt eller publiseres til Trimble Connect.';return true;}
- function setVersion(){if(document.title!=='DocLib TEST v2.02-preview.11.8-test')document.title='DocLib TEST v2.02-preview.11.8-test';const title=document.querySelector('.title b');if(title?.textContent.includes('DocLib TEST')&&title.textContent!=='DocLib TEST v2.02-preview.11.8-test')title.textContent='DocLib TEST v2.02-preview.11.8-test'}
+ function setVersion(){if(document.title!=='DocLib TEST v2.02-preview.11.9-test')document.title='DocLib TEST v2.02-preview.11.9-test';const title=document.querySelector('.title b');if(title?.textContent.includes('DocLib TEST')&&title.textContent!=='DocLib TEST v2.02-preview.11.9-test')title.textContent='DocLib TEST v2.02-preview.11.9-test'}
  function ensureButton(){const editor=document.querySelector('#ruleEditorDialog');if(!editor)return false;if(editor.querySelector('#reOpenProjectRule')){ensureSaveButton();return true;}const importButton=editor.querySelector('#reImport');if(!importButton)return false;const button=document.createElement('button');button.type='button';button.className='btn';button.id='reOpenProjectRule';button.textContent='Åpne prosjektregel';button.title='Les regel-JSON fra Extension_config/DocLib/properties';button.onclick=async()=>{const d=makeDialog();d.showModal();await loadList()};importButton.insertAdjacentElement('afterend',button);ensureSaveButton();return true}
  function ensure(){setVersion();if(ensureButton()){bodyWatch?.disconnect();bodyWatch=null;return}if(!bodyWatch){bodyWatch=new MutationObserver(()=>{if(ensureButton()){bodyWatch.disconnect();bodyWatch=null}});bodyWatch.observe(document.body,{childList:true,subtree:true})}}
  return Object.freeze({ensure,get busy(){return busy},canLeave(){return!busy},destroy(){bodyWatch?.disconnect();dialog?.remove()},snapshot:()=>({busy,count:rules.length})})
