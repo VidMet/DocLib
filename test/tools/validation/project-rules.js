@@ -22,10 +22,10 @@ export function createProjectRulePicker({context,getContainer}){
   const folderId=(match?.folderId)||(all[0]?.folderId)||((await list())[0]?.folderId);
   if(!folderId)throw Error('Fant ikke målmappen Extension_config/DocLib/properties.');
   const bytes=new TextEncoder().encode(jsonText);
-  const payload={projectId:String(context.project.id),parentId:String(folderId),folderId:String(folderId),name:fileName,fileName:fileName,size:bytes.byteLength,contentType:'application/json',mimeType:'application/json'};
+  const payload={projectId:String(context.project.id),parentId:String(folderId),parentType:'folder',folderId:String(folderId),name:fileName,fileName:fileName,size:bytes.byteLength,contentType:'application/json',mimeType:'application/json'};
   if(match){payload.fileId=String(match.id);payload.existingFileId=String(match.id);}
   const explain=r=>{const d=r?.data;if(!d)return'';if(typeof d==='string')return d.slice(0,500);return String(d.details||d.message||d.errorDetails||d.errorCode||JSON.stringify(d)).slice(0,500)};
-  const initQuery=new URLSearchParams({parentId:payload.parentId,fileName:payload.fileName,name:payload.name,size:String(payload.size),contentType:payload.contentType});
+  const initQuery=new URLSearchParams({parentId:payload.parentId,parentType:payload.parentType,fileName:payload.fileName,name:payload.name,size:String(payload.size),contentType:payload.contentType});
   if(match)initQuery.set('fileId',String(match.id));
   const init=await context.apiWrite(`${context.CORE}/files/fs/upload?${initQuery.toString()}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
   if(!init.ok)throw Error(`Kunne ikke opprette opplastingsjobb (HTTP ${init.status})${explain(init)?': '+explain(init):'.'}`);
@@ -39,7 +39,7 @@ export function createProjectRulePicker({context,getContainer}){
   if(!put.ok)throw Error(`Opplasting av JSON-innhold feilet (HTTP ${put.status}): ${(await put.text()).slice(0,500)}`);
   const complete=await context.apiWrite(`${context.CORE}/files/fs/upload/${encodeURIComponent(uploadId)}/complete`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({uploadId,projectId:payload.projectId,fileId:match?String(match.id):undefined})});
   if(!complete.ok&&![404,405].includes(complete.status))throw Error(`Kunne ikke fullføre opplastingen (HTTP ${complete.status})${explain(complete)?': '+explain(complete):'.'}`);
-  const commitBody={uploadId,projectId:payload.projectId,parentId:payload.parentId,folderId:payload.folderId,name:fileName,fileName:fileName,size:payload.size,contentType:payload.contentType};
+  const commitBody={uploadId,projectId:payload.projectId,parentId:payload.parentId,parentType:payload.parentType,folderId:payload.folderId,name:fileName,fileName:fileName,size:payload.size,contentType:payload.contentType};
   if(match){commitBody.fileId=String(match.id);commitBody.existingFileId=String(match.id);}
   const commit=await context.apiWrite(`${context.CORE}/files/fs/commit`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(commitBody)});
   if(!commit.ok)throw Error(`Opplastingen ble sendt, men commit feilet (HTTP ${commit.status})${explain(commit)?': '+explain(commit):'.'}`);
@@ -60,7 +60,7 @@ export function createProjectRulePicker({context,getContainer}){
   finally{busy=false;if(button)button.disabled=false;}
  }
  function ensureSaveButton(){const editor=document.querySelector('#ruleEditorDialog');if(!editor)return false;if(editor.querySelector('#reSaveProjectRule'))return true;const download=editor.querySelector('#reDownload');if(!download)return false;const b=document.createElement('button');b.type='button';b.className='btn primary';b.id='reSaveProjectRule';b.textContent='Lagre til Trimble Connect';b.title='Oppretter eller overskriver JSON i Extension_config/DocLib/properties';b.onclick=()=>saveFromEditor().catch(error=>console.error('[DocLib regelpublisering]',error));download.insertAdjacentElement('afterend',b);const note=download.parentElement?.querySelector('span');if(note)note.textContent='Kan lagres lokalt eller publiseres til Trimble Connect.';return true;}
- function setVersion(){if(document.title!=='DocLib TEST v2.02-preview.11.3-test')document.title='DocLib TEST v2.02-preview.11.3-test';const title=document.querySelector('.title b');if(title?.textContent.includes('DocLib TEST')&&title.textContent!=='DocLib TEST v2.02-preview.11.3-test')title.textContent='DocLib TEST v2.02-preview.11.3-test'}
+ function setVersion(){if(document.title!=='DocLib TEST v2.02-preview.11.4-test')document.title='DocLib TEST v2.02-preview.11.4-test';const title=document.querySelector('.title b');if(title?.textContent.includes('DocLib TEST')&&title.textContent!=='DocLib TEST v2.02-preview.11.4-test')title.textContent='DocLib TEST v2.02-preview.11.4-test'}
  function ensureButton(){const editor=document.querySelector('#ruleEditorDialog');if(!editor)return false;if(editor.querySelector('#reOpenProjectRule')){ensureSaveButton();return true;}const importButton=editor.querySelector('#reImport');if(!importButton)return false;const button=document.createElement('button');button.type='button';button.className='btn';button.id='reOpenProjectRule';button.textContent='Åpne prosjektregel';button.title='Les regel-JSON fra Extension_config/DocLib/properties';button.onclick=async()=>{const d=makeDialog();d.showModal();await loadList()};importButton.insertAdjacentElement('afterend',button);ensureSaveButton();return true}
  function ensure(){setVersion();if(ensureButton()){bodyWatch?.disconnect();bodyWatch=null;return}if(!bodyWatch){bodyWatch=new MutationObserver(()=>{if(ensureButton()){bodyWatch.disconnect();bodyWatch=null}});bodyWatch.observe(document.body,{childList:true,subtree:true})}}
  return Object.freeze({ensure,get busy(){return busy},canLeave(){return!busy},destroy(){bodyWatch?.disconnect();dialog?.remove()},snapshot:()=>({busy,count:rules.length})})
