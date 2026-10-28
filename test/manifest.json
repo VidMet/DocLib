@@ -1,10 +1,1 @@
-{
-  "title": "DocLib TEST",
-  "icon": "https://vidmet.github.io/DocLib/paper.png",
-  "url": "https://vidmet.github.io/DocLib/test/index.html?v=2.02-preview.8.1-test",
-  "description": "DocLib TEST v2.02-preview.8.1: rettet MMI-import og listeverdier i tillatte kombinasjoner.",
-  "extensionType": [
-    "project"
-  ],
-  "enabled": true
-}
+{"title":"DocLib TEST v2.02-preview.10.2-test","url":"https://norconsult.github.io/Trimble-Connect-Extension/test/","description":"DocLib modular TEST architecture with centralized version display.","icon":"https://norconsult.github.io/Trimble-Connect-Extension/test/icon.png","enabled":true}

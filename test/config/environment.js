@@ -1,1 +1,2 @@
-export const environment=Object.freeze({version:'2.02-preview.8-test',mode:'test',networkWritesEnabled:false,linkStorage:'local',storageNamespace:'doclib-test-v137:',showDeveloperMessages:true});
+import {VERSION} from './version.js';
+export const environment=Object.freeze({name:'TEST',label:'TESTMILJO',version:VERSION.value,versionLabel:VERSION.label,readOnly:false,persistence:true});
