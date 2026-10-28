@@ -1,1 +1,10 @@
-{"title":"DocLib TEST v2.02-preview.11.1-test","url":"https://norconsult.github.io/Trimble-Connect-Extension/test/","description":"DocLib modular TEST architecture with centralized version display.","icon":"https://norconsult.github.io/Trimble-Connect-Extension/test/icon.png","enabled":true}
+{
+  "title": "Dokumentutforsker med Metadata",
+  "icon": "https://vidmet.github.io/DocLib/paper.png",
+  "url": "https://vidmet.github.io/DocLib/index.html?v=1.37-preview.2",
+  "description": "DocLib 1.37-preview.2 CONTROL_LINK_SELECTION - delivery selection, explicit per-model control links and full configuration download; no automatic upload.",
+  "extensionType": [
+    "project"
+  ],
+  "enabled": true
+}
