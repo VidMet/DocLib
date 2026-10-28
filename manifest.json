@@ -1,10 +1,7 @@
 {
-  "title": "Dokumentutforsker med Metadata",
-  "icon": "https://vidmet.github.io/DocLib/paper.png",
-  "url": "https://vidmet.github.io/DocLib/index.html?v=1.37-preview.2",
-  "description": "DocLib 1.37-preview.2 CONTROL_LINK_SELECTION - delivery selection, explicit per-model control links and full configuration download; no automatic upload.",
-  "extensionType": [
-    "project"
-  ],
+  "title": "DocLib v1.37-preview.2",
+  "url": "https://norconsult.github.io/Trimble-Connect-Extension/",
+  "description": "DocLib",
+  "icon": "https://norconsult.github.io/Trimble-Connect-Extension/icon.png",
   "enabled": true
 }
