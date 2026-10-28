@@ -18,32 +18,22 @@ export function createProjectRulePicker({context,getContainer}){
  async function uploadRule(fileName,jsonText,existing){
   const all=rules.length?rules:await list();
   const match=existing||all.find(x=>x.name.toLowerCase()===fileName.toLowerCase());
-  if(match&&!confirm(`Filen ${fileName} finnes allerede. Overskrive og opprette en ny filversjon i Trimble Connect?`))return{cancelled:true};
+  if(match&&!confirm(`Filen ${fileName} finnes allerede. Forsøke å lagre en ny filversjon i Trimble Connect?`))return{cancelled:true};
   const folderId=(match?.folderId)||(all[0]?.folderId)||((await list())[0]?.folderId);
   if(!folderId)throw Error('Fant ikke målmappen Extension_config/DocLib/properties.');
-  const bytes=new TextEncoder().encode(jsonText);
-  const payload={projectId:String(context.project.id),parentId:String(folderId),parentType:'folder',folderId:String(folderId),name:fileName,fileName:fileName,size:bytes.byteLength,contentType:'application/json',mimeType:'application/json'};
-  if(match){payload.fileId=String(match.id);payload.existingFileId=String(match.id);}
-  const explain=r=>{const d=r?.data;if(!d)return'';if(typeof d==='string')return d.slice(0,500);return String(d.details||d.message||d.errorDetails||d.errorCode||JSON.stringify(d)).slice(0,500)};
-  const initQuery=new URLSearchParams({parentId:payload.parentId,parentType:payload.parentType,fileName:payload.fileName,name:payload.name,size:String(payload.size),contentType:payload.contentType});
-  if(match)initQuery.set('fileId',String(match.id));
-  const init=await context.apiWrite(`${context.CORE}/files/fs/upload?${initQuery.toString()}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
-  if(!init.ok)throw Error(`Kunne ikke opprette opplastingsjobb (HTTP ${init.status})${explain(init)?': '+explain(init):'.'}`);
-  const info=init.data||{},uploadId=info.uploadId||info.id||info.upload?.id||info.data?.uploadId;
-  let uploadUrl=info.uploadUrl||info.url||info.upload?.url||info.urls?.upload||info.data?.uploadUrl;
-  if(!uploadId)throw Error('Trimble Connect opprettet ingen uploadId. Svar: '+JSON.stringify(info).slice(0,500));
-  if(!uploadUrl){const details=await context.apiRead(`${context.CORE}/files/fs/upload?uploadId=${encodeURIComponent(uploadId)}`);if(!details.ok)throw Error(`Kunne ikke hente opplastingsdetaljer (HTTP ${details.status})${explain(details)?': '+explain(details):'.'}`);const d=details.data||{};uploadUrl=d.uploadUrl||d.url||d.upload?.url||d.urls?.upload||d.data?.uploadUrl;Object.assign(info,d)}
-  if(!uploadUrl)throw Error('Trimble Connect returnerte uploadId, men ingen opplastingsadresse.');
-  const putHeaders={...(info.headers||info.upload?.headers||{})};if(!Object.keys(putHeaders).some(k=>k.toLowerCase()==='content-type'))putHeaders['Content-Type']='application/json';
-  const put=await fetch(uploadUrl,{method:info.method||info.upload?.method||'PUT',headers:putHeaders,body:bytes});
-  if(!put.ok)throw Error(`Opplasting av JSON-innhold feilet (HTTP ${put.status}): ${(await put.text()).slice(0,500)}`);
-  const complete=await context.apiWrite(`${context.CORE}/files/fs/upload/${encodeURIComponent(uploadId)}/complete`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({uploadId,projectId:payload.projectId,fileId:match?String(match.id):undefined})});
-  if(!complete.ok&&![404,405].includes(complete.status))throw Error(`Kunne ikke fullføre opplastingen (HTTP ${complete.status})${explain(complete)?': '+explain(complete):'.'}`);
-  const commitBody={uploadId,projectId:payload.projectId,parentId:payload.parentId,parentType:payload.parentType,folderId:payload.folderId,name:fileName,fileName:fileName,size:payload.size,contentType:payload.contentType};
-  if(match){commitBody.fileId=String(match.id);commitBody.existingFileId=String(match.id);}
-  const commit=await context.apiWrite(`${context.CORE}/files/fs/commit`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(commitBody)});
-  if(!commit.ok)throw Error(`Opplastingen ble sendt, men commit feilet (HTTP ${commit.status})${explain(commit)?': '+explain(commit):'.'}`);
-  rules=await list();render();return{overwritten:!!match,file:commit.data,uploadId};
+  const fileBlob=new Blob([jsonText],{type:'application/octet-stream'});
+  const explain=r=>{const d=r?.data;if(!d)return'';if(typeof d==='string')return d.slice(0,500);return String(d.details||d.detail||d.message||d.errorDetails||d.errorCode||d.errorcode||JSON.stringify(d)).slice(0,500)};
+  const findUrl=value=>{if(!value)return null;if(typeof value==='string'&&/^https?:\/\//i.test(value))return value;if(Array.isArray(value)){for(const item of value){const hit=findUrl(item);if(hit)return hit}}else if(typeof value==='object'){for(const key of['uploadUrl','uploadURL','presignedUrl','signedUrl','signedURL','url','href','location']){if(typeof value[key]==='string'&&/^https?:\/\//i.test(value[key]))return value[key]}for(const item of Object.values(value)){const hit=findUrl(item);if(hit)return hit}}return null};
+  const initUrl=`${context.CORE}/files/fs/upload?parentId=${encodeURIComponent(folderId)}&parentType=FOLDER`;
+  const bodies=[{label:'standard',value:{name:fileName}},{label:'parent-i-body',value:{name:fileName,parentId:folderId,parentType:'FOLDER'}},{label:'contents-array',value:{name:fileName,contents:[{name:fileName,size:fileBlob.size}]}}];
+  let init=null,initData=null;const diagnostics=[];
+  for(const strategy of bodies){const response=await context.apiWrite(initUrl,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(strategy.value)});diagnostics.push({strategy:strategy.label,status:response.status,error:explain(response)});if(response.ok){init=response;initData=response.data||{};break}}
+  if(!init)throw Error('Trimble Connect avviste opplastingsstart: '+diagnostics.map(d=>`${d.strategy} HTTP ${d.status}${d.error?': '+d.error:''}`).join(' | '));
+  const uploadUrl=findUrl(initData),uploadId=initData?.uploadId||initData?.id||initData?.contents?.[0]?.uploadId||initData?.upload?.id;
+  if(!uploadUrl){if(initData?.id&&initData?.versionId){rules=await list();render();return{overwritten:!!match,file:initData,uploadId:null}}throw Error('Trimble Connect opprettet opplastingen, men returnerte ingen opplastingsadresse. Svar: '+JSON.stringify(initData).slice(0,500))}
+  let put=await fetch(uploadUrl,{method:'PUT',headers:{'Content-Type':'application/octet-stream'},body:fileBlob}).catch(()=>null);if(!put||!put.ok)put=await fetch(uploadUrl,{method:'PUT',body:fileBlob});if(!put.ok)throw Error(`Opplasting av JSON-innhold feilet (HTTP ${put.status}): ${(await put.text()).slice(0,500)}`);
+  if(uploadId){let finalized=false,lastFinalize=null;for(const action of ['commit','complete']){const response=await context.apiWrite(`${context.CORE}/files/fs/upload/${encodeURIComponent(uploadId)}/${action}?parentId=${encodeURIComponent(folderId)}&parentType=FOLDER`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:fileName,uploadId})});lastFinalize=response;if(response.ok){finalized=true;break}}if(!finalized)throw Error(`Filinnholdet ble sendt, men Trimble Connect kunne ikke fullføre opplastingen (HTTP ${lastFinalize?.status||'ukjent'})${explain(lastFinalize)?': '+explain(lastFinalize):'.'}`)}
+  rules=await list();render();return{overwritten:!!match,file:initData,uploadId};
  }
  async function saveFromEditor(){
   if(busy)return;const editor=document.querySelector('#ruleEditorDialog'),status=editor?.querySelector('#reStatus'),preview=editor?.querySelector('#reJson');
@@ -60,7 +50,7 @@ export function createProjectRulePicker({context,getContainer}){
   finally{busy=false;if(button)button.disabled=false;}
  }
  function ensureSaveButton(){const editor=document.querySelector('#ruleEditorDialog');if(!editor)return false;if(editor.querySelector('#reSaveProjectRule'))return true;const download=editor.querySelector('#reDownload');if(!download)return false;const b=document.createElement('button');b.type='button';b.className='btn primary';b.id='reSaveProjectRule';b.textContent='Lagre til Trimble Connect';b.title='Oppretter eller overskriver JSON i Extension_config/DocLib/properties';b.onclick=()=>saveFromEditor().catch(error=>console.error('[DocLib regelpublisering]',error));download.insertAdjacentElement('afterend',b);const note=download.parentElement?.querySelector('span');if(note)note.textContent='Kan lagres lokalt eller publiseres til Trimble Connect.';return true;}
- function setVersion(){if(document.title!=='DocLib TEST v2.02-preview.11.4-test')document.title='DocLib TEST v2.02-preview.11.4-test';const title=document.querySelector('.title b');if(title?.textContent.includes('DocLib TEST')&&title.textContent!=='DocLib TEST v2.02-preview.11.4-test')title.textContent='DocLib TEST v2.02-preview.11.4-test'}
+ function setVersion(){if(document.title!=='DocLib TEST v2.02-preview.11.5-test')document.title='DocLib TEST v2.02-preview.11.5-test';const title=document.querySelector('.title b');if(title?.textContent.includes('DocLib TEST')&&title.textContent!=='DocLib TEST v2.02-preview.11.5-test')title.textContent='DocLib TEST v2.02-preview.11.5-test'}
  function ensureButton(){const editor=document.querySelector('#ruleEditorDialog');if(!editor)return false;if(editor.querySelector('#reOpenProjectRule')){ensureSaveButton();return true;}const importButton=editor.querySelector('#reImport');if(!importButton)return false;const button=document.createElement('button');button.type='button';button.className='btn';button.id='reOpenProjectRule';button.textContent='Åpne prosjektregel';button.title='Les regel-JSON fra Extension_config/DocLib/properties';button.onclick=async()=>{const d=makeDialog();d.showModal();await loadList()};importButton.insertAdjacentElement('afterend',button);ensureSaveButton();return true}
  function ensure(){setVersion();if(ensureButton()){bodyWatch?.disconnect();bodyWatch=null;return}if(!bodyWatch){bodyWatch=new MutationObserver(()=>{if(ensureButton()){bodyWatch.disconnect();bodyWatch=null}});bodyWatch.observe(document.body,{childList:true,subtree:true})}}
  return Object.freeze({ensure,get busy(){return busy},canLeave(){return!busy},destroy(){bodyWatch?.disconnect();dialog?.remove()},snapshot:()=>({busy,count:rules.length})})
