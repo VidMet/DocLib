@@ -1,7 +1,7 @@
 {
-  "title": "DocLib v1.37-preview.2",
+  "title": "DocLib v2.02-rc.2",
   "url": "https://norconsult.github.io/Trimble-Connect-Extension/",
-  "description": "DocLib",
+  "description": "DocLib v2.02 release candidate 2",
   "icon": "https://norconsult.github.io/Trimble-Connect-Extension/icon.png",
   "enabled": true
 }
