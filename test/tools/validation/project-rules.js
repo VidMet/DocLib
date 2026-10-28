@@ -24,9 +24,11 @@ export function createProjectRulePicker({context,getContainer}){
   const bytes=new TextEncoder().encode(jsonText);
   const initBody={projectId:String(context.project.id),parentId:String(folderId),folderId:String(folderId),name:fileName,fileName,size:bytes.byteLength,contentType:'application/json'};
   if(match){initBody.fileId=String(match.id);initBody.id=String(match.id);}
-  const init=await context.apiWrite(`${context.CORE}/files/fs/upload`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(initBody)});
-  if(!init.ok)throw Error(`Kunne ikke starte opplasting (HTTP ${init.status}).`);
-  const info=init.data||{},uploadId=info.uploadId||info.id,uploadUrl=info.uploadUrl||info.url||info.upload?.url;
+  const uploadQuery=new URLSearchParams({projectId:initBody.projectId,parentId:initBody.parentId,fileName:initBody.fileName,name:initBody.name,size:String(initBody.size),contentType:initBody.contentType});
+  if(match)uploadQuery.set('fileId',String(match.id));
+  const init=await context.apiRead(`${context.CORE}/files/fs/upload?${uploadQuery}`);
+  if(!init.ok)throw Error(`Kunne ikke hente opplastingsdetaljer (HTTP ${init.status}).`);
+  const info=init.data||{},uploadId=info.uploadId||info.id||info.upload?.id,uploadUrl=info.uploadUrl||info.url||info.upload?.url||info.urls?.upload;
   if(!uploadId||!uploadUrl)throw Error('Trimble Connect returnerte ikke uploadId og uploadUrl.');
   const put=await fetch(uploadUrl,{method:info.method||'PUT',headers:info.headers||{'Content-Type':'application/json'},body:bytes});
   if(!put.ok)throw Error(`Opplasting av innhold feilet (HTTP ${put.status}).`);
@@ -51,7 +53,7 @@ export function createProjectRulePicker({context,getContainer}){
   finally{busy=false;if(button)button.disabled=false;}
  }
  function ensureSaveButton(){const editor=document.querySelector('#ruleEditorDialog');if(!editor)return false;if(editor.querySelector('#reSaveProjectRule'))return true;const download=editor.querySelector('#reDownload');if(!download)return false;const b=document.createElement('button');b.type='button';b.className='btn primary';b.id='reSaveProjectRule';b.textContent='Lagre til Trimble Connect';b.title='Oppretter eller overskriver JSON i Extension_config/DocLib/properties';b.onclick=()=>saveFromEditor().catch(error=>console.error('[DocLib regelpublisering]',error));download.insertAdjacentElement('afterend',b);const note=download.parentElement?.querySelector('span');if(note)note.textContent='Kan lagres lokalt eller publiseres til Trimble Connect.';return true;}
- function setVersion(){if(document.title!=='DocLib TEST v2.02-preview.11-test')document.title='DocLib TEST v2.02-preview.11-test';const title=document.querySelector('.title b');if(title?.textContent.includes('DocLib TEST')&&title.textContent!=='DocLib TEST v2.02-preview.11-test')title.textContent='DocLib TEST v2.02-preview.11-test'}
+ function setVersion(){if(document.title!=='DocLib TEST v2.02-preview.11.1-test')document.title='DocLib TEST v2.02-preview.11.1-test';const title=document.querySelector('.title b');if(title?.textContent.includes('DocLib TEST')&&title.textContent!=='DocLib TEST v2.02-preview.11.1-test')title.textContent='DocLib TEST v2.02-preview.11.1-test'}
  function ensureButton(){const editor=document.querySelector('#ruleEditorDialog');if(!editor)return false;if(editor.querySelector('#reOpenProjectRule')){ensureSaveButton();return true;}const importButton=editor.querySelector('#reImport');if(!importButton)return false;const button=document.createElement('button');button.type='button';button.className='btn';button.id='reOpenProjectRule';button.textContent='Åpne prosjektregel';button.title='Les regel-JSON fra Extension_config/DocLib/properties';button.onclick=async()=>{const d=makeDialog();d.showModal();await loadList()};importButton.insertAdjacentElement('afterend',button);ensureSaveButton();return true}
  function ensure(){setVersion();if(ensureButton()){bodyWatch?.disconnect();bodyWatch=null;return}if(!bodyWatch){bodyWatch=new MutationObserver(()=>{if(ensureButton()){bodyWatch.disconnect();bodyWatch=null}});bodyWatch.observe(document.body,{childList:true,subtree:true})}}
  return Object.freeze({ensure,get busy(){return busy},canLeave(){return!busy},destroy(){bodyWatch?.disconnect();dialog?.remove()},snapshot:()=>({busy,count:rules.length})})
