@@ -19,7 +19,7 @@ window.DocLibLegacyBridge=Object.freeze({
  createProjectContext(){return Object.freeze({
   projectId:()=>project?.id,
   canReload(){
-   if(validationPort.valBusy||controlPlanPort.cpExportBusy)return false;
+   if(validationPort.valBusy||controlPlanPort.cpExportBusy)return false;const validationSnapshot=toolLifecycle.snapshot('validation');if(validationSnapshot?.editorDirty&&!confirm('Du har ulagrede endringer i Regeloppsett. Oppfrisk prosjektet likevel? Regelutkastet beholdes, men eventuelle modellresultater blir utdaterte.'))return false;
    const pending=controlPlanPort.cpPendingLinks.length||document.getElementById('cpLinkDialog')?.open||document.getElementById('cpPdfChoose')?.open;
    if(pending&&!confirm('Oppdatering lukker kontrollvalg og forkaster upubliserte koblingsutkast. Fortsette?'))return false;
    for(const id of ['cpLinkDialog','cpPdfChoose']){const d=document.getElementById(id);if(d?.open)d.close();d?.remove();}
@@ -60,7 +60,7 @@ window.DocLibLegacyBridge=Object.freeze({
    const labels={idle:'Venter på prosjekt',loading:'Laster prosjekt',ready:'Prosjektgrunnlag klart',incomplete:'Ufullstendig prosjektgrunnlag',error:'Prosjektinnlasting feilet'};
    banner.dataset.phase=state.phase;banner.dataset.warnings=String(state.warnings?.length||0);banner.textContent=labels[state.phase]+(state.stage?' · '+state.stage:'')+(state.stale&&state.phase!=='idle'?' · Visningen er ikke bekreftet oppdatert.':'')+(state.warnings?.length?' · '+state.warnings.length+' fil(er) med metadataadvarsel. Øvrige filer kan brukes.':'');
    banner.title=[...state.issues,...(state.warnings||[]).map(x=>[x.folder,x.name,'ID: '+x.fileId,x.status?'HTTP '+x.status:'',x.message].filter(Boolean).join(' · '))].join('\n');banner.setAttribute('aria-busy',String(state.phase==='loading'));
-   $('refresh').disabled=state.phase==='loading'||validationPort.valBusy;
+   $('refresh').disabled=state.phase==='loading'||validationPort.valBusy;const treeRefresh=$('treeRefresh');if(treeRefresh){treeRefresh.disabled=state.phase==='loading'||validationPort.valBusy||controlPlanPort.cpExportBusy;treeRefresh.setAttribute('aria-busy',String(state.phase==='loading'));}
    for(const id of ['profileSelect','profileSaveAs','profileRename','profileDelete','profileExport','profileImport','settingsBtn','discoveryBtn','analyticsBtn']){const el=$(id);if(el)el.disabled=state.phase==='loading'||workspaceMode!=='explorer';}
    workspaceModeUI();
   }
