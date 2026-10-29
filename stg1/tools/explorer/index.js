@@ -1,4 +1,4 @@
-import {install,initialize} from './table.js?v=2.02-preview.11.11.2';
+import {install,initialize} from './table.js?v=2.03-preview.1';
 export default Object.freeze({id:'explorer',title:'Utforsker',legacyMode:'explorer',status:'module',create:createExplorer});
 export function createExplorer(context){
  const state={};install(state,context);initialize(state,context);
