@@ -1,4 +1,4 @@
-DocLib STG2 v2.02-rc.2.1
+DocLib STG2 v2.02-rc.2.2
 
 Critical hotfix for RC2:
 - Stops MutationObserver feedback loop in config/version.js.

@@ -1,11 +1,11 @@
-import {install as reports, compose as reportsCompose} from './reports.js?v=2.02-rc.2.1';
-import {install as requirements} from './requirements.js?v=2.02-rc.2.1';
-import {install as links} from './links.js?v=2.02-rc.2.1';
-import {install as repository, compose as repositoryCompose} from './repository.js?v=2.02-rc.2.1';
-import {install as table, compose as tableCompose} from './table.js?v=2.02-rc.2.1';
-import {install as details} from './details.js?v=2.02-rc.2.1';
-import {initialize} from './state.js?v=2.02-rc.2.1';
-import {install as pdf} from './pdf.js?v=2.02-rc.2.1';
+import {install as reports, compose as reportsCompose} from './reports.js?v=2.02-rc.2.2';
+import {install as requirements} from './requirements.js?v=2.02-rc.2.2';
+import {install as links} from './links.js?v=2.02-rc.2.2';
+import {install as repository, compose as repositoryCompose} from './repository.js?v=2.02-rc.2.2';
+import {install as table, compose as tableCompose} from './table.js?v=2.02-rc.2.2';
+import {install as details} from './details.js?v=2.02-rc.2.2';
+import {initialize} from './state.js?v=2.02-rc.2.2';
+import {install as pdf} from './pdf.js?v=2.02-rc.2.2';
 export default Object.freeze({id:'control-plan',title:'Kontrollplan',legacyMode:'documents',status:'module',create:createControlPlan});
 export function createControlPlan(host){
  const cp={active:false,viewController:null,dataController:null};

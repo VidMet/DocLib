@@ -1,4 +1,4 @@
-DocLib STG1 v2.02-preview.11.11.1
+DocLib STG1 v2.02-preview.11.11.2
 
 Critical hotfix for RC2:
 - Stops MutationObserver feedback loop in config/version.js.

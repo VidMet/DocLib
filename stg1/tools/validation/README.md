@@ -1,4 +1,4 @@
-# Validation module 2.02-preview.11.11.1
+# Validation module 2.02-preview.11.11.2
 
 Private state instance, ES modules. rules/engine/report install functions into private state;
 state.js initializes values. index.js exposes mount/render/update/canLeave/unmount/destroy,

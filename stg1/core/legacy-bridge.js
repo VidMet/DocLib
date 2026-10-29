@@ -56,7 +56,8 @@ window.DocLibLegacyBridge=Object.freeze({
   progress(done,total,cached){$('progress').textContent=done===null?'':`${done}/${total}, ${cached} fra cache`;},
   render:()=>explorerPort.renderTable(),status:(...a)=>status(...a),log:(...a)=>log(...a),
   present(state){
-   const banner=$('projectLoadState');
+   let banner=$('projectLoadState');
+   if(!banner){banner=document.createElement('div');banner.id='projectLoadState';banner.className='status project-load-state';banner.setAttribute('aria-live','polite');document.querySelector('header.top')?.appendChild(banner);}
    const labels={idle:'Venter på prosjekt',loading:'Laster prosjekt',ready:'Prosjektgrunnlag klart',incomplete:'Ufullstendig prosjektgrunnlag',error:'Prosjektinnlasting feilet'};
    banner.dataset.phase=state.phase;banner.dataset.warnings=String(state.warnings?.length||0);banner.textContent=labels[state.phase]+(state.stage?' · '+state.stage:'')+(state.stale&&state.phase!=='idle'?' · Visningen er ikke bekreftet oppdatert.':'')+(state.warnings?.length?' · '+state.warnings.length+' fil(er) med metadataadvarsel. Øvrige filer kan brukes.':'');
    banner.title=[...state.issues,...(state.warnings||[]).map(x=>[x.folder,x.name,'ID: '+x.fileId,x.status?'HTTP '+x.status:'',x.message].filter(Boolean).join(' · '))].join('\n');banner.setAttribute('aria-busy',String(state.phase==='loading'));
