@@ -1,3 +1,3 @@
-export const VERSION=Object.freeze({value:'2.03-preview.3',label:'DocLib STG1 v2.03-preview.3',cacheKey:'2.03-preview.3'});
+export const VERSION=Object.freeze({value:'2.03-preview.4',label:'DocLib STG1 v2.03-preview.4',cacheKey:'2.03-preview.4'});
 export function applyVersionDisplay(root=document){if(document.title!==VERSION.label)document.title=VERSION.label;const title=root.querySelector?.('.title b');if(title&&title.textContent!==VERSION.label)title.textContent=VERSION.label;root.querySelectorAll?.('[data-doclib-version]').forEach(node=>{if(node.textContent!==VERSION.label)node.textContent=VERSION.label;});}
 export function installVersionDisplay(){let scheduled=false;const observer=new MutationObserver(()=>{if(scheduled)return;scheduled=true;queueMicrotask(()=>{scheduled=false;applyVersionDisplay();});});applyVersionDisplay();observer.observe(document.documentElement,{childList:true,subtree:true,characterData:true});return observer;}
