@@ -1,4 +1,4 @@
-DocLib STG1 v2.03-preview.2
+DocLib STG1 v2.03-preview.3
 
 Første UI-preview av Mengdesammenstilling.
 - Ny arbeidsmodus/fane.

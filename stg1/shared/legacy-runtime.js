@@ -1,6 +1,6 @@
 let controlPlanPort=null,toolLifecycle=null,validationPort=null,treePort=null,propertiesPort=null,explorerPort=null,projectController=null;
 'use strict';
-const VERSION='2.03-preview.2',CORE='https://app21.connect.trimble.com/tc/api/2.0',MODEL='https://model-api21.connect.trimble.com',WORKERS=5,PAGE=1000,CACHE='doclib-v127:';
+const VERSION='2.03-preview.3',CORE='https://app21.connect.trimble.com/tc/api/2.0',MODEL='https://model-api21.connect.trimble.com',WORKERS=5,PAGE=1000,CACHE='doclib-v127:';
 function fileExt(name){const i=String(name||'').lastIndexOf('.');return i>0?String(name).slice(i+1).toLowerCase():'uten filtype'}
 const TARGET={fag:['Underdisiplin','Fag','Disiplin'],mmi:['MMI'],revisjon:['Revisjon'],revisjonsdato:['Revisjonsdato'],gjelder:['Revisjonen gjelder']},EMPTY={fag:'-',mmi:'-',revisjon:'-',revisjonsdato:'-',gjelder:'-'};
 let API,project,token,rows=[],treeRoot=null,viewerStates=new Map(),columnConfig=[],profiles={},activeProfile='Standard',pendingProfileImport=null,projectProfileKeys=new Set(),projectProfileMeta={},projectProfileStatus='Ikke konfigurert',lines=[],projectConfiguration=null,projectConfigurationFile=null;const $=id=>document.getElementById(id),norm=v=>String(v??'').trim().toLowerCase().replace(/[\s_.-]/g,'');

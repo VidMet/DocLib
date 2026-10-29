@@ -1,4 +1,4 @@
-DocLib STG1 v2.03-preview.2
+DocLib STG1 v2.03-preview.3
 
 Mengdesammenstilling, matrise-preview:
 - Standard radnivåer: Sted, Element, Modellnavn.
