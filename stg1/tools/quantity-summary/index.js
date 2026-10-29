@@ -1,28 +1,60 @@
-const td=(x)=>`<td>${x}</td>`;
-function selectedIfcRows(context){
- const rows=context?.explorerPort?.selectedRows?.()||[];
- return rows.filter(r=>String(r?.file?.name||'').toLowerCase().endsWith('.ifc'));
-}
-function modelName(row){return row?.file?.name||'Ukjent IFC-modell';}
-function mockRows(models){
- const source=models.length?models:[{file:{name:'Ingen IFC-modell valgt'}}];
- return source.flatMap((m,i)=>[
-  {model:modelName(m),type:'IfcWall',count:128+i*17,length:'-',area:(848.3+i*91.2).toFixed(1),volume:(112.4+i*13.7).toFixed(1)},
-  {model:modelName(m),type:'IfcSlab',count:34+i*4,length:'-',area:(1267.8+i*117.5).toFixed(1),volume:(286.9+i*25.4).toFixed(1)},
-  {model:modelName(m),type:'IfcBeam',count:76+i*9,length:(932.6+i*84.2).toFixed(1),area:'-',volume:(41.8+i*4.9).toFixed(1)},
-  {model:modelName(m),type:'IfcColumn',count:42+i*5,length:(158.4+i*15.7).toFixed(1),area:'-',volume:(19.6+i*2.6).toFixed(1)}
- ]);
+// Preview.5 step 1: read-only inspection of existing selected model metadata.
+// No API calls, storage writes or changes to workspace routing.
+const BUILD = 'preview.5-step.1';
+const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const compare = (a,b) => a.localeCompare(b,'nb',{numeric:true});
+export function inspectSelectedMetadata(context = {}) {
+  const selected = context.explorerPort?.selectedRows?.() || [];
+  const seen = new Set();
+  const models = [];
+  const catalog = new Map();
+  for (const row of selected) {
+    const file = row?.file;
+    if (!file || !(String(file.format || '').toLowerCase() === 'ifc' || /\.ifc$/i.test(file.name || ''))) continue;
+    if (file.id == null || String(file.id) === '') continue;
+    const id = String(file.id);
+    if (seen.has(id)) continue;
+    seen.add(id);
+    const entries = [];
+    for (const [key,value] of Object.entries(row.props || {})) {
+      const cut = key.indexOf('::');
+      if (cut <= 0 || cut + 2 >= key.length || value == null || String(value).trim() === '') continue;
+      const pset = key.slice(0,cut), property = key.slice(cut+2);
+      entries.push({key,pset,property,value:String(value)});
+      if (!catalog.has(key)) catalog.set(key,{key,pset,property,modelIds:[],sampleValues:[]});
+      const item = catalog.get(key);
+      item.modelIds.push(id);
+      if (item.sampleValues.length < 5 && !item.sampleValues.includes(String(value))) item.sampleValues.push(String(value));
+    }
+    entries.sort((a,b) => compare(a.pset,b.pset) || compare(a.property,b.property));
+    models.push({id,name:String(file.name || id),versionId:file.versionId == null ? null : String(file.versionId),propertyCount:entries.length,setCount:new Set(entries.map(x=>x.pset)).size,metadataState:entries.length?'available':'no-values',entries});
+  }
+  const properties = [...catalog.values()].sort((a,b)=>compare(a.pset,b.pset)||compare(a.property,b.property)).map(item=>({...item,modelCount:item.modelIds.length,selectedModelCount:models.length}));
+  return {build:BUILD,source:'explorerPort.selectedRows().props',models,properties,selectedModels:models.length,modelsWithValues:models.filter(x=>x.propertyCount>0).length,setCount:new Set(properties.map(x=>x.pset)).size,propertyCount:properties.length,limitations:['Kun egenskaper med ikke-tom verdi i eksisterende modellmetadata.','Ingen objektdekning, datatype, enhet eller mengdesummering.','Tom metadata betyr ikke at modellen mangler egenskaper.']};
 }
 export default Object.freeze({id:'quantity-summary',title:'Mengdesammenstilling',legacyMode:'quantities',status:'module',create});
-export function create(context={}){
- let active=false,destroyed=false,host=null,notice='Forhåndsvisning med demonstrasjonsmengder. Faktisk IFC-utlesing kobles i neste trinn.';
- function render(){if(!active||!host)return;const models=selectedIfcRows(context);const rows=mockRows(models);host.innerHTML=`<div class="quantity-summary-tool">
-  <section class="quantity-hero"><div><span class="quantity-kicker">PREVIEW.4 FIX.2</span><h2>Mengdeoversikt</h2><p>Modellvalg fra Utforsker er nå koblet til verktøyet.</p></div><button class="primary" data-action="refresh">Oppdater fra valgte modeller</button></section>
-  <div class="quantity-notice">${notice}</div>
-  <section class="quantity-card"><div class="quantity-card-head"><div><h3>Valgte IFC-modeller</h3><p>${models.length?models.map(modelName).join(' · '):'Velg én eller flere IFC-filer i Utforsker, og åpne Mengdeoversikt.'}</p></div><strong>${models.length}</strong></div></section>
-  <section class="quantity-grid"><label>Gruppering<select id="qGroup"><option>IFC-type</option><option>Modell</option><option>IFC-type og modell</option></select></label><label>Mengdefelt<select id="qField"><option>Alle basisfelt</option><option>Antall</option><option>Lengde</option><option>Areal</option><option>Volum</option></select></label><label>Visning<select><option>Detaljert tabell</option><option>Summerte typer</option></select></label></section>
-  <section class="quantity-card"><div class="quantity-card-head"><div><h3>Mengder per IFC-type</h3><p>Datakontrakt for preview.4: modell, IFC-type, antall, lengde, areal og volum.</p></div><span>${rows.length} rader</span></div><div class="quantity-table-wrap"><table><thead><tr><th>Modell</th><th>IFC-type</th><th>Antall</th><th>Lengde (m)</th><th>Areal (m²)</th><th>Volum (m³)</th></tr></thead><tbody>${rows.map(r=>`<tr>${td(r.model)}${td(r.type)}${td(r.count)}${td(r.length)}${td(r.area)}${td(r.volume)}</tr>`).join('')}</tbody></table></div></section>
-  <div class="quantity-actions"><button disabled>Eksporter Excel</button><button disabled>Lagre oppsett</button><span>Eksport og reelle IFC-mengder kommer etter godkjent prøveflyt.</span></div>
- </div>`;host.querySelector('[data-action="refresh"]')?.addEventListener('click',()=>{notice=`Oppdatert ${new Date().toLocaleTimeString('nb-NO')} fra ${models.length} valgte IFC-modell${models.length===1?'':'er'}.`;render()});}
- return Object.freeze({id:'quantity-summary',mount(hostElement){if(destroyed)throw Error('Mengdesammenstilling er lukket permanent.');host=hostElement;active=true;render()},render,update(){render()},canLeave(){return true},unmount(){active=false;if(host)host.replaceChildren();host=null;return true},activate(){active=true;render()},deactivate(){active=false},destroy(){destroyed=true;active=false;if(host)host.replaceChildren();host=null},snapshot(){return Object.freeze({active,destroyed,selectedModels:selectedIfcRows(context).length,stage:'preview.4-fix.2'})}})
+export function create(context = {}) {
+  let host = null, active = false, destroyed = false;
+  let last = null;
+  function render() {
+    if (!active || !host || destroyed) return;
+    last = inspectSelectedMetadata(context);
+    const modelRows = last.models.map(m=>`<tr><td>${esc(m.name)}</td><td>${esc(m.id)}</td><td>${esc(m.versionId || 'Ikke oppgitt')}</td><td>${m.setCount}</td><td>${m.propertyCount}</td><td>${m.propertyCount?'Verdier tilgjengelige':'Ingen innleste verdier; kontroller metadata'}</td></tr>`).join('');
+    const propertyRows = last.properties.map(p=>`<tr><td>${esc(p.pset)}</td><td>${esc(p.property)}</td><td>${p.modelCount} av ${p.selectedModelCount}</td><td>${p.sampleValues.map(esc).join(' / ')}</td></tr>`).join('');
+    host.innerHTML = `<div class="quantity-summary-tool"><section class="quantity-hero"><div><span class="quantity-kicker">PREVIEW.5 TRINN 1</span><h2>Mengdesammenstilling</h2><p>Lesekontroll av eksisterende modellmetadata</p></div><button class="btn primary" data-quantity-refresh>Oppdater fra valgte modeller</button></section><div class="quantity-notice" role="status">${last.selectedModels ? `${last.selectedModels} valgte IFC-modeller · ${last.modelsWithValues} med innleste verdier · ${last.setCount} egenskapssett · ${last.propertyCount} egenskaper` : 'Velg minst én IFC-modell i Utforsker og åpne Mengdesammenstilling igjen.'}</div><p>Dette trinnet kontrollerer datagrunnlaget. Dynamiske nedtrekksmenyer og mengdeberegning er ikke implementert her. Ingen nye API-kall utføres.</p><section class="quantity-card"><h3>Valgte modeller</h3><div class="quantity-table-wrap"><table><thead><tr><th>Modell</th><th>Modell-ID</th><th>Versjon-ID</th><th>Sett</th><th>Egenskaper</th><th>Metadata</th></tr></thead><tbody>${modelRows || '<tr><td colspan="6">Ingen valgte IFC-modeller.</td></tr>'}</tbody></table></div></section><section class="quantity-card"><h3>Oppdagede egenskaper</h3><p>Dekning gjelder modeller med registrert verdi, ikke IFC-objekter. Eksempler er modellaggregerte verdier, ikke alle verdier i modellen.</p><div class="quantity-table-wrap"><table><thead><tr><th>Egenskapssett</th><th>Egenskap</th><th>Modelldekning</th><th>Eksempelverdier, maks. 5</th></tr></thead><tbody>${propertyRows || '<tr><td colspan="4">Ingen tilgjengelige egenskapsverdier. Kjør Oppdater metadata ved behov.</td></tr>'}</tbody></table></div></section><details><summary>Datagrunnlag og begrensninger</summary><ul>${last.limitations.map(x=>`<li>${esc(x)}</li>`).join('')}</ul><p>Kilde: ${esc(last.source)}. Diagnose er også tilgjengelig gjennom window.DocLib.quantitySummary.snapshot().</p></details><div class="quantity-actions"><button disabled>Eksporter Excel</button><button disabled>Lagre oppsett</button></div></div>`;
+    host.querySelector('[data-quantity-refresh]')?.addEventListener('click',render);
+  }
+  const api = {
+    id:'quantity-summary',
+    mount(container){if(destroyed)throw Error('Mengdesammenstilling er lukket permanent.');host=container;active=true;render();},
+    render,
+    update(){render();},
+    canLeave(){return true;},
+    unmount(){active=false;if(host)host.replaceChildren();host=null;return true;},
+    activate(){active=true;render();},
+    deactivate(){active=false;},
+    destroy(){api.unmount();last=null;destroyed=true;},
+    snapshot(){const report=inspectSelectedMetadata(context);return Object.freeze({active,destroyed,stage:BUILD,...report});}
+  };
+  return Object.freeze(api);
 }
