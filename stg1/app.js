@@ -1,14 +1,14 @@
-import {VERSION,applyVersionDisplay,installVersionDisplay} from './config/version.js?v=2.03-preview.5.3.a';
-import {createProjectController} from './core/project.js?v=2.03-preview.5.3.a';
-import {createFileTree} from './shared/file-tree.js?v=2.03-preview.5.3.a';
-import {createProperties} from './shared/properties.js?v=2.03-preview.5.3.a';
-import {environment} from './config/environment.js?v=2.03-preview.5.3.a';
-import {createToolRegistry} from './core/tool-registry.js?v=2.03-preview.5.3.a';
-import explorer from './tools/explorer/index.js?v=2.03-preview.5.3.a';
-import validation from './tools/validation/index.js?v=2.03-preview.5.3.a';
-import controlPlan from './tools/control-plan/index.js?v=2.03-preview.5.3.a';
-import todos from './tools/todos/index.js?v=2.03-preview.5.3.a';
-import quantitySummary from './tools/quantity-summary/index.js?v=2.03-preview.5.3.a';
+import {VERSION,applyVersionDisplay,installVersionDisplay} from './config/version.js?v=2.03-preview.5.3.a-fix.1';
+import {createProjectController} from './core/project.js?v=2.03-preview.5.3.a-fix.1';
+import {createFileTree} from './shared/file-tree.js?v=2.03-preview.5.3.a-fix.1';
+import {createProperties} from './shared/properties.js?v=2.03-preview.5.3.a-fix.1';
+import {environment} from './config/environment.js?v=2.03-preview.5.3.a-fix.1';
+import {createToolRegistry} from './core/tool-registry.js?v=2.03-preview.5.3.a-fix.1';
+import explorer from './tools/explorer/index.js?v=2.03-preview.5.3.a-fix.1';
+import validation from './tools/validation/index.js?v=2.03-preview.5.3.a-fix.1';
+import controlPlan from './tools/control-plan/index.js?v=2.03-preview.5.3.a-fix.1';
+import todos from './tools/todos/index.js?v=2.03-preview.5.3.a-fix.1';
+import quantitySummary from './tools/quantity-summary/index.js?v=2.03-preview.5.3.a-fix.1';
 const versionObserver=installVersionDisplay();const registry=createToolRegistry();[explorer,validation,controlPlan,quantitySummary,todos].forEach(t=>registry.register(t));
 function loadScript(path){return new Promise((resolve,reject)=>{const script=document.createElement('script');script.src=new URL(path+'?v='+VERSION.cacheKey,import.meta.url).href;script.onload=resolve;script.onerror=()=>reject(Error('Kunne ikke laste '+path));document.head.appendChild(script);});}
 async function start(){try{applyVersionDisplay();for(const path of['core/storage.js','core/network-policy.js','shared/legacy-runtime.js','core/diagnostics.js','core/auth.js','core/api.js','core/legacy-bridge.js'])await loadScript(path);const bridge=window.DocLibLegacyBridge,host=document.getElementById('workspacePlaceholder'),propertyContext=bridge.createPropertiesContext(),tree=createFileTree(bridge.createTreeContext()),properties=createProperties(propertyContext);bridge.attachShared(tree.port,properties.port);const explorerTool=explorer.create(bridge.createExplorerContext());bridge.attachExplorer(explorerTool.port);registry.attach('explorer',explorerTool,document.getElementById('explorerContent'));tree.mount();const control=controlPlan.create(bridge.createControlContext()),validator=validation.create(bridge.createValidationContext()),quantities=quantitySummary.create({explorerPort:explorerTool.port,objectContext:propertyContext});registry.attach('control-plan',control,host);registry.attach('validation',validator,host);registry.attach('quantity-summary',quantities,host);bridge.attachControlPlan(control.port,registry);bridge.attachValidation(validator.port);const projectService=createProjectController(bridge.createProjectContext());bridge.attachProject(projectService);const treeRefresh=document.getElementById('treeRefresh');if(treeRefresh)treeRefresh.addEventListener('click',async()=>{if(projectService.snapshot().phase==='loading')return;treeRefresh.disabled=true;treeRefresh.textContent='Oppfrisker …';try{await projectService.reload(false)}finally{treeRefresh.textContent='Oppfrisk';treeRefresh.disabled=projectService.snapshot().phase==='loading'}});projectService.subscribe(state=>registry.broadcast({type:'project-state',state}));registry.activate('explorer');window.addEventListener('beforeunload',e=>{if(control.snapshot().hasUnsavedChanges||validator.snapshot().busy||validator.snapshot().editorDirty){e.preventDefault();e.returnValue=''}});window.DocLib=Object.freeze({environment,version:VERSION,tools:registry.list(),bridge,controlPlan:control,validation:validator,quantitySummary:quantities,explorer:explorerTool,project:projectService});await bridge.start();applyVersionDisplay()}catch(error){const status=document.getElementById('status');if(status){status.textContent='Oppstartsfeil: '+error.message;status.className='status bad'}console.error('[DocLib startup]',error)}}
