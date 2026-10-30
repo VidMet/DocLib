@@ -1,4 +1,4 @@
-// DocLib Mengdesammenstilling - objektindeks for v2.03-preview.5 trinn 3A.
+// DocLib Mengdesammenstilling - v2.03-preview.5 trinn 3A Fix.1
 // Read-only Model API access. Cache is kept in memory for the tool session.
 const memoryCache = new Map();
 const list = value => Array.isArray(value) ? value : Array.isArray(value?.items) ? value.items : Array.isArray(value?.data) ? value.data : [];
@@ -60,16 +60,21 @@ export function createObjectIndex(context = {}) {
 
     options.onProgress?.({model,stage:'definitions',done:0,total:null});
     const definitionsResponse = await request(`${modelBase}/models/${encodedId}/psetdefs?offset=0&top=30000${version}`, signal);
-    if (!definitionsResponse?.ok || definitionsResponse.status === 206) throw Object.assign(Error(`Egenskapsdefinisjoner kunne ikke leses for ${model.name} (HTTP ${definitionsResponse?.status ?? 'ukjent'}).`), {status:definitionsResponse?.status});
+    if (!definitionsResponse?.ok || definitionsResponse.status === 206) {
+      throw Object.assign(Error(`Egenskapsdefinisjoner kunne ikke leses for ${model.name} (HTTP ${definitionsResponse?.status ?? 'ukjent'}).`), {status:definitionsResponse?.status});
+    }
     const defs = definitions(definitionsResponse.data);
 
     const entities = [];
     let offset = 0;
     let total = Infinity;
     while (offset < total) {
-      const url = `${modelBase}/models/${encodedId}/entities?offset=${offset}&top=${pageSize}&fields=id&fields=type&fields=psets${version}`;
+      // Fix.1: bruker samme dokumenterte feltkombinasjon som shared/properties.js.
+      const url = `${modelBase}/models/${encodedId}/entities?offset=${offset}&top=${pageSize}&fields=id&fields=psets${version}`;
       const response = await request(url, signal);
-      if (!response?.ok || response.status === 206) throw Object.assign(Error(`Objektmetadata kunne ikke leses komplett for ${model.name} (HTTP ${response?.status ?? 'ukjent'}).`), {status:response?.status});
+      if (!response?.ok || response.status === 206) {
+        throw Object.assign(Error(`Objektmetadata kunne ikke leses komplett for ${model.name} (HTTP ${response?.status ?? 'ukjent'}).`), {status:response?.status});
+      }
       const page = list(response.data);
       for (const entity of page) entities.push(entityRecord(entity, model, defs));
       total = Number(response.data?.total ?? page.length);
@@ -108,8 +113,9 @@ export function createObjectIndex(context = {}) {
     const signal = controller.signal;
     const results = [], errors = [];
     for (const model of models) {
-      try { results.push(await loadModel(model,{...options,signal})); }
-      catch (error) {
+      try {
+        results.push(await loadModel(model,{...options,signal}));
+      } catch (error) {
         if (error?.name === 'AbortError') throw error;
         errors.push({modelId:String(model.id),modelName:String(model.name || model.id),message:error?.message || String(error),status:error?.status ?? null});
       }
