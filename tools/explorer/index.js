@@ -1,4 +1,4 @@
-import {install,initialize} from './table.js?v=2.02-rc.2.2';
+import {install,initialize} from './table.js?v=2.03-preview.4';
 export default Object.freeze({id:'explorer',title:'Utforsker',legacyMode:'explorer',status:'module',create:createExplorer});
 export function createExplorer(context){
  const state={};install(state,context);initialize(state,context);
@@ -40,6 +40,7 @@ renderTable:(...args)=>state.renderTable(...args),
 renderFormats:(...args)=>state.renderFormats(...args),
 selectedIds:(...args)=>state.selectedIds(...args),
 selectedRows:(...args)=>state.selectedRows(...args),
+workspaceSelectedIds:()=>[...context.workspaceScope()].map(String),
 renderDynamicHeaders:(...args)=>state.renderDynamicHeaders(...args),
 wireHeaders:(...args)=>state.wireHeaders(...args),
 updateSelection:(...args)=>state.updateSelection(...args),
