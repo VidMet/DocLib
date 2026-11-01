@@ -8,13 +8,14 @@ export const EXCLUDED_IFC_CLASSES=Object.freeze([
  'IfcRailway','IfcRailwayPart','IfcMarineFacility','IfcMarinePart'
 ]);
 const excluded=new Set(EXCLUDED_IFC_CLASSES.map(c=>c.toLowerCase()));
-const propertyNames=new Set(['ifcclass','ifcentity','ifcentitytype','ifctype','entitytype','entity','class','type']);
+const propertyNames=new Set(['ifcclass','ifcentity','ifcentitytype','ifctype','entitytype','entity','class','type','objekttype','objecttype','ifcentityname']);
 function className(value){
  if(typeof value!=='string')return '';
  const text=value.trim();return /^ifc[a-z][a-z0-9]*$/i.test(text)?text:'';
 }
 export function resolveIfcClass(entity={}){
  const candidates=[entity.entityType,entity.ifcType,entity.ifcClass,entity.type,entity.class];
+ for(const value of [entity.product,entity.productInfo,entity.classification])if(value&&typeof value==='object')for(const key of ['ifcClass','ifcType','entityType','class','type'])candidates.push(value[key]);
  const props=entity.properties||{};
  for(const key of Object.keys(props).sort())if(propertyNames.has(key.split('::').pop().replace(/[ _-]/g,'').toLowerCase()))candidates.push(props[key]);
  const classes=candidates.map(className).filter(Boolean);

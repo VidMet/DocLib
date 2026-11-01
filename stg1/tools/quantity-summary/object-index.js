@@ -1,4 +1,4 @@
-import {filterIfcEntities,resolveIfcClass} from './ifc-filter.js?v=2.03-preview.5.3.i';
+import {filterIfcEntities,resolveIfcClass} from './ifc-filter.js?v=2.03-preview.5.3.i-fix.1';
 // DocLib Mengdesammenstilling - v2.03-preview.5 trinn 3A Fix.1
 // Read-only Model API access. Cache is kept in memory for the tool session.
 const memoryCache = new Map();
@@ -51,7 +51,7 @@ export function createObjectIndex(context = {}) {
 
   async function loadModel(model, options = {}) {
     const key = cacheKey(model);
-    if (!options.force && memoryCache.has(key)) return {...memoryCache.get(key), fromCache:true};
+    if (!options.force && memoryCache.has(key) && !memoryCache.get(key).unknownClassCount) return {...memoryCache.get(key), fromCache:true};
     const signal = options.signal;
     const encodedId = encodeURIComponent(model.id);
     const version = model.versionId ? `&versionId=${encodeURIComponent(model.versionId)}` : '';
@@ -88,6 +88,36 @@ export function createObjectIndex(context = {}) {
       options.onProgress?.({model,stage:'entities',done:Math.min(offset,total),total});
     }
 
+    // Keep the known-working pset request. If class is absent, try the same
+    // documented GET collection without field projection. Do not invent fields.
+    let classReadStatus='not-needed';
+    const initialUnknown=filterIfcEntities(entities).unknownCount;
+    if(initialUnknown){
+      classReadStatus='default-entity-read';
+      const byId=new Map(entities.map(e=>[e.entityId,e]));
+      let classOffset=0,classTotal=Infinity;
+      try{
+        while(classOffset<classTotal){
+          const response=await request(`${modelBase}/models/${encodedId}/entities?offset=${classOffset}&top=${pageSize}${version}`,signal);
+          if(!response?.ok||response.status===206)throw Error(`HTTP ${response?.status??'ukjent'}`);
+          const page=list(response.data);
+          for(const raw of page){
+            const record=byId.get(String(raw.id??''));if(!record)continue;
+            const candidate=entityRecord(raw,model,defs);
+            const type=resolveIfcClass({...raw,properties:{...record.properties,...candidate.properties}});
+            if(type)record.entityType=type;
+          }
+          classTotal=Number(response.data?.total??page.length);
+          const count=Number(response.data?.count??page.length);
+          if(count<=0){if(classOffset<classTotal)throw Error('Ufullstendig klasselesing');break;}
+          classOffset+=count;
+        }
+        classReadStatus=filterIfcEntities(entities).unknownCount?'class-still-unavailable':'resolved';
+      }catch(error){if(error.name==='AbortError')throw error;classReadStatus='class-read-failed';}
+    }
+    const classDiagnostics={status:classReadStatus,objects:entities.length,unknown:filterIfcEntities(entities).unknownCount,
+      propertyNames:[...new Set(entities.flatMap(e=>Object.keys(e.properties)))].sort(),
+      classPropertySamples:entities.slice(0,10).map(e=>Object.fromEntries(Object.entries(e.properties).filter(([key,value])=>/ifc|class|entity|objekttype|objecttype/i.test(key)&&/^ifc[a-z0-9]+$/i.test(String(value))))) };
     const readEntityCount=entities.length;
     const filtered=filterIfcEntities(entities);
     entities=filtered.entities;
@@ -99,7 +129,7 @@ export function createObjectIndex(context = {}) {
       keys.forEach(keyName => propertyKeys.add(keyName));
     }
     const result = {
-      key,model:{...model},entities,
+      key,model:{...model},entities,classDiagnostics,
       entityCount:entities.length,readEntityCount,excludedStructureCount:filtered.excludedCount,excludedByClass:filtered.excludedByClass,unknownClassCount:filtered.unknownCount,
       entitiesWithProperties:withProperties,
       propertyCount:propertyKeys.size,
