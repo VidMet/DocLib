@@ -12,3 +12,10 @@ Etter publisering: kontroller oppstart/prosjektlasting, de fire verktøyene, en 
 Alle ES-modulimporter bruker nå `?v=2.03` som cache-busting. Den første
 v2.03-pakken beholdt ved en feil enkelte querystrenger fra preview-baselinen.
 Ingen modulfunksjon er endret.
+
+
+## UI-korreksjon
+Produksjonsmerket PREVIEW.5 TRINN 3I er fjernet fra Mengdesammenstilling.
+Den eksisterende scoped heading-helperen kobles nå fra app.js, slik at
+arbeidsflateoverskriften viser Mengdesammenstilling mens verktøyet er aktivt,
+og gjenoppretter korrekt overskrift ved bytte til andre verktøy.
