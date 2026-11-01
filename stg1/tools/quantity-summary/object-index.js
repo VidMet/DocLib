@@ -1,4 +1,4 @@
-import {filterIfcEntities,resolveIfcClass} from './ifc-filter.js?v=2.03-preview.5.3.i-fix.1';
+import {filterIfcEntities,resolveIfcClass} from './ifc-filter.js?v=2.04-preview.1';
 // DocLib Mengdesammenstilling - v2.03-preview.5 trinn 3A Fix.1
 // Read-only Model API access. Cache is kept in memory for the tool session.
 const memoryCache = new Map();
@@ -71,7 +71,7 @@ export function createObjectIndex(context = {}) {
     let total = Infinity;
     while (offset < total) {
       // Fix.1: bruker samme dokumenterte feltkombinasjon som shared/properties.js.
-      const url = `${modelBase}/models/${encodedId}/entities?offset=${offset}&top=${pageSize}&fields=id&fields=psets${version}`;
+      const url = `${modelBase}/models/${encodedId}/entities?offset=${offset}&top=${pageSize}&fields=id&fields=psets&fields=class&fields=type${version}`;
       const response = await request(url, signal);
       if (!response?.ok || response.status === 206) {
         throw Object.assign(Error(`Objektmetadata kunne ikke leses komplett for ${model.name} (HTTP ${response?.status ?? 'ukjent'}).`), {status:response?.status});

@@ -1,6 +1,14 @@
 'use strict';
 window.DocLibLegacyBridge=Object.freeze({
  start:()=>init(),getProject:()=>project?{id:project.id}:null,getMode:()=>workspaceMode,
+ async getProjectRoleData(){
+  const projectId=String(project?.id||''),userId=String(mineUser?.id||'');
+  if(!projectId||!userId)return{projectId,userId,status:0,rolesStatus:0,member:null,roles:[]};
+  const memberUrl=`${CORE}/projects/${encodeURIComponent(projectId)}/users/${encodeURIComponent(userId)}`;
+  const rolesUrl=`${CORE}/projects/${encodeURIComponent(projectId)}/roles`;
+  const [member,roles]=await Promise.all([req(memberUrl),req(rolesUrl)]);
+  return{projectId,userId,status:member.status,rolesStatus:roles.status,member:member.ok?member.data:null,roles:roles.ok?list(roles.data):[]};
+ },
  getDiagnostics:()=>lines.slice(),getVersion:()=>VERSION,
  attachControlPlan(port,lifecycle){controlPlanPort=port;toolLifecycle=lifecycle;},
  attachValidation(port){validationPort=port;},
