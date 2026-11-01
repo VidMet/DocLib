@@ -1,11 +1,11 @@
-# Mengdesammenstilling v2.03-preview.5.3.b
+# Mengdesammenstilling v2.03-preview.5.3.c
 
 ## Installering
 Pakk ut ZIP-filen i DocLib-roten slik at filene havner under
 `stg1/tools/quantity-summary/`. Overskriv de fire eksisterende filene og
 legg til `summary-engine.js`. Ingen endringer i core eller shared.
 Last utvidelsen pa nytt. Byggnummeret inne i Mengdesammenstilling skal
-vise `v2.03-preview.5.3.b`. Felles topptekst kan fortsatt vise gammel
+vise `v2.03-preview.5.3.c`. Felles topptekst kan fortsatt vise gammel
 versjon eller Kontrollplan; denne pakken endrer ikke verktoyrammen.
 
 ## Bruk
@@ -31,7 +31,13 @@ for samme modell-ID og versjon, som i forrige fix.
 - Uten valgt enhet er det brukerens ansvar at mengdene er sammenlignbare.
 - Punktum/komma som desimalskilletegn stottes. Tusenskilletegn og
   mengdetekst med enhet avvises fremfor aa bli tolket ved gjetting.
-- Visning har opptil seks desimaler. Summer bruker uavrundede tall.
+- Standard 0 desimaler; velg 0 til 6 desimaler.
+- Vanlig avrunding til valgte desimaler, eller opp/ned til 1, 10, 100, 1000 eller 10000.
+- Avrunding skjer per celle på nederste grupperingsnivå, IKKE per IFC-objekt.
+- Delsummer og totalsum summerer de avrundede cellene uten ny trinnavrunding.
+- Endret gruppering kan endre avrundet totalsum. Skjuling av grupper endrer ikke summene.
+- Negative tall: opp mot pluss uendelig, ned mot minus uendelig.
+- Vanlig avrunding ved halv verdi går bort fra null. Originaldata endres ikke.
 - Null vises som 0; celler uten gyldige mengder vises som strek.
 - Ingen Total-kolonne per rad. Gruppene har delsummer per kolonne.
 - Ved modellfeil vises tydelig varsel; summer gjelder kun komplett leste modeller.
@@ -45,9 +51,6 @@ for samme modell-ID og versjon, som i forrige fix.
 - README.md: denne dokumentasjonen.
 
 ## Verifikasjon
-29 lokale kontroller bestod med syntetiske testobjekter og simulert API/DOM.
-Dekker talltolking, null, ugyldige verdier, gruppering, separate enheter,
-modeller med samme navn, modellbytte og mount/unmount/destroy.
-JavaScript-syntaks kontrollert. Ikke testet mot levende Trimble Connect
-eller visuelt i nettleser. Kontroller forst med modellen som tidligere
-rapporterte 322 objekter, og sammenlign en kjent mengdesum manuelt.
+Lokale automatiserte tester med syntetiske data dekker avrunding,
+desimalvalg, negative tall, separate enheter og summering fra avrundede
+bladceller. JavaScript-syntaks kontrollert. Ikke live-testet i Trimble Connect.
