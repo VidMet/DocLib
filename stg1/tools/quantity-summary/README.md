@@ -1,3 +1,72 @@
+# Mengdesammenstilling v2.03-preview.5.3.i
+
+## Installering
+Pakk ut i DocLib-roten. Overskriv alle åtte filer under
+stg1/tools/quantity-summary/. Ingen endringer i core/shared.
+Last utvidelsen på nytt. Byggnummeret skal vise v2.03-preview.5.3.i.
+
+## Nytt: beskrivelse og kolonnevis avrunding
+Under Datakilder finnes Kolonne (beskrivelse). Velg for eksempel
+Prosessnavn. Ved første innlesing foreslås egenskap med navnet Prosessnavn
+hvis den finnes. Valget er ellers valgfritt og påvirker ikke kolonnenøkkelen.
+Kolonner identifiseres fortsatt av kode + enhet. Ulike beskrivelser for
+samme kode/enhet samles og vises, ikke overskrives tilfeldig.
+
+Et informasjonssymbol ved koden viser beskrivelse og avrundingsutslag
+ved musepeker. Klikk, Enter eller mellomrom åpner samme informasjon i
+en dialog. Dialogen lukkes med Lukk eller Escape. Mangler beskrivelse,
+vises en forklaring. Ingen beskrivelse gjettes fra kode eller objektnavn.
+
+Under Velg kolonner og avrunding finnes tre valg per kode/enhet:
+- Følg tabelloppsett (standard): felles retning og trinn.
+- Kun desimaler: vanlig avrunding til valgte desimaler, ingen grovavrunding.
+- Eget avrundingstrinn: velg 1, 10, 100, 1000 eller 10000.
+Avrundingsnivå (gruppe 1/2/3 eller totalsum), retning og desimaler er
+fortsatt felles. Eget trinn brukes bare ved Rund opp/ned. Med vanlig
+avrunding brukes desimalvalget. Endring av kode- eller enhetsegenskap
+nullstiller overstyringer og skjulte kolonner. Valgene beholdes i
+verktøyøkten, men lagres ikke permanent ved ny sideinnlasting.
+
+Informasjonen viser før/etter grovavrunding, samlet differanse og prosent.
+Før-verdien er samme gruppering beregnet med kun desimalavrunding.
+Prosent = differanse / absolutt før-verdi * 100. Ved null før-verdi er
+prosent ikke definert. Dette er avrundingsutslag, ikke modellavvik.
+Det innføres ingen automatisk prosentgrense eller skjult talltilpasning.
+
+Excel/CSV-overskrifter inneholder beskrivelsen. Excel/PDF-oppsettet
+inneholder alle beskrivelser, kolonnenes avrundingsvalg og utslag.
+PDF beholder kompakte kodeoverskrifter i selve tabellen og viser
+beskrivelsene som lesbar tekst i oppsettdelen bakerst. CSV viser faktisk
+avrundingsvalg per kolonne i overskriften. Tallene kommer fra samme
+beregningsresultat som tabellen, uten separat eksportavrunding.
+
+## Beholdt fra 5.3.h
+Fire avrundingsnivåer, differanser, lukkbart tabelloppsett, navnevalg i
+avvik, kolonnevalg og filtrering av IFC-strukturobjekter er beholdt.
+IFC-objektmengdene avrundes aldri. Ukjent IFC-klasse sperrer fortsatt
+beregning og eksport. Ingen endring i klasseinnlesing eller filterliste.
+
+## Verifikasjon av denne versjonen
+943 lokale kontroller bestod med syntetiske data og simulert API/DOM.
+Dekker alle fire nivåer, 0–6 desimaler, alle retninger og trinn,
+kolonneoverstyringer, kode/enhet-separasjon, flere beskrivelser,
+nullgrunnlag, differanser, IFC-filter, UI-valg og dialogåpning.
+XLSX/CSV/PDF fra alle fire nivåer er åpnet med uavhengige lesere og
+kontrollert for beskrivelser, avrundingsvalg og numeriske totalsummer.
+JavaScript-syntaks kontrollert. Ikke live-testet i Trimble Connect,
+ikke visuelt nettlesertestet og ikke åpnet i skrivebords-Excel.
+
+## Test før STG2
+1. Velg Prosessnavn som beskrivelse og kontroller hover/klikk/tastatur.
+2. Bruk felles trinn 1000, og overstyr en liten kolonne til Kun desimaler.
+3. Sett en annen kolonne til eget trinn 10 og sammenlign kjent sum.
+4. Kontroller differanser på alle fire avrundingsnivåer.
+5. Eksporter alle tre formater og sammenlign tall og beskrivelser.
+6. Bekreft at Ukjent IFC-klasse er 0 før STG2.
+
+---
+Tidligere dokumentasjon (historikk for 5.3.h og underliggende funksjoner):
+
 # Nytt i v2.03-preview.5.3.h
 
 IFC-prosjekt- og romlige strukturobjekter filtreres fra objektindeksen

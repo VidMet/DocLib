@@ -14,3 +14,6 @@
 
 /* Preview.5.3.g: group-level rounding reconciliation. */
 .qs-shell .qs-matrix .qs-node-diff th,.qs-shell .qs-matrix .qs-node-diff td{background:#fff7df;font-size:12px;color:#79520b;font-weight:500}
+
+/* Preview.5.3.i: accessible column information and rounding overrides. */
+.qs-shell .qs-info{border:0;background:transparent;color:#075985;font-size:15px;cursor:pointer;padding:0 3px}.qs-shell .qs-info:focus-visible{outline:2px solid #0284c7}.qs-info-dialog{max-width:min(650px,90vw);border:1px solid #b9c3d0;border-radius:10px;padding:20px}.qs-info-dialog::backdrop{background:#0005}.qs-info-dialog pre{white-space:pre-wrap;font-family:inherit;line-height:1.6}.qs-shell .qs-column-list{grid-template-columns:repeat(auto-fit,minmax(250px,1fr));max-height:440px}.qs-shell .qs-column-item{padding:10px;border:1px solid #d8dee8;border-radius:6px}.qs-shell .qs-column-item label{border:0;padding:4px 0}.qs-shell .qs-column-item select{max-width:100%;padding:5px}.qs-shell .qs-column-item>small{display:block;white-space:pre-line;color:#667085;margin-top:6px}.qs-shell .qs-setup-row:first-child .qs-fields-sources{grid-template-columns:repeat(auto-fit,minmax(200px,1fr))}

@@ -1,5 +1,5 @@
-import {filterIfcEntities} from './ifc-filter.js?v=2.03-preview.5.3.h';
-import {objectLabel} from './view-options.js?v=2.03-preview.5.3.h';
+import {filterIfcEntities} from './ifc-filter.js?v=2.03-preview.5.3.i';
+import {objectLabel} from './view-options.js?v=2.03-preview.5.3.i';
 // Pure object-level aggregation. No network access and no unit conversion.
 export const MODEL = '@model';
 export function parseQuantity(value) {
@@ -36,6 +36,15 @@ export function roundCell(value,config={}) {
   const result=Number((rounded*quantum).toFixed(decimals));
   return Object.is(result,-0)?0:result;
 }
+export function columnRounding(config,key){
+  const override=config.columnOverrides?.[key];
+  if(!override||override.mode==='inherit')return {...config};
+  if(override.mode==='decimals')return {...config,roundMode:'normal'};
+  if(override.mode==='step'){
+    const result={...config,roundStep:Number(override.step)};roundingSettings(result);return result;
+  }
+  throw Error('Ugyldig kolonneavrunding.');
+}
 export function summarize(entities, config) {
   const filtered=filterIfcEntities(entities);
   if(filtered.unknownCount)throw Error(`IFC-klasse mangler for ${filtered.unknownCount} objekter. Beregning og eksport er sperret fordi strukturobjekter ikke kan identifiseres sikkert. Kontroller at metadata inneholder IFC-klasse (for eksempel IfcClass eller IfcEntity). Objektnavn brukes ikke til klassifisering.`);
@@ -66,7 +75,9 @@ export function summarize(entities, config) {
     const labels=groups.map(key=>key===MODEL?String(entity.modelName||entity.modelId):absent(props[key])?null:String(props[key]));
     if(labels.some(label=>label===null)){missingGroup++;issue('Mangler grupperingsverdi');}
     const key=JSON.stringify([code,unit]);
-    if(!columns.has(key)) columns.set(key,{key,code,unit});
+    if(!columns.has(key)) columns.set(key,{key,code,unit,descriptions:[]});
+    const description=props[config.descriptionProperty];
+    if(!absent(description)&&!columns.get(key).descriptions.includes(String(description)))columns.get(key).descriptions.push(String(description));
     included++;root.count++;add(root.cells,key,value);
     let node=root;
     labels.forEach((label,depth)=>{
@@ -98,12 +109,24 @@ export function summarize(entities, config) {
     if(node.roundedHere)for(const [key,cell] of node.cells){
       // At a leaf use its raw sum, never pre-round raw IFC objects.
       const input=leaf?node.rawCells.get(key).sum:cell.sum;
-      const rounded=roundCell(input,config);
+      const rounded=roundCell(input,columnRounding(config,key));
       node.differences.set(key,{sum:Number((rounded-cell.sum).toFixed(rounding.decimals)),count:0});
       cell.sum=rounded;
     }
   }
   calculate(root,true);
+  // Baseline is the same grouping/decimal calculation with no coarse rounding.
+  function baseline(node){
+    if(!node.children.size)return new Map([...node.rawCells].map(([key,cell])=>[key,roundCell(cell.sum,decimalConfig)]));
+    const totals=new Map();for(const child of node.children.values())for(const [key,value] of baseline(child))totals.set(key,Number(((totals.get(key)||0)+value).toFixed(rounding.decimals)));return totals;
+  }
+  const unroundedTotals=baseline(root);
+  for(const column of columns.values()){
+    column.descriptions.sort((a,b)=>a.localeCompare(b,'nb'));
+    const before=unroundedTotals.get(column.key)||0,after=root.cells.get(column.key)?.sum||0;
+    const difference=Number((after-before).toFixed(rounding.decimals));
+    column.rounding={mode:config.columnOverrides?.[column.key]?.mode||'inherit',effectiveMode:columnRounding(config,column.key).roundMode||'normal',step:Number(columnRounding(config,column.key).roundStep??10),before,after,difference,percent:before===0?null:difference/Math.abs(before)*100};
+  }
   const baseTotals=root.baseCells;
   const differences=root.differences;
   return {root,baseTotals,differences,roundScope,columns:[...columns.values()].sort((a,b)=>a.code.localeCompare(b.code,'nb',{numeric:true})||a.unit.localeCompare(b.unit,'nb')),issues,stats:{objects:entities.length,included,missing,invalid,missingColumn,missingGroup,missingUnit}};
