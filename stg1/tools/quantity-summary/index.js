@@ -3,7 +3,7 @@ import {makeSnapshot,downloadExport} from './export.js?v=2.03-preview.5.3.i-fix.
 import {createObjectIndex} from './object-index.js?v=2.03-preview.5.3.i-fix.1';
 // DocLib Mengdesammenstilling - v2.03-preview.5, trinn 2
 // Dynamiske valg fra eksisterende, modellaggregerte metadata. Ingen nye API-kall.
-const BUILD = '2.03-preview.5.3.i-fix.1';
+const BUILD = '2.03-preview.5.3.i-fix.2';
 const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const compare = (a,b) => String(a).localeCompare(String(b),'nb',{numeric:true,sensitivity:'base'});
 
@@ -94,6 +94,9 @@ export function create(context={}) {
     if(!state.config.groups[0])state.config.groups[0]=find(['sted']);
     if(!state.config.groups[1])state.config.groups[1]=find(['element','0_element']);
   }
+  function columnDescription(column){
+    return column.descriptions?.length?column.descriptions.join(' / '):'Ingen beskrivelse tilgjengelig';
+  }
   function columnInfo(column){
     const r=column.rounding,fmt=new Intl.NumberFormat('nb-NO',{maximumFractionDigits:6});
     return [column.descriptions?.length?column.descriptions.join(' / '):'Ingen beskrivelse tilgjengelig',r?`Før grovavrunding: ${fmt.format(r.before)}\nEtter avrunding: ${fmt.format(r.after)}\nSamlet differanse: ${fmt.format(r.difference)} (${r.percent===null?'prosent ikke definert':fmt.format(r.percent)+' %'})`:'' ].filter(Boolean).join('\n');
@@ -121,7 +124,7 @@ export function create(context={}) {
     }
     walk(report.root);
     if(!report.root.children.size&&report.root.count)rows.push(`<tr class="qs-model-row"><th scope="row">Alle objekter</th>${cells({cells:report.baseTotals})}</tr>`);
-    return `<div class="qs-table-wrap"><table class="qs-matrix"><thead><tr><th class="qs-axis" scope="col">Gruppering</th>${cols.map(c=>`<th scope="col">${esc(c.code)} <button type="button" class="qs-info" data-info="${esc(c.key)}" title="${esc(columnInfo(c))}" aria-label="Informasjon om ${esc(c.code)}">ⓘ</button><small class="qs-unit">${esc(c.unit||'Enhet ikke valgt')}</small></th>`).join('')}</tr></thead><tbody>${rows.join('')}</tbody><tfoot>${report.roundScope==='final'?`<tr class="qs-round-diff"><th scope="row">Avrundingsdifferanse</th>${cells({cells:report.differences})}</tr>`:''}<tr><th scope="row">Sum per kolonne</th>${cells(report.root)}</tr></tfoot></table></div>`;
+    return `<div class="qs-table-wrap"><table class="qs-matrix"><thead><tr><th class="qs-axis" scope="col">Gruppering</th>${cols.map(c=>`<th scope="col">${esc(c.code)} <button type="button" class="qs-info" data-info="${esc(c.key)}" title="${esc(columnDescription(c))}" aria-label="Informasjon om ${esc(c.code)}">ⓘ</button><small class="qs-unit">${esc(c.unit||'Enhet ikke valgt')}</small></th>`).join('')}</tr></thead><tbody>${rows.join('')}</tbody><tfoot>${report.roundScope==='final'?`<tr class="qs-round-diff"><th scope="row">Avrundingsdifferanse</th>${cells({cells:report.differences})}</tr>`:''}<tr><th scope="row">Sum per kolonne</th>${cells(report.root)}</tr></tfoot></table></div>`;
   }
   function render(){
     if(!active||!host||destroyed)return;
@@ -144,7 +147,7 @@ export function create(context={}) {
     host.querySelectorAll('[data-column-key]').forEach(input=>input.addEventListener('change',()=>{if(input.checked)state.hiddenColumns.delete(input.dataset.columnKey);else state.hiddenColumns.add(input.dataset.columnKey);render();}));
     host.querySelectorAll('[data-columns]').forEach(button=>button.addEventListener('click',()=>{if(button.dataset.columns==='all')state.hiddenColumns.clear();else allColumns.forEach(c=>state.hiddenColumns.add(c.key));render();}));
     host.querySelectorAll('[data-override]').forEach(select=>select.addEventListener('change',()=>{const key=select.dataset.key;const setting={mode:'inherit',step:10,...state.config.columnOverrides[key]};setting[select.dataset.override]=select.dataset.override==='step'?Number(select.value):select.value;state.config.columnOverrides[key]=setting;render();}));
-    host.querySelectorAll('[data-info]').forEach(button=>button.addEventListener('click',()=>{const column=allColumns.find(c=>c.key===button.dataset.info);if(!column)return;const dialog=document.createElement('dialog');dialog.className='qs-info-dialog';dialog.innerHTML=`<h3>${esc(column.code)} [${esc(column.unit)}]</h3><pre>${esc(columnInfo(column))}</pre><button type="button">Lukk</button>`;document.body.appendChild(dialog);dialog.querySelector('button').addEventListener('click',()=>dialog.close());dialog.addEventListener('close',()=>dialog.remove(),{once:true});dialog.showModal();}));
+    host.querySelectorAll('[data-info]').forEach(button=>button.addEventListener('click',()=>{const column=allColumns.find(c=>c.key===button.dataset.info);if(!column)return;const dialog=document.createElement('dialog');dialog.className='qs-info-dialog';dialog.innerHTML=`<h3>${esc(column.code)} [${esc(column.unit)}]</h3><pre>${esc(columnDescription(column))}</pre><button type="button">Lukk</button>`;document.body.appendChild(dialog);dialog.querySelector('button').addEventListener('click',()=>dialog.close());dialog.addEventListener('close',()=>dialog.remove(),{once:true});dialog.showModal();}));
     host.querySelectorAll('[data-config]').forEach(select=>select.addEventListener('change',event=>{const key=event.target.dataset.config;if(key.startsWith('group'))state.config.groups[Number(key.slice(5))]=event.target.value;else state.config[key]=event.target.value;if(/^group[123]$/.test(state.config.roundScope)&&!state.config.groups[Number(state.config.roundScope.slice(-1))-1])state.config.roundScope='final';if(key==='column'||key==='unit'){state.hiddenColumns.clear();state.config.columnOverrides={};}state.collapsed.clear();render();}));
     host.querySelectorAll('[data-toggle]').forEach(button=>button.addEventListener('click',()=>{const key=button.dataset.toggle;if(state.collapsed.has(key))state.collapsed.delete(key);else state.collapsed.add(key);render();}));
   }
