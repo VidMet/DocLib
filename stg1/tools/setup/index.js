@@ -1,15 +1,17 @@
-const esc=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-export function installSetupAccess({access,document:doc=document}){
- const nav=doc.querySelector('.workspace-nav');if(!nav)return()=>{};let button=null,dialog=null;
- const close=()=>{dialog?.close();};
- const open=()=>{
-  const state=access.snapshot();if(!state.isAdmin)return;
-  dialog=doc.createElement('dialog');dialog.className='setup-preview-dialog';dialog.innerHTML=`<section><h2>Setup</h2><p><strong>Trimble Connect-rolle:</strong> Prosjektadministrator</p><p>Rolleoppslaget er aktivt. Verktøyvalg og prosjekt-JSON kommer i neste trinn.</p><details><summary>Diagnostikk</summary><dl><dt>Status</dt><dd>${esc(state.state)}</dd><dt>Rolle</dt><dd>${esc(state.roles.join(', ')||'Ikke oppgitt')}</dd></dl></details><button type="button">Lukk</button></section>`;doc.body.appendChild(dialog);dialog.querySelector('button').addEventListener('click',close);dialog.addEventListener('close',()=>{dialog.remove();dialog=null;},{once:true});dialog.showModal();
- };
- const render=state=>{
-  if(state.isAdmin&&!button){button=doc.createElement('button');button.type='button';button.id='modeSetup';button.className='btn';button.textContent='Setup';button.addEventListener('click',open);nav.appendChild(button);}
-  if(!state.isAdmin&&button){button.remove();button=null;close();}
-  nav.dataset.setupAccess=state.state;
- };
- const unsubscribe=access.subscribe(render);return()=>{unsubscribe();button?.remove();close();};
+import {enabledTools,normalizeProjectTools,TOOL_IDS} from './project-tools.js?v=2.04-preview.2';
+const LABELS={'validation':'Egenskapsvalidering','quantity-summary':'Mengdesammenstilling','control-plan':'Kontrollplan','todos':'Todos'};
+const BUTTONS={'validation':'modeValidation','quantity-summary':'modeQuantities','control-plan':'modeDocuments','todos':'modeTodos'};
+export function installToolVisibility({store,access,document:doc=document}){
+ const nav=doc.querySelector('.workspace-nav');if(!nav)return()=>{};
+ const ensureTodos=()=>{let b=doc.getElementById('modeTodos');if(!b){b=doc.createElement('button');b.type='button';b.id='modeTodos';b.className='btn';b.textContent='Todos';nav.appendChild(b);}return b};
+ const render=config=>{const enabled=enabledTools(config);for(const id of TOOL_IDS){const b=id==='todos'?ensureTodos():doc.getElementById(BUTTONS[id]);if(b)b.hidden=!enabled.has(id);}const current=doc.querySelector('.workspace-nav .btn[aria-pressed="true"]');if(current?.hidden)doc.getElementById('modeExplorer')?.click();};
+ const unsub=store.subscribe(render);return()=>unsub();
+}
+export function installSetupAccess({access,store,repository,document:doc=document}){
+ const nav=doc.querySelector('.workspace-nav');if(!nav)return()=>{};let button=null,dialog=null,busy=false;
+ const close=()=>dialog?.close();
+ const status=(text,bad=false)=>{const x=dialog?.querySelector('[data-setup-status]');if(x){x.textContent=text;x.className=bad?'setup-status bad':'setup-status';}};
+ const open=()=>{if(!access.snapshot().isAdmin)return;const cfg=store.snapshot();dialog=doc.createElement('dialog');dialog.className='setup-dialog';dialog.innerHTML=`<form method="dialog"><h2>Setup</h2><p>Velg prosjektverktøy. Utforsker og Setup er alltid tilgjengelige.</p><fieldset><legend>Aktiver verktøy</legend>${TOOL_IDS.map(id=>`<label><input type="checkbox" name="${id}"${cfg.tools[id].enabled?' checked':''}> ${LABELS[id]}</label>`).join('')}</fieldset><p class="setup-path">Lagring: Extension_config/DocLib/doclib.tools.json</p><p data-setup-status>${store.source()==='project'?'Prosjektoppsett lastet.':'Ingen prosjektfil funnet. Standard er kun Utforsker + Setup.'}</p><div><button type="button" data-save>Lagre prosjektoppsett</button><button type="button" data-close>Lukk</button></div></form>`;doc.body.appendChild(dialog);dialog.querySelector('[data-close]').onclick=close;dialog.querySelector('[data-save]').onclick=async()=>{if(busy||!access.snapshot().isAdmin)return;busy=true;dialog.querySelector('[data-save]').disabled=true;status('Lagrer til Trimble Connect …');try{const next=normalizeProjectTools({schema:'DocLibProjectTools',schemaVersion:1,tools:Object.fromEntries(TOOL_IDS.map(id=>[id,{enabled:dialog.querySelector(`[name="${id}"]`).checked}]))});const saved=await repository.save(next);store.set(saved.config,'project');status('Prosjektoppsettet er lagret og menyen er oppdatert.');}catch(error){status(error.message||String(error),true);}finally{busy=false;if(dialog)dialog.querySelector('[data-save]').disabled=false;}};dialog.addEventListener('close',()=>{dialog.remove();dialog=null;},{once:true});dialog.showModal();};
+ const render=state=>{if(state.isAdmin&&!button){button=doc.createElement('button');button.type='button';button.id='modeSetup';button.className='btn';button.textContent='Setup';button.onclick=open;nav.appendChild(button);}if(!state.isAdmin&&button){button.remove();button=null;close();}};
+ const unsub=access.subscribe(render);return()=>{unsub();button?.remove();close();};
 }

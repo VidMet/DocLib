@@ -24,7 +24,8 @@ window.DocLibLegacyBridge=Object.freeze({
  attachShared(tree,properties){treePort=tree;propertiesPort=properties;},
  attachExplorer(port){explorerPort=port;},
  attachProject(controller){projectController=controller;},
- createProjectContext(){return Object.freeze({
+ createSetupContext(){return Object.freeze({get CORE(){return CORE;},get projectId(){return String(project?.id||'');},apiRead:(...a)=>req(...a),apiWrite:(url,options={})=>reqWrite(url,{...options,headers:{...(options.headers||{}),'X-DocLib-Write':'setup-json'}})});},
+  createProjectContext(){return Object.freeze({
   projectId:()=>project?.id,
   canReload(){
    if(validationPort.valBusy||controlPlanPort.cpExportBusy)return false;const validationSnapshot=toolLifecycle.snapshot('validation');if(validationSnapshot?.editorDirty&&!confirm('Du har ulagrede endringer i Regeloppsett. Oppfrisk prosjektet likevel? Regelutkastet beholdes, men eventuelle modellresultater blir utdaterte.'))return false;

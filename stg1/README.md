@@ -1,12 +1,21 @@
-# DocLib STG1 v2.04-preview.1
+# DocLib v2.03
 
-Første read-only trinn for prosjektstyrt verktøyoppsett.
+Produksjonspakke promotert direkte fra godkjent STG3 v2.03-rc.2.
 
-- Leser innlogget bruker fra eksisterende Workspace-identitet.
-- Leser prosjektmedlemskap fra Core API `GET /projects/{projectId}/users/{userId}`.
-- Leser rollekatalog fra `GET /projects/{projectId}/roles` for å kunne mappe rolle-ID til rollenavn.
-- Setup vises bare ved eksplisitt administratorrolle. Ukjent rolle, API-feil eller manglende kontekst skjuler Setup.
-- Setup er foreløpig read-only og viser kun resultatet av rolleoppslaget.
-- Eksisterende verktøy og prosjektfiler er ikke endret i dette trinnet.
+Ingen funksjonsendringer er gjort ved produksjonspromoteringen. Kun mappenavn, versjonsidentitet og produksjonsmerking er endret.
 
-Test med både prosjektadministrator og vanlig prosjektbruker før neste trinn.
+Rollback-baseline: STG3 v2.03-rc.2.
+
+Etter publisering: kontroller oppstart/prosjektlasting, de fire verktøyene, en kjent Mengdesammenstilling og minst én eksport før bred bruk.
+
+## Produksjonspakke-korreksjon
+Alle ES-modulimporter bruker nå `?v=2.03` som cache-busting. Den første
+v2.03-pakken beholdt ved en feil enkelte querystrenger fra preview-baselinen.
+Ingen modulfunksjon er endret.
+
+
+## UI-korreksjon
+Produksjonsmerket PREVIEW.5 TRINN 3I er fjernet fra Mengdesammenstilling.
+Den eksisterende scoped heading-helperen kobles nå fra app.js, slik at
+arbeidsflateoverskriften viser Mengdesammenstilling mens verktøyet er aktivt,
+og gjenoppretter korrekt overskrift ved bytte til andre verktøy.
