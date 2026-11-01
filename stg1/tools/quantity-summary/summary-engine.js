@@ -1,4 +1,4 @@
-import {objectLabel} from './view-options.js?v=2.03-preview.5.3.f';
+import {objectLabel} from './view-options.js?v=2.03-preview.5.3.g';
 // Pure object-level aggregation. No network access and no unit conversion.
 export const MODEL = '@model';
 export function parseQuantity(value) {
@@ -35,26 +35,19 @@ export function roundCell(value,config={}) {
   const result=Number((rounded*quantum).toFixed(decimals));
   return Object.is(result,-0)?0:result;
 }
-function rebuildRounded(node,config) {
-  if(!node.children.size){for(const cell of node.cells.values()){cell.rawSum=cell.sum;cell.sum=roundCell(cell.sum,{decimals:config.decimals,roundMode:config.mode,roundStep:config.step});}return;}
-  node.cells=new Map();
-  for(const child of node.children.values()){
-    rebuildRounded(child,config);
-    for(const [key,cell] of child.cells){
-      const old=node.cells.get(key)||{sum:0,count:0};
-      node.cells.set(key,{sum:Number((old.sum+cell.sum).toFixed(config.decimals)),count:old.count+cell.count});
-    }
-  }
-}
 export function summarize(entities, config) {
   const rounding=roundingSettings(config);
   const roundScope=config.roundScope||'final';
-  if(!['final','model','leaf'].includes(roundScope))throw Error('Ugyldig avrundingsnivå.');
-  const groups = (config.groups || []).filter(Boolean);
+  if(!['final','group1','group2','group3'].includes(roundScope))throw Error('Ugyldig avrundingsnivå.');
+  const slots=(config.groups||[]).slice(0,3);
+  const groupSlots=slots.map((key,index)=>({key,index})).filter(slot=>slot.key);
+  const groups=groupSlots.map(slot=>slot.key);
+  const targetIndex=roundScope==='final'?-1:Number(roundScope.slice(-1))-1;
+  if(targetIndex>=0&&!slots[targetIndex])throw Error('Valgt avrundingsgruppe er ikke i bruk. Velg en aktiv gruppe eller Kun totalsum.');
   if (new Set(groups).size !== groups.length) throw Error('Samme grupperingsnivå kan ikke velges flere ganger.');
   if (!config.column || !config.quantity) throw Error('Velg kolonneegenskap og mengdeegenskap.');
   const root={children:new Map(),cells:new Map(),count:0};
-  const columns=new Map(), issues=[], modelBuckets=new Map();
+  const columns=new Map(), issues=[];
   let included=0, missing=0, invalid=0, missingColumn=0, missingGroup=0, missingUnit=0;
   for (const entity of entities) {
     const props=entity.properties||{}, raw=props[config.quantity];
@@ -74,46 +67,40 @@ export function summarize(entities, config) {
     let node=root;
     labels.forEach((label,depth)=>{
       const childKey=JSON.stringify([label,groups[depth]===MODEL?entity.modelId:null]);
-      if(!node.children.has(childKey)) node.children.set(childKey,{label:label??'(Mangler verdi)',missing:label===null,depth,path:[],children:new Map(),cells:new Map(),count:0});
+      if(!node.children.has(childKey)) node.children.set(childKey,{label:label??'(Mangler verdi)',missing:label===null,depth,groupIndex:groupSlots[depth].index,path:[],children:new Map(),cells:new Map(),count:0});
       const child=node.children.get(childKey);child.path=[...(node.path||[]),childKey];child.count++;add(child.cells,key,value);node=child;
     });
-    if(roundScope!=='leaf'){
-      const bucketKey=JSON.stringify([entity.modelId??entity.modelName,key]);
-      if(!modelBuckets.has(bucketKey))modelBuckets.set(bucketKey,{sum:0,count:0,key,modelName:entity.modelName,code,leaves:new Set()});
-      const bucket=modelBuckets.get(bucketKey);bucket.sum+=value;bucket.count++;bucket.leaves.add(node);
-    }
   }
-  if(roundScope==='leaf')rebuildRounded(root,rounding);
-  else {
-    // A fixed model/code/unit sum cannot be assigned to multiple group leaves
-    // without inventing a distribution of the rounding difference.
-    for(const bucket of modelBuckets.values())if(bucket.leaves.size>1){
-      throw Error(`Modellen «${bucket.modelName}», kode «${bucket.code}», er fordelt på flere grupper. Fast modellavrunding kan ikke fordeles automatisk. Velg «Nederste grupperingsnivå», eller endre grupperingen slik at hver modell/kode/enhet ligger i én gruppe.`);
-    }
-    const reset=node=>{node.cells=new Map();for(const child of node.children.values())reset(child);};reset(root);
-    const cellConfig=roundScope==='final'?{...config,roundMode:'normal'}:config;
-    for(const bucket of modelBuckets.values()){
-      const leaf=[...bucket.leaves][0],value=roundCell(bucket.sum,cellConfig);
-      const old=leaf.cells.get(bucket.key)||{sum:0,count:0};
-      leaf.cells.set(bucket.key,{sum:Number((old.sum+value).toFixed(rounding.decimals)),count:old.count+bucket.count});
-    }
-    const rollup=node=>{
-      if(!node.children.size)return;
+  const decimalConfig={...config,roundMode:'normal'};
+  const cloneCells=cells=>new Map([...cells].map(([key,cell])=>[key,{...cell}]));
+  function calculate(node,isRoot=false){
+    const leaf=!node.children.size;
+    if(leaf){
+      node.rawCells=cloneCells(node.cells);
+      for(const cell of node.cells.values())cell.sum=roundCell(cell.sum,decimalConfig);
+    }else{
+      node.cells=new Map();
       for(const child of node.children.values()){
-        rollup(child);
+        calculate(child);
         for(const [key,cell] of child.cells){
           const old=node.cells.get(key)||{sum:0,count:0};
           node.cells.set(key,{sum:Number((old.sum+cell.sum).toFixed(rounding.decimals)),count:old.count+cell.count});
         }
       }
-    };rollup(root);
+    }
+    node.baseCells=cloneCells(node.cells);
+    node.differences=new Map();
+    node.roundedHere=isRoot?roundScope==='final':node.groupIndex===targetIndex;
+    if(node.roundedHere)for(const [key,cell] of node.cells){
+      // At a leaf use its raw sum, never pre-round raw IFC objects.
+      const input=leaf?node.rawCells.get(key).sum:cell.sum;
+      const rounded=roundCell(input,config);
+      node.differences.set(key,{sum:Number((rounded-cell.sum).toFixed(rounding.decimals)),count:0});
+      cell.sum=rounded;
+    }
   }
-  const baseTotals=new Map([...root.cells].map(([key,cell])=>[key,{...cell}]));
-  const differences=new Map();
-  if(roundScope==='final')for(const [key,cell] of root.cells){
-    const rounded=roundCell(cell.sum,config);
-    differences.set(key,{sum:Number((rounded-cell.sum).toFixed(rounding.decimals)),count:0});
-    cell.sum=rounded;
-  }
+  calculate(root,true);
+  const baseTotals=root.baseCells;
+  const differences=root.differences;
   return {root,baseTotals,differences,roundScope,columns:[...columns.values()].sort((a,b)=>a.code.localeCompare(b.code,'nb',{numeric:true})||a.unit.localeCompare(b.unit,'nb')),issues,stats:{objects:entities.length,included,missing,invalid,missingColumn,missingGroup,missingUnit}};
 }
