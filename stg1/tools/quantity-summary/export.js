@@ -7,21 +7,21 @@ export function makeSnapshot(report,config,meta={}){
   const labels=[...path,node.label],row={labels,depth:node.depth,type:node.children.size?'Delsum':'Mengde',count:node.count,values:report.columns.map(c=>node.cells.get(c.key)?.sum??null)};
   rows.push(row);if(!node.children.size)leaves.push(row);walk(node,labels);
  }}walk(report.root);
- if(!rows.length&&report.root.count){const row={labels:['Alle objekter'],depth:0,type:'Mengde',count:report.root.count,values:report.columns.map(c=>report.root.cells.get(c.key)?.sum??null)};rows.push(row);leaves.push(row);}
- return {created:new Date().toISOString(),config:JSON.parse(JSON.stringify(config)),meta,columns:report.columns.map(c=>({...c})),rows,leaves,total:report.columns.map(c=>report.root.cells.get(c.key)?.sum??null),issues:report.issues.map(i=>({...i})),stats:{...report.stats}};
+ if(!rows.length&&report.root.count){const row={labels:['Alle objekter'],depth:0,type:'Mengde',count:report.root.count,values:report.columns.map(c=>report.baseTotals.get(c.key)?.sum??null)};rows.push(row);leaves.push(row);}
+ return {created:new Date().toISOString(),config:JSON.parse(JSON.stringify(config)),meta,columns:report.columns.map(c=>({...c})),rows,leaves,roundScope:report.roundScope,baseTotal:report.columns.map(c=>report.baseTotals.get(c.key)?.sum??null),difference:report.roundScope==='final'?report.columns.map(c=>report.differences.get(c.key)?.sum??null):null,total:report.columns.map(c=>report.root.cells.get(c.key)?.sum??null),issues:report.issues.map(i=>({...i})),stats:{...report.stats}};
 }
-const scope=s=>s.config.roundScope==='object'?'Hvert IFC-objekt':'Nederste grupperingsnivå';
+const scope=s=>({final:'Kun sluttsum',model:'Per prosesskode per modell',leaf:'Nederste grupperingsnivå'})[s.roundScope||s.config.roundScope||'final'];
 function settings(s){return [
  ['Bygg',s.meta.build||''],['Eksportert',s.created],['Datagrunnlag',s.meta.warning||'Ingen modellfeil rapportert'],['Kolonneegenskap',s.config.column],['Mengdeegenskap',s.config.quantity],['Enhetsegenskap',s.config.unit||'Ikke valgt: kontroller enheter'],
  ...s.config.groups.map((g,i)=>['Gruppering '+(i+1),g==='@model'?'Modellnavn':g||'Ikke valgt']),
- ['Desimaler',Number(s.config.decimals??0)],['Avrund på',scope(s)],['Avrundingsmåte',({normal:'Vanlig avrunding',up:'Rund opp',down:'Rund ned'})[s.config.roundMode||'normal']],['Avrundingstrinn',s.config.roundMode==='normal'?'Valgte desimaler':Number(s.config.roundStep)],['Negative tall','Opp mot pluss uendelig, ned mot minus uendelig'],['Summer','Summerer avrundede verdier, uten ny trinnavrunding'],['Innhold','Alle grupper, uavhengig av sammenfolding'],
+ ['Desimaler',Number(s.config.decimals??0)],['Avrund på',scope(s)],['Avrundingsmåte',({normal:'Vanlig avrunding',up:'Rund opp',down:'Rund ned'})[s.config.roundMode||'normal']],['Avrundingstrinn',s.config.roundMode==='normal'?'Valgte desimaler':Number(s.config.roundStep)],['Negative tall','Opp mot pluss uendelig, ned mot minus uendelig'],['Summer',s.roundScope==='final'?'Modellsummer til valgte desimaler; sluttsum trinnavrundes; differanse vises separat':'Summerer avrundede modell-/bladverdier uten ny trinnavrunding'],['IFC-objekter','Avrundes aldri'],['Innhold','Alle grupper, uavhengig av sammenfolding'],
  ...Object.entries(s.stats).map(([k,v])=>[k,v])];}
 const header=s=>s.columns.map(c=>`${c.code} [${c.unit||'enhet ikke valgt'}]`);
 const csvCell=(v,numeric=false)=>{let t=String(v??'');if(!numeric&&typeof v==='string'&&/^[\s]*[=+\-@]/.test(t))t="'"+t;return '"'+t.replace(/"/g,'""')+'"';};
 export function csvText(s){
  const count=Math.max(1,s.config.groups.filter(Boolean).length),heads=Array.from({length:count},(_,i)=>'Gruppering '+(i+1));
  const common=[scope(s),s.config.roundMode||'normal',s.config.roundMode==='normal'?'desimaler':s.config.roundStep,s.config.decimals??0,s.meta.warning||''];
- const rows=[['Radtype',...heads,...header(s),'Avrund på','Avrundingsmåte','Trinn','Desimaler','Datagrunnlagsvarsel'],...s.leaves.map(r=>['Mengde',...Array.from({length:count},(_,i)=>r.labels[i]||''),...r.values,...common]),['Totalsum','Sum per kolonne',...Array(count-1).fill(''),...s.total,...common]];
+ const rows=[['Radtype',...heads,...header(s),'Avrund på','Avrundingsmåte','Trinn','Desimaler','Datagrunnlagsvarsel'],...s.leaves.map(r=>['Mengde',...Array.from({length:count},(_,i)=>r.labels[i]||''),...r.values,...common]),...(s.difference?[['Avrundingsdifferanse','Avrundingsdifferanse',...Array(count-1).fill(''),...s.difference,...common]]:[]),['Totalsum','Sum per kolonne',...Array(count-1).fill(''),...s.total,...common]];
  return '\ufeff'+rows.map(row=>row.map(v=>csvCell(typeof v==='number'?v.toFixed(Number(s.config.decimals??0)).replace('.',','):v,typeof v==='number')).join(';')).join('\r\n');
 }
 const encoder=new TextEncoder();
@@ -34,10 +34,10 @@ function zip(files){const locals=[],central=[];let offset=0;for(const [name,text
  central.push(join([record(46,[[0,0x02014b50,4],[4,20,2],[6,20,2],[8,0x800,2],[16,crc,4],[20,data.length,4],[24,data.length,4],[28,n.length,2],[42,offset,4]]),n]));offset+=local.length;
  }const directory=join(central);return join([...locals,directory,record(22,[[0,0x06054b50,4],[8,central.length,2],[10,central.length,2],[12,directory.length,4],[16,offset,4]])]);}
 const colName=n=>{let s='';for(n++;n;n=Math.floor((n-1)/26))s=String.fromCharCode(65+(n-1)%26)+s;return s;};
-function sheet(rows,widths=[],decimals=0){return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetViews><sheetView workbookViewId="0"><pane ySplit="1" topLeftCell="A2" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews><cols>${widths.map((w,i)=>`<col min="${i+1}" max="${i+1}" width="${w}" customWidth="1"/>`).join('')}</cols><sheetData>${rows.map((r,i)=>`<row r="${i+1}">${r.map((v,j)=>{const ref=colName(j)+(i+1),style=i===0?1:['Delsum','Totalsum'].includes(r[0])?(typeof v==='number'?4:3):typeof v==='number'?2:0;return v==null?`<c r="${ref}"/>`:typeof v==='number'?`<c r="${ref}" s="${style}"><v>${v}</v></c>`:`<c r="${ref}" s="${style}" t="inlineStr"><is><t xml:space="preserve">${xml(v)}</t></is></c>`;}).join('')}</row>`).join('')}</sheetData></worksheet>`;}
+function sheet(rows,widths=[],decimals=0){return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetViews><sheetView workbookViewId="0"><pane ySplit="1" topLeftCell="A2" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews><cols>${widths.map((w,i)=>`<col min="${i+1}" max="${i+1}" width="${w}" customWidth="1"/>`).join('')}</cols><sheetData>${rows.map((r,i)=>`<row r="${i+1}">${r.map((v,j)=>{const ref=colName(j)+(i+1),style=i===0?1:['Delsum','Totalsum','Avrundingsdifferanse'].includes(r[0])?(typeof v==='number'?4:3):typeof v==='number'?2:0;return v==null?`<c r="${ref}"/>`:typeof v==='number'?`<c r="${ref}" s="${style}"><v>${v}</v></c>`:`<c r="${ref}" s="${style}" t="inlineStr"><is><t xml:space="preserve">${xml(v)}</t></is></c>`;}).join('')}</row>`).join('')}</sheetData></worksheet>`;}
 export function xlsxBytes(s){
  const count=Math.max(1,s.config.groups.filter(Boolean).length),groups=Array.from({length:count},(_,i)=>'Gruppering '+(i+1));
- const table=[['Radtype',...groups,'Objekter',...header(s)],...s.rows.map(r=>[r.type,...Array.from({length:count},(_,i)=>r.labels[i]||''),r.count,...r.values]),['Totalsum','Sum per kolonne',...Array(count-1).fill(''),s.stats.included,...s.total]];
+ const table=[['Radtype',...groups,'Objekter',...header(s)],...s.rows.map(r=>[r.type,...Array.from({length:count},(_,i)=>r.labels[i]||''),r.count,...r.values]),...(s.difference?[['Avrundingsdifferanse','Avrundingsdifferanse',...Array(count-1).fill(''),null,...s.difference]]:[]),['Totalsum','Sum per kolonne',...Array(count-1).fill(''),s.stats.included,...s.total]];
  const sheets=[['Mengder',table,[15,...Array(count).fill(42),12,...s.columns.map(()=>20)]],['Oppsett',[['Innstilling','Verdi'],...settings(s)],[30,95]],['Avvik',[['Modell','Objekt-ID','Avvik','Råverdi'],...s.issues.map(i=>[i.modelName,i.entityId,i.reason,i.value])],[45,38,32,35]],['Modeller',[['Modell','Modell-ID','Versjon'],...(s.meta.models||[]).map(m=>[m.name,m.id,m.versionId||''])],[45,38,38]]];
  const ns='http://schemas.openxmlformats.org/spreadsheetml/2006/main',rel='http://schemas.openxmlformats.org/officeDocument/2006/relationships';
  const files={
@@ -55,7 +55,7 @@ function wrap(text,max){const lines=[];for(const line of ansi(text).split(/\r?\n
 export function pdfBytes(s){
  const pages=[],W=1191,H=842,margin=32,labelWidth=360,colWidth=125,perPanel=6;
  const fmt=new Intl.NumberFormat('nb-NO',{minimumFractionDigits:Number(s.config.decimals??0),maximumFractionDigits:Number(s.config.decimals??0)});
- const rows=[...s.rows,{labels:['Sum per kolonne'],depth:0,type:'Totalsum',values:s.total}];
+ const rows=[...s.rows,...(s.difference?[{labels:['Avrundingsdifferanse'],depth:0,type:'Avrundingsdifferanse',values:s.difference}]:[]),{labels:['Sum per kolonne'],depth:0,type:'Totalsum',values:s.total}];
  const panels=Math.max(1,Math.ceil(s.columns.length/perPanel));
  function text(cmd,x,y,value,size=9,bold=false){cmd.push(`BT /${bold?'F2':'F1'} ${size} Tf 1 0 0 1 ${x} ${y} Tm (${pdfString(value)}) Tj ET`);}
  function pageTitle(cmd,title){text(cmd,margin,H-35,'Mengdesammenstilling - '+title,15,true);text(cmd,margin,H-53,`v${s.meta.build||''} | ${s.created}`,9);}

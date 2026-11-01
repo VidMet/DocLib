@@ -5,3 +5,6 @@
 
 /* Preview.5.3.d export toolbar */
 .qs-shell .qs-export-bar{display:flex;align-items:end;gap:12px;flex-wrap:wrap;margin-bottom:14px}.qs-shell .qs-export-bar label{display:grid;gap:5px;font-size:12px;font-weight:700}.qs-shell .qs-export-bar select{padding:7px 10px;border:1px solid #b9c3d0;border-radius:6px;background:#fff}.qs-shell .qs-export-bar span{font-size:12px;color:#667085;align-self:center}.qs-shell .qs-fields-sources:has([data-config="roundScope"]){grid-template-columns:repeat(4,minmax(0,1fr))}@media(max-width:900px){.qs-shell .qs-fields-sources:has([data-config="roundScope"]){grid-template-columns:1fr 1fr}}
+
+/* Preview.5.3.e: explicit final rounding difference above sticky total. */
+.qs-shell .qs-matrix tfoot tr.qs-round-diff th,.qs-shell .qs-matrix tfoot tr.qs-round-diff td{position:static;background:#fff7df;border-top:1px solid #e8d59c;font-weight:600}.qs-shell .qs-matrix tfoot tr.qs-round-diff th{position:sticky;left:0;z-index:3}
