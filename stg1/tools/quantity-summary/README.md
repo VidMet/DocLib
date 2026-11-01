@@ -1,56 +1,76 @@
-# Mengdesammenstilling v2.03-preview.5.3.c
+# Mengdesammenstilling v2.03-preview.5.3.d
 
 ## Installering
-Pakk ut ZIP-filen i DocLib-roten slik at filene havner under
-`stg1/tools/quantity-summary/`. Overskriv de fire eksisterende filene og
-legg til `summary-engine.js`. Ingen endringer i core eller shared.
-Last utvidelsen pa nytt. Byggnummeret inne i Mengdesammenstilling skal
-vise `v2.03-preview.5.3.c`. Felles topptekst kan fortsatt vise gammel
-versjon eller Kontrollplan; denne pakken endrer ikke verktoyrammen.
+Pakk ut i DocLib-roten. Overskriv alle filer i stg1/tools/quantity-summary/.
+Pakken inkluderer seks komplette filer. export.js er ny i denne versjonen.
+Ingen endringer i core/shared. Objektinnlesingen er beholdt fra siste fix.
+Last utvidelsen på nytt. Verktøyet skal vise v2.03-preview.5.3.d.
+Den felles toppteksten og overskriften Kontrollplan endres ikke her.
 
-## Bruk
-1. Velg IFC-modeller i det felles filtreet.
-2. Trykk Bygg objektindeks.
-3. Velg kodeegenskap for kolonnene, mengdeegenskap og eventuelt enhet.
-4. Velg opptil tre grupperingsnivaer. Modellnavn er standard pa niva 3.
-5. Utvid/skjul grupper med pilene. Sum per kolonne star nederst.
+## Nytt
+- Eksport til ekte Excel (.xlsx), CSV og direkte PDF (.pdf).
+- Avrund på nederste grupperingsnivå (standard) eller hvert IFC-objekt.
+- Eksport bruker samme beregnede resultat som tabellen.
+- Alle grupper eksporteres, uavhengig av sammenfolding på skjermen.
+- Ingen eksterne biblioteker, CDN-er eller nettverkskall for eksport.
 
-Egenskapslisten bygges fra faktisk innleste objektdata, ikke modellens
-aggregerte eksempelverdier. Enkle standardvalg foreslas ved eksakte
-navnetreff; kontroller alltid at egenskapene er riktige for modellen.
-Alle valg kan endres. Endring av modellutvalg/versjon sperrer tabellen
-inntil objektindeksen oppdateres. Oppdater bruker eksisterende minnecache
-for samme modell-ID og versjon, som i forrige fix.
+## Avrunding
+Standard: 0 desimaler, vanlig avrunding, nederste grupperingsnivå.
+Velg 0–6 desimaler. Opp/ned bruker trinn 1, 10, 100, 1000 eller 10000.
+Ved nederste nivå summeres råmengder per celle før cellen avrundes.
+Ved objekt avrundes hver gyldig objektmengde før sammenstilling.
+Delsummer og totalsum summerer avrundede verdier uten ny trinnavrunding.
+Opp går mot pluss uendelig, ned mot minus uendelig. Halve verdier ved
+vanlig avrunding går bort fra null. Originaldata endres aldri.
+Endret gruppering kan endre totalsum ved avrunding på nederste nivå.
+Ved objektavrunding påvirker ikke gruppering totalsummen.
+
+## Eksport
+Velg format ved tabellen og trykk Eksporter.
+
+Excel: fire ark: Mengder, Oppsett, Avvik, Modeller. Mengder har faktiske
+numeriske celler, gruppering i separate kolonner, radtype, delsummer og
+totalsum. Beregnede verdier eksporteres, ikke formler som rekalkulerer
+ved redigering. Ved videre summering filtreres Radtype=Mengde for å
+unngå dobbelttelling av delsummer og totalsum.
+
+CSV: UTF-8 med BOM, semikolon, desimalkomma og uten tusenskilletegn.
+Flat tabell med nederste rader, separate grupperingskolonner og en
+merket totalsumrad. Filtrer Radtype=Mengde ved videre summering.
+Avrundingsinnstillinger og eventuelt datagrunnlagsvarsel følger radene.
+CSV har ikke egne oppsett-/avviksark. Formel-lignende tekst beskyttes
+med apostrof; faktiske negative tall beholdes som tall.
+
+PDF: A3 liggende, opptil seks mengdekolonner per kolonnedel. Brede
+rapporter deles både vannrett og loddrett, med gjentatte overskrifter
+og sidenummer. Oppsett, modelloversikt og alle avvik følger bakerst.
+Norske og vesteuropeiske tegn støttes via Helvetica/WinAnsi.
+Andre skriftsystemer kan vises som spørsmålstegn. Ingen PDF/A eller
+universell Unicode-font er inkludert i denne previewen.
 
 ## Datakvalitet
-- Ingen demonstrasjonsdata i verktøyet.
-- Manglende/ugyldig mengde, kode eller valgt enhet utelates fra summer.
-- Manglende gruppeverdi samles i egen gruppe og inngaer i summene.
-- Avvik viser modell, objekt-ID, aarsak og raaverdi. Inntil 500 vises.
-- Ulike enheter for samme kode gir separate kolonner, uten omregning.
-- Uten valgt enhet er det brukerens ansvar at mengdene er sammenlignbare.
-- Punktum/komma som desimalskilletegn stottes. Tusenskilletegn og
-  mengdetekst med enhet avvises fremfor aa bli tolket ved gjetting.
-- Standard 0 desimaler; velg 0 til 6 desimaler.
-- Vanlig avrunding til valgte desimaler, eller opp/ned til 1, 10, 100, 1000 eller 10000.
-- Avrunding skjer per celle på nederste grupperingsnivå, IKKE per IFC-objekt.
-- Delsummer og totalsum summerer de avrundede cellene uten ny trinnavrunding.
-- Endret gruppering kan endre avrundet totalsum. Skjuling av grupper endrer ikke summene.
-- Negative tall: opp mot pluss uendelig, ned mot minus uendelig.
-- Vanlig avrunding ved halv verdi går bort fra null. Originaldata endres ikke.
-- Null vises som 0; celler uten gyldige mengder vises som strek.
-- Ingen Total-kolonne per rad. Gruppene har delsummer per kolonne.
-- Ved modellfeil vises tydelig varsel; summer gjelder kun komplett leste modeller.
-- Excel-eksport og lagring av oppsett er ikke inkludert.
+Manglende/ugyldig mengde, kode eller valgt enhet utelates fra summer.
+Manglende gruppeverdi inngår i egen gruppe. Ulike enheter får separate
+kolonner, uten omregning. Uten valgt enhet må brukeren kontrollere
+sammenlignbarheten. Modellfeil varsles og følger eksporten.
+Endret modellutvalg/versjon krever oppdatert objektindeks før eksport.
+Gyldig null vises som 0; manglende celle vises som strek.
+Tusenskilletegn og enhetstekst i mengdeverdier tolkes ikke ved gjetting.
+Lagring/import av oppsett og JSON-eksport er ikke inkludert.
 
-## Filer
-- index.js: brukergrensesnitt, livssyklus og kobling til objektindeks.
-- object-index.js: uendret API-innlesing fra preview.5.3.a-fix.1.
-- summary-engine.js: ny, separat grupperings- og summeringsmotor.
-- styles.css: eksisterende tabellstil med tillegg og eksplisitt innlasting.
-- README.md: denne dokumentasjonen.
+## Tester
+231 eksisterende kontroller og 39 nye eksport-/avrundingskontroller
+bestod med syntetiske data og simulert API/DOM. Genererte testeksporter
+ble åpnet med uavhengige lesere: XLSX med openpyxl, PDF med PyMuPDF,
+CSV med standard CSV-leser. Norsk tekst, numeriske celler, separate
+ark, avvik, totaler og bred PDF med syv sider kontrollert.
+JavaScript-syntaks kontrollert. Ikke live-testet i Trimble Connect,
+ikke testet i skrivebords-Excel eller alle nettlesere.
 
-## Verifikasjon
-Lokale automatiserte tester med syntetiske data dekker avrunding,
-desimalvalg, negative tall, separate enheter og summering fra avrundede
-bladceller. JavaScript-syntaks kontrollert. Ikke live-testet i Trimble Connect.
+## Før live
+1. Kontroller kjent modellutvalg og mengdesum mot 5.3.c.
+2. Prøv begge avrundingsnivåene med kjent objektmengde.
+3. Last ned alle tre formater og sammenlign med tabellen.
+4. Åpne XLSX i Excel og kontroller at ingen reparasjonsmelding vises.
+5. Kontroller PDF med mange kolonner og CSV med norske tegn.
+6. Endre modellutvalg og bekreft at eksport krever oppdatert indeks.

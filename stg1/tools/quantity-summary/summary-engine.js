@@ -47,6 +47,8 @@ function rebuildRounded(node,config) {
 }
 export function summarize(entities, config) {
   const rounding=roundingSettings(config);
+  const roundScope=config.roundScope||'leaf';
+  if(!['leaf','object'].includes(roundScope))throw Error('Ugyldig avrundingsnivå.');
   const groups = (config.groups || []).filter(Boolean);
   if (new Set(groups).size !== groups.length) throw Error('Samme grupperingsnivå kan ikke velges flere ganger.');
   if (!config.column || !config.quantity) throw Error('Velg kolonneegenskap og mengdeegenskap.');
@@ -57,8 +59,9 @@ export function summarize(entities, config) {
     const props=entity.properties||{}, raw=props[config.quantity];
     const issue=reason=>issues.push({modelName:entity.modelName,entityId:entity.entityId,reason,value:raw??''});
     if(absent(raw)){missing++;issue('Mangler mengde');continue;}
-    const value=parseQuantity(raw);
+    let value=parseQuantity(raw);
     if(value===null){invalid++;issue('Ugyldig mengde');continue;}
+    if(roundScope==='object')value=roundCell(value,config);
     const code=absent(props[config.column])?null:String(props[config.column]);
     if(code===null){missingColumn++;issue('Mangler kolonneverdi');continue;}
     const unit=config.unit?(absent(props[config.unit])?null:String(props[config.unit])):'';
@@ -75,6 +78,10 @@ export function summarize(entities, config) {
       const child=node.children.get(childKey);child.path=[...(node.path||[]),childKey];child.count++;add(child.cells,key,value);node=child;
     });
   }
-  rebuildRounded(root,rounding);
+  if(roundScope==='leaf')rebuildRounded(root,rounding);
+  else {
+    // Only remove floating-point noise; never apply step rounding twice.
+    const clean=node=>{for(const cell of node.cells.values())cell.sum=Number(cell.sum.toFixed(rounding.decimals));for(const child of node.children.values())clean(child);};clean(root);
+  }
   return {root,columns:[...columns.values()].sort((a,b)=>a.code.localeCompare(b.code,'nb',{numeric:true})||a.unit.localeCompare(b.unit,'nb')),issues,stats:{objects:entities.length,included,missing,invalid,missingColumn,missingGroup,missingUnit}};
 }
