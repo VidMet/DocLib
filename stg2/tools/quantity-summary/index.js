@@ -1,9 +1,9 @@
-import {visibleReport} from './view-options.js?v=2.03-rc.1';
-import {makeSnapshot,downloadExport} from './export.js?v=2.03-rc.1';
-import {createObjectIndex} from './object-index.js?v=2.03-rc.1';
+import {visibleReport} from './view-options.js?v=2.03-rc.1-fix.1';
+import {makeSnapshot,downloadExport} from './export.js?v=2.03-rc.1-fix.1';
+import {createObjectIndex} from './object-index.js?v=2.03-rc.1-fix.1';
 // DocLib Mengdesammenstilling - v2.03-preview.5, trinn 2
 // Dynamiske valg fra eksisterende, modellaggregerte metadata. Ingen nye API-kall.
-const BUILD = '2.03-rc.1';
+const BUILD = '2.03-rc.1-fix.1';
 const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const compare = (a,b) => String(a).localeCompare(String(b),'nb',{numeric:true,sensitivity:'base'});
 
@@ -75,7 +75,7 @@ function option(value,label,selected=false) {
   return `<option value="${esc(value)}"${selected?' selected':''}>${esc(label)}</option>`;
 }
 
-import {MODEL,catalog,summarize} from './summary-engine.js?v=2.03-rc.1';
+import {MODEL,catalog,summarize} from './summary-engine.js?v=2.03-rc.1-fix.1';
 export default Object.freeze({id:'quantity-summary',title:'Mengdesammenstilling',legacyMode:'quantities',status:'module',create});
 const signature = models => JSON.stringify(models.map(m=>[m.id,m.versionId]).sort((a,b)=>String(a[0]).localeCompare(String(b[0]))));
 
