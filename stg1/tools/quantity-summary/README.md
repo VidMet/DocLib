@@ -1,11 +1,36 @@
-# Mengdesammenstilling v2.03-preview.5.3.e
+# Mengdesammenstilling v2.03-preview.5.3.f
 
 ## Installering
-Pakk ut i DocLib-roten. Overskriv alle seks filer under
+Pakk ut i DocLib-roten. Overskriv alle sju filer under
 stg1/tools/quantity-summary/. Ingen endringer i core/shared.
 Last utvidelsen på nytt. Verktøyets byggnummer skal vise
-v2.03-preview.5.3.e. Felles topptekst og Kontrollplan-overskrift
-endres ikke av denne pakken. API-innlesingen er uendret fra 5.3.d.
+v2.03-preview.5.3.f. Felles topptekst og Kontrollplan-overskrift
+endres ikke av denne pakken. API-innlesingen er uendret fra 5.3.e.
+
+## Nytt i 5.3.f
+- Tabelloppsett samler Datakilder, Gruppering, Avrunding og Summering i
+  en lukkbar boks. Åpen ved første bruk. Åpen/lukket beholdes i verktøyøkten,
+  også ved endring av valg og bytte frem/tilbake til verktøyet.
+- Objektnavn i avvik: velg en egenskap under Datakilder, eller bruk
+  Automatisk navnevalg. Ved tom valgt egenskap forsøkes automatisk valg.
+  Automatisk valg ser etter egenskapsnavn Name, Navn, IfcName, ObjectName,
+  Objektnavn eller Betegnelse. Finnes ingen verdi, vises Navn ikke tilgjengelig.
+  Navn kan bare vises når navneverdien finnes i innleste metadata.
+  Objekt-ID beholdes. Objekttype vises når API-dataene inneholder typen.
+  Hold pekeren over objektnavnet for å se hvilken navneegenskap som ble brukt.
+  Excel/PDF-avvik får også objektnavn og navneegenskap.
+- Velg kolonner: avkryssing per kode/enhet, Vis alle og Skjul alle.
+  Utvalget gjelder både tabellen og Excel/CSV/PDF. Ingen IFC-data slettes,
+  og avrundingsreglene endres ikke. Alle kolonner vises som standard.
+  Ved endring av kode-/enhetsegenskap nullstilles skjulingen. Valgene
+  beholdes ellers i verktøyøkten, men lagres ikke permanent mellom sideinnlastinger.
+- Objektantall og avvik gjelder fortsatt hele modellutvalget. Det står
+  uttrykkelig i kolonnevelgeren og i eksportoppsettet. Skjuling av kolonner
+  er et visnings-/eksportvalg, ikke et filter på objekter eller datakvalitet.
+- Skjules alle kolonner, sperres eksport og en forklaring vises.
+- Råverdi ved manglende kode/enhet gjelder nå den aktuelle egenskapen,
+  ikke mengdeegenskapen.
+- Ny modul view-options.js følger pakken. Ingen endring i objektinnlesing.
 
 ## Tre avrundingsnivåer
 IFC-objektmengder avrundes ALDRI. Valget fra 5.3.d er fjernet,
@@ -78,11 +103,15 @@ Tusenskilletegn og enhetstekst i mengdeverdier tolkes ikke ved gjetting.
 Lagring/import av oppsett og JSON-eksport er ikke inkludert.
 
 ## Tester
-2140 lokale kontroller bestod med syntetiske testobjekter og simulert
+2176 lokale kontroller bestod med syntetiske testobjekter og simulert
 API/DOM. Dekker tre nivåer, 0–6 desimaler, opp/ned/vanlig, alle trinn,
 negative tall, separate enheter, modellidentitet, omgruppering,
 sperring ved oppdeling, modellbytte og livssyklus. En test med 1000
 små objekter kontrollerer at objektene ikke avrundes hver for seg.
+36 av kontrollene dekker nye visningsvalg, navnevalg, manglende navn,
+kolonneutvalg, skjul alle, gjenoppretting og bevaring av lukket oppsett.
+Filtrerte testeksporter ble kontrollert for riktig kolonneutvalg, tall,
+avrundingsdifferanse og objektnavn.
 Testeksporter fra alle tre nivåer ble åpnet med uavhengige lesere:
 XLSX med openpyxl, PDF med PyMuPDF og CSV med standard CSV-leser.
 Totalsum og differanse ble sammenlignet med beregningsresultatet.
@@ -97,3 +126,8 @@ skrivebords-Excel, og ingen visuell nettlesertest i dette miljøet.
 4. Eksporter alle tre formater og sammenlign med tabellen.
 5. Åpne XLSX i Excel uten reparasjonsmelding.
 6. Kontroller meldingen ved modell/kode fordelt på flere grupper.
+
+7. Lukk Tabelloppsett, endre kolonnevalg og kontroller at boksen forblir lukket.
+8. Velg en kjent navneegenskap og kontroller navnene i avvik og eksport.
+9. Skjul en prosess og kontroller at kolonnen mangler i alle tre eksportformater.
+10. Bruk Vis alle for å gjenopprette tabellen.

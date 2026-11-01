@@ -1,3 +1,4 @@
+import {objectLabel} from './view-options.js?v=2.03-preview.5.3.f';
 // Pure object-level aggregation. No network access and no unit conversion.
 export const MODEL = '@model';
 export function parseQuantity(value) {
@@ -57,14 +58,14 @@ export function summarize(entities, config) {
   let included=0, missing=0, invalid=0, missingColumn=0, missingGroup=0, missingUnit=0;
   for (const entity of entities) {
     const props=entity.properties||{}, raw=props[config.quantity];
-    const issue=reason=>issues.push({modelName:entity.modelName,entityId:entity.entityId,reason,value:raw??''});
+    const issue=(reason,value=raw)=>{const label=objectLabel(entity,config.nameProperty);issues.push({modelName:entity.modelName,entityId:entity.entityId,entityName:label.name,nameSource:label.source,entityType:entity.entityType||'',reason,value:value??''});};
     if(absent(raw)){missing++;issue('Mangler mengde');continue;}
     let value=parseQuantity(raw);
     if(value===null){invalid++;issue('Ugyldig mengde');continue;}
     const code=absent(props[config.column])?null:String(props[config.column]);
-    if(code===null){missingColumn++;issue('Mangler kolonneverdi');continue;}
+    if(code===null){missingColumn++;issue('Mangler kolonneverdi',props[config.column]);continue;}
     const unit=config.unit?(absent(props[config.unit])?null:String(props[config.unit])):'';
-    if(config.unit && unit===null){missingUnit++;issue('Mangler enhet');continue;}
+    if(config.unit && unit===null){missingUnit++;issue('Mangler enhet',props[config.unit]);continue;}
     const labels=groups.map(key=>key===MODEL?String(entity.modelName||entity.modelId):absent(props[key])?null:String(props[key]));
     if(labels.some(label=>label===null)){missingGroup++;issue('Mangler grupperingsverdi');}
     const key=JSON.stringify([code,unit]);
