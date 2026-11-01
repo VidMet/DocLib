@@ -7,3 +7,5 @@
 .setup-preview-dialog{max-width:min(620px,90vw);border:1px solid #b9c3d0;border-radius:10px;padding:0}.setup-preview-dialog::backdrop{background:#0005}.setup-preview-dialog section{padding:22px}.setup-preview-dialog h2{margin-top:0}.setup-preview-dialog dl{display:grid;grid-template-columns:auto 1fr;gap:6px 14px}.setup-preview-dialog dt{font-weight:700}.setup-preview-dialog dd{margin:0;overflow-wrap:anywhere}
 
 .setup-dialog{max-width:min(650px,92vw);border:1px solid #94a3b8;border-radius:10px;padding:0}.setup-dialog::backdrop{background:#0005}.setup-dialog form{padding:22px}.setup-dialog h2{margin:0 0 10px}.setup-dialog fieldset{display:grid;gap:10px;padding:14px;margin:14px 0}.setup-dialog label{display:flex;gap:8px;align-items:center}.setup-dialog .setup-path{font-size:12px;color:#64748b}.setup-status{min-height:20px;color:#166534}.setup-status.bad{color:#b91c1c}.workspace-nav .btn[hidden]{display:none!important}
+
+.tree-head-actions{display:inline-flex;gap:6px;align-items:center}.tree-head-actions .btn{white-space:nowrap}
