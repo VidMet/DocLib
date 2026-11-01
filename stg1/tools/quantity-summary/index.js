@@ -1,7 +1,7 @@
-import {createObjectIndex} from './object-index.js?v=2.03-preview.5.3.a-fix.1';
+import {createObjectIndex} from './object-index.js?v=2.03-preview.5.3.b';
 // DocLib Mengdesammenstilling - v2.03-preview.5, trinn 2
 // Dynamiske valg fra eksisterende, modellaggregerte metadata. Ingen nye API-kall.
-const BUILD = '2.03-preview.5.3.a-fix.1';
+const BUILD = '2.03-preview.5.3.b';
 const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const compare = (a,b) => String(a).localeCompare(String(b),'nb',{numeric:true,sensitivity:'base'});
 
@@ -73,59 +73,67 @@ function option(value,label,selected=false) {
   return `<option value="${esc(value)}"${selected?' selected':''}>${esc(label)}</option>`;
 }
 
+import {MODEL,catalog,summarize} from './summary-engine.js?v=2.03-preview.5.3.b';
 export default Object.freeze({id:'quantity-summary',title:'Mengdesammenstilling',legacyMode:'quantities',status:'module',create});
-
-export function create(context = {}) {
-  let host = null, active = false, destroyed = false, last = null;
+const signature = models => JSON.stringify(models.map(m=>[m.id,m.versionId]).sort((a,b)=>String(a[0]).localeCompare(String(b[0]))));
+const numberFormat=new Intl.NumberFormat('nb-NO',{maximumFractionDigits:6});
+export function create(context={}) {
+  let host=null,active=false,destroyed=false,generation=0;
   const objectIndex=createObjectIndex(context);
-  const state = {modelScope:'all',setKey:'',propertyKey:'',notice:'',indexStatus:'idle',indexResult:null,indexProgress:'',indexError:''};
-
-  function validateSelections(report) {
-    if (state.modelScope !== 'all' && !report.models.some(m=>m.id===state.modelScope)) state.modelScope='all';
-    let scoped = scopedCatalog(report,state.modelScope);
-    if (state.setKey && !scoped.sets.includes(state.setKey)) {state.setKey='';state.propertyKey='';state.notice='Det tidligere valgte egenskapssettet finnes ikke lenger i modellutvalget.';}
-    const setProperties = scoped.properties.filter(p=>!state.setKey || p.pset===state.setKey);
-    if (state.propertyKey && !setProperties.some(p=>p.key===state.propertyKey)) {state.propertyKey='';state.notice='Den tidligere valgte egenskapen finnes ikke lenger i modellutvalget.';}
-    return {scoped,setProperties};
+  const state={result:null,signature:'',loading:false,progress:'',error:'',config:{groups:['','',MODEL],column:'',quantity:'',unit:''},collapsed:new Set()};
+  function entities(){return state.result?.results.flatMap(r=>r.entities)||[];}
+  function field(name,label,keys,value,model=false){return `<label>${esc(label)}<select data-config="${name}">${option('','Ikke valgt',!value)}${model?option(MODEL,'Modellnavn (filnavn)',value===MODEL):''}${keys.map(key=>option(key,key,key===value)).join('')}</select></label>`;}
+  function defaults(keys){
+    const find=names=>keys.find(key=>names.includes(key.split('::').pop().toLowerCase()))||'';
+    if(!state.config.column)state.config.column=find(['prosesskode','ns-kode','nskode']);
+    if(!state.config.quantity)state.config.quantity=find(['mengde','volum','netvolume']);
+    if(!state.config.unit)state.config.unit=find(['enhet','unit']);
+    if(!state.config.groups[0])state.config.groups[0]=find(['sted']);
+    if(!state.config.groups[1])state.config.groups[1]=find(['element','0_element']);
   }
-
-  function render() {
-    if (!active || !host || destroyed) return;
-    last = inspectSelectedMetadata(context);
-    const {scoped,setProperties} = validateSelections(last);
-    const chosen = scoped.properties.find(p=>p.key===state.propertyKey) || null;
-    const modelOptions = [option('all',`Alle valgte modeller (${last.selectedModels})`,state.modelScope==='all'),...last.models.map(m=>option(m.id,m.name,state.modelScope===m.id))].join('');
-    const setOptions = [option('','Velg egenskapssett',!state.setKey),...scoped.sets.map(setName=>{
-      const count = new Set(scoped.properties.filter(p=>p.pset===setName).flatMap(p=>p.modelIds)).size;
-      return option(setName,`${setName} · ${count} av ${scoped.modelIds.size}`,state.setKey===setName);
-    })].join('');
-    const propertyOptions = [option('','Velg egenskap',!state.propertyKey),...setProperties.filter(p=>state.setKey && p.pset===state.setKey).map(p=>option(p.key,`${p.property} · ${p.modelCount} av ${p.selectedModelCount}`,state.propertyKey===p.key))].join('');
-    const summary = last.selectedModels ? `${last.selectedModels} valgte IFC-modell${last.selectedModels===1?'':'er'} · ${last.modelsWithValues} med innleste verdier · ${last.setCount} egenskapssett · ${last.propertyCount} egenskaper` : 'Velg minst én IFC-modell i Utforsker.';
-    const details = chosen ? `<section class="quantity-card"><h3>Valgt egenskap</h3><dl class="quantity-property-details"><dt>Full nøkkel</dt><dd>${esc(chosen.key)}</dd><dt>Modelldekning</dt><dd>${chosen.modelCount} av ${chosen.selectedModelCount}</dd><dt>Eksempelverdier</dt><dd>${chosen.sampleValues.length?chosen.sampleValues.map(esc).join(' / '):'Ingen tilgjengelige verdier'}</dd></dl></section>` : `<section class="quantity-card"><h3>Valgt egenskap</h3><p>Velg først egenskapssett og deretter egenskap.</p></section>`;
-    host.innerHTML = `<div class="quantity-summary-tool"><section class="quantity-hero"><div><span class="quantity-kicker">PREVIEW.5 TRINN 3A</span><div><strong>Bygg: v2.03-preview.5.3.a-fix.1</strong></div><h2>Mengdesammenstilling</h2><p>Dynamiske egenskapsvalg fra valgte IFC-modeller</p></div><button class="btn primary" data-action="refresh"${last.selectedModels?'':' disabled'}>${last.selectedModels?'Oppdater fra valgte modeller':'Velg IFC-modeller i Utforsker'}</button></section><div class="quantity-notice" role="status">${esc(summary)}</div>${state.notice?`<div class="quantity-notice warning">${esc(state.notice)}</div>`:''}<section class="quantity-card"><h3>Velg egenskap</h3><div class="quantity-fields"><label>Modellomfang<select data-field="model"${last.selectedModels?'':' disabled'}>${modelOptions}</select></label><label>Egenskapssett<select data-field="set"${scoped.sets.length?'':' disabled'}>${setOptions}</select></label><label>Egenskap<select data-field="property"${state.setKey?'':' disabled'}>${propertyOptions}</select></label></div></section>${details}<section class="quantity-card"><h3>Objektindeks</h3><p>Trinn 3A leser og bevarer metadata per IFC-objekt. Gruppering og summering aktiveres først etter at objektantallet er kontrollert.</p><button class="btn primary" data-action="build-index"${last.selectedModels&&state.indexStatus!=='loading'?'':' disabled'}>${state.indexStatus==='loading'?'Leser objekter...':'Bygg objektindeks'}</button><p role="status">${state.indexProgress||'Objektindeksen er ikke bygget ennå.'}</p>${state.indexError?`<div class="quantity-notice warning">${esc(state.indexError)}</div>`:''}${state.indexResult?`<div class="quantity-table-wrap"><table><thead><tr><th>Modeller</th><th>Objekter</th><th>Med egenskaper</th><th>Unike egenskaper</th><th>Cachetreff</th><th>Feil</th></tr></thead><tbody><tr><td>${state.indexResult.modelsLoaded} av ${state.indexResult.modelsRequested}</td><td>${state.indexResult.entityCount.toLocaleString('nb-NO')}</td><td>${state.indexResult.entitiesWithProperties.toLocaleString('nb-NO')}</td><td>${state.indexResult.propertyCount}</td><td>${state.indexResult.cacheHits}</td><td>${state.indexResult.errors.length}</td></tr></tbody></table></div>`:''}</section><details><summary>Datagrunnlag og begrensninger</summary><ul>${last.limitations.map(x=>`<li>${esc(x)}</li>`).join('')}</ul><p>Kilde: ${esc(last.source)}</p></details><div class="quantity-actions"><button disabled>Eksporter Excel</button><button disabled>Lagre oppsett</button></div></div>`;
-    host.querySelector('[data-action="build-index"]')?.addEventListener('click',async()=>{
-      state.indexStatus='loading';state.indexResult=null;state.indexError='';state.indexProgress='Starter objektlesing...';render();
-      const report=inspectSelectedMetadata(context);
-      const models=report.models.map(model=>({id:model.id,name:model.name,versionId:model.versionId}));
-      try{state.indexResult=await objectIndex.load(models,{onProgress:progress=>{state.indexProgress=progress.stage==='definitions'?`Leser egenskapsdefinisjoner for ${progress.model.name}...`:`${progress.model.name}: ${Number(progress.done||0).toLocaleString('nb-NO')} av ${Number(progress.total||0).toLocaleString('nb-NO')} objekter`;render();}});state.indexStatus=state.indexResult.errors.length?'partial':'ready';state.indexError=state.indexResult.errors.map(item=>`${item.modelName}: ${item.message}${item.status!=null?` [HTTP ${item.status}]`:''}`).join(' | ');state.indexProgress=`${state.indexResult.entityCount.toLocaleString('nb-NO')} objekter lest fra ${state.indexResult.modelsLoaded} modell${state.indexResult.modelsLoaded===1?'':'er'}.`;}catch(error){if(error?.name!=='AbortError'){state.indexStatus='error';state.indexError=error?.message||String(error);state.indexProgress='Objektindeksen kunne ikke bygges.';}}render();
-    });
-        host.querySelector('[data-action="refresh"]')?.addEventListener('click',()=>{state.notice='';render();});
-    host.querySelector('[data-field="model"]')?.addEventListener('change',event=>{state.modelScope=event.target.value;state.setKey='';state.propertyKey='';state.notice='';render();});
-    host.querySelector('[data-field="set"]')?.addEventListener('change',event=>{state.setKey=event.target.value;state.propertyKey='';state.notice='';render();});
-    host.querySelector('[data-field="property"]')?.addEventListener('change',event=>{state.propertyKey=event.target.value;state.notice='';render();});
+  function matrix(report){
+    const cols=report.columns;
+    const cells=node=>cols.map(col=>{const cell=node.cells.get(col.key);return `<td class="qs-number">${cell?esc(numberFormat.format(cell.sum)):'<span title="Ingen gyldige mengder">–</span>'}</td>`;}).join('');
+    const rows=[];
+    function walk(parent,hidden=false){
+      const children=[...parent.children.values()].sort((a,b)=>compare(a.label,b.label));
+      for(const node of children){
+        const id=JSON.stringify(node.path),closed=state.collapsed.has(id),hasChildren=node.children.size>0;
+        rows.push(`<tr class="${hasChildren?'qs-group-row':'qs-model-row'}" data-depth="${node.depth}"${hidden?' hidden':''}><th scope="row"><div class="qs-indent" style="--depth:${node.depth}">${hasChildren?`<button class="qs-toggle" data-toggle="${esc(id)}" aria-expanded="${!closed}" aria-label="Utvid eller skjul gruppe">${closed?'▸':'▾'}</button>`:''}<span>${esc(node.label)}</span><span class="qs-count">${node.count} obj.</span></div></th>${cells(node)}</tr>`);
+        walk(node,hidden||closed);
+      }
+    }
+    walk(report.root);
+    return `<div class="qs-table-wrap"><table class="qs-matrix"><thead><tr><th class="qs-axis" scope="col">Gruppering</th>${cols.map(c=>`<th scope="col">${esc(c.code)}<small class="qs-unit">${esc(c.unit||'Enhet ikke valgt')}</small></th>`).join('')}</tr></thead><tbody>${rows.join('')}</tbody><tfoot><tr><th scope="row">Sum per kolonne</th>${cells(report.root)}</tr></tfoot></table></div>`;
   }
-
-  const api = {
-    id:'quantity-summary',
-    mount(container){if(destroyed)throw Error('Mengdesammenstilling er lukket permanent.');host=container;active=true;render();},
-    render,
-    update(){render();},
-    canLeave(){return true;},
-    unmount(){objectIndex.abort();active=false;if(host)host.replaceChildren();host=null;return true;},
-    activate(){active=true;render();},
-    deactivate(){active=false;},
-    destroy(){api.unmount();objectIndex.clear();last=null;destroyed=true;},
-    snapshot(){const report=inspectSelectedMetadata(context);const scoped=scopedCatalog(report,state.modelScope);return Object.freeze({active,destroyed,stage:BUILD,selection:{...state},selectedModels:report.selectedModels,setCount:scoped.sets.length,propertyCount:scoped.properties.length,source:report.source,indexStatus:state.indexStatus,indexResult:state.indexResult,indexCache:objectIndex.snapshot()});}
-  };
+  function render(){
+    if(!active||!host||destroyed)return;
+    const selection=inspectSelectedMetadata(context), stale=state.result&&signature(selection.models)!==state.signature;
+    const keys=catalog(entities());let report=null,configError='';
+    if(state.result&&!stale&&!state.loading){try{report=summarize(entities(),state.config);}catch(error){configError=error.message;}}
+    host.innerHTML=`<div class="qs-shell"><header><div><span class="quantity-kicker">PREVIEW.5 TRINN 3B</span><h2>Mengdesammenstilling</h2><p>Bygg: v${BUILD}</p></div><button class="btn primary" data-action="load"${state.loading||!selection.selectedModels?' disabled':''}>${state.loading?'Leser objekter...':state.result?'Oppdater objektindeks':'Bygg objektindeks'}</button></header><p>${selection.selectedModels} valgte IFC-modeller. ${esc(state.progress)}</p>${state.error?`<p class="quantity-notice warning">${esc(state.error)}</p>`:''}${stale?'<p class="quantity-notice warning">Modellutvalget eller versjonen er endret. Oppdater objektindeksen før summering.</p>':''}${state.result?`<div class="qs-kpis"><span>Modeller: ${state.result.modelsLoaded} av ${state.result.modelsRequested}</span><span>Objekter: ${state.result.entityCount}</span><span>Med egenskaper: ${state.result.entitiesWithProperties}</span><span>Egenskaper: ${keys.length}</span><span>Cachetreff: ${state.result.cacheHits}</span></div><section class="qs-setup"><div class="qs-setup-row"><div class="qs-row-title"><h3>Datakilder</h3><p>Egenskaper fra innleste objekter</p></div><div class="qs-fields qs-fields-sources">${field('column','Kolonner (kode)',keys,state.config.column)}${field('quantity','Mengde',keys,state.config.quantity)}${field('unit','Enhet (valgfritt)',keys,state.config.unit)}</div></div><div class="qs-setup-row"><div class="qs-row-title"><h3>Gruppering</h3><p>Øverste til nederste nivå</p></div><div class="qs-fields qs-fields-groups">${state.config.groups.map((key,i)=>field('group'+i,'Nivå '+(i+1),keys,key,true)).join('')}</div></div><div class="qs-setup-row"><div class="qs-row-title"><h3>Summering</h3></div><p>Summer per kolonne og gruppenivå. Ulike enheter får separate kolonner. Ingen omregning av enheter.${!state.config.unit?' <strong>Enhet er ikke valgt. Kontroller at mengdene har samme enhet før summene brukes.</strong>':''}</p></div></section>`:'<p>Velg IFC-filer i det felles filtreet, og bygg objektindeksen.</p>'}${configError?`<p class="quantity-notice">${esc(configError)}</p>`:''}${report?`<section class="qs-main"><div class="qs-kpis"><span>Summerte objekter: ${report.stats.included}</span><span>Mangler mengde: ${report.stats.missing}</span><span>Ugyldig mengde: ${report.stats.invalid}</span><span>Mangler kode: ${report.stats.missingColumn}</span><span>Mangler enhet: ${report.stats.missingUnit}</span><span>Mangler gruppeverdi: ${report.stats.missingGroup}</span></div>${report.columns.length?matrix(report):'<p>Ingen gyldige mengder for valgte egenskaper.</p>'}${report.issues.length?`<details><summary>Avvik (${report.issues.length})</summary><p>Manglende gruppeverdier vises i egen gruppe og inngår i summene. Andre avvik utelates fra summeringen.</p><div class="qs-table-wrap"><table class="qs-issues"><thead><tr><th>Modell</th><th>Objekt-ID</th><th>Avvik</th><th>Råverdi</th></tr></thead><tbody>${report.issues.slice(0,500).map(i=>`<tr><td>${esc(i.modelName)}</td><td>${esc(i.entityId)}</td><td>${esc(i.reason)}</td><td>${esc(i.value)}</td></tr>`).join('')}</tbody></table></div>${report.issues.length>500?'<p>Viser de første 500 avvikene.</p>':''}</details>`:''}</section>`:''}<details><summary>Datagrunnlag og begrensninger</summary><p>Kun objektmetadata fra valgte IFC-modeller. Ingen demonstrasjonsverdier. Tall med punktum eller komma som desimalskilletegn støttes. Tusenskilletegn og tekst med enhet tolkes ikke automatisk. Visning avrundes til seks desimaler; summering bruker uavrundede verdier. Manglende celler vises som strek, gyldig null vises som 0.</p><p>Excel-eksport og lagring av oppsett er ikke inkludert i dette trinnet.</p></details></div>`;
+    host.querySelector('[data-action="load"]')?.addEventListener('click',load);
+    host.querySelectorAll('[data-config]').forEach(select=>select.addEventListener('change',event=>{const key=event.target.dataset.config;if(key.startsWith('group'))state.config.groups[Number(key.slice(5))]=event.target.value;else state.config[key]=event.target.value;state.collapsed.clear();render();}));
+    host.querySelectorAll('[data-toggle]').forEach(button=>button.addEventListener('click',()=>{const key=button.dataset.toggle;if(state.collapsed.has(key))state.collapsed.delete(key);else state.collapsed.add(key);render();}));
+  }
+  async function load(){
+    const token=++generation,selection=inspectSelectedMetadata(context),models=selection.models.map(({id,name,versionId})=>({id,name,versionId}));
+    state.loading=true;state.error='';state.progress='Starter objektlesing...';render();
+    try{
+      const result=await objectIndex.load(models,{onProgress:p=>{if(token!==generation)return;state.progress=p.stage==='definitions'?`Leser egenskaper: ${p.model.name}`:`${p.model.name}: ${p.done} av ${p.total} objekter`;render();}});
+      if(token!==generation)return;
+      state.result=result;state.signature=signature(models);state.collapsed.clear();
+      state.error=result.errors.map(e=>`${e.modelName}: ${e.message}`).join(' | ');
+      if(result.errors.length)state.error='Ufullstendig datagrunnlag. Summene gjelder bare modeller som ble lest komplett. '+state.error;
+      const available=catalog(entities());
+      for(const key of ['column','quantity','unit'])if(state.config[key]&&!available.includes(state.config[key]))state.config[key]='';
+      state.config.groups=state.config.groups.map(key=>key===MODEL||available.includes(key)?key:'');
+      defaults(available);state.progress=`${result.entityCount} objekter lest.`;
+    }catch(error){if(token===generation&&error.name!=='AbortError')state.error=error.message||String(error);}
+    finally{if(token===generation){state.loading=false;render();}}
+  }
+  const api={id:'quantity-summary',mount(container){if(destroyed)throw Error('Verktøyet er lukket permanent.');host=container;active=true;
+    if(!document.querySelector('link[data-quantity-summary-style]')){const link=document.createElement('link');link.rel='stylesheet';link.href=new URL('./styles.css?v='+BUILD,import.meta.url).href;link.dataset.quantitySummaryStyle=BUILD;document.head.appendChild(link);}else{document.querySelector('link[data-quantity-summary-style]').href=new URL('./styles.css?v='+BUILD,import.meta.url).href;}
+    render();},render,update(){render();},canLeave(){return true;},unmount(){generation++;objectIndex.abort();state.loading=false;active=false;if(host)host.replaceChildren();host=null;return true;},activate(){active=true;render();},deactivate(){active=false;},destroy(){api.unmount();objectIndex.clear();state.result=null;destroyed=true;},snapshot(){return {active,destroyed,stage:BUILD,selection:JSON.parse(JSON.stringify(state.config)),indexStatus:state.loading?'loading':state.result?'ready':'idle',indexResult:state.result,indexCache:objectIndex.snapshot(),stale:!!state.result&&state.signature!==signature(inspectSelectedMetadata(context).models)};}};
   return Object.freeze(api);
 }
