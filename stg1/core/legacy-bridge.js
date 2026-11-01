@@ -1,6 +1,6 @@
 'use strict';
 window.DocLibLegacyBridge=Object.freeze({
- start:()=>init(),getProject:()=>project?{id:project.id}:null,getMode:()=>workspaceMode,
+ start:()=>init(),refreshTree:()=>load(true),getProject:()=>project?{id:project.id}:null,getMode:()=>workspaceMode,
  async getProjectRoleData(){
   const projectId=String(project?.id||''),userId=String(mineUser?.id||'');
   if(!projectId||!userId)return{projectId,userId,status:0,rolesStatus:0,member:null,roles:[]};
