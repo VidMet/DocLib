@@ -71,7 +71,7 @@ export function createObjectIndex(context = {}) {
     let total = Infinity;
     while (offset < total) {
       // Fix.1: bruker samme dokumenterte feltkombinasjon som shared/properties.js.
-      const url = `${modelBase}/models/${encodedId}/entities?offset=${offset}&top=${pageSize}&fields=id&fields=psets${version}`;
+      const url = `${modelBase}/models/${encodedId}/entities?offset=${offset}&top=${pageSize}&fields=id&fields=psets&fields=class&fields=type${version}`;
       const response = await request(url, signal);
       if (!response?.ok || response.status === 206) {
         throw Object.assign(Error(`Objektmetadata kunne ikke leses komplett for ${model.name} (HTTP ${response?.status ?? 'ukjent'}).`), {status:response?.status});

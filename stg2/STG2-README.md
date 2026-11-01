@@ -1,13 +1,9 @@
 # DocLib STG2 v2.03-rc.1
 
-Baseline: STG1 v2.03-preview.5.3.i-fix.2.
+Release candidate basert på fungerende STG1-baseline og Mengdesammenstilling v2.03-preview.5.3.i-fix.2.
 
-Denne pakken inneholder bare filene som er tilgjengelige i den verifiserte
-baselinen i denne samtalen: stg2/index.html, quantity-summary og
-core/quantity-heading.js. App.js, de oevrige core-filene, shared, andre
-verktoy og ressurser maa kopieres byte-for-byte fra den faktisk fungerende
-STG1-mappen til STG2. Ikke bruk eldre filer fra tidligere ZIP-er for aa
-rekonstruere dem.
+STG2 er stabiliseringsområde. Nye funksjoner går tilbake til STG1.
+Mengdesammenstilling beholder fire avrundingsnivåer, kolonnevis avrunding, prosessbeskrivelse/info, kolonnevalg, eksport og IFC-strukturfilter.
+Primær objektlesing bruker `fields=id&fields=psets&fields=class&fields=type`, samme feltmønster som Egenskapsvalidering. Kompatibilitetsfallback beholdes dersom klassen fortsatt mangler.
 
-Etter kopiering: bruk denne pakken til aa overskrive de oppforte filene i
-stg2. STG2 skal brukes til stabilisering/feilretting, ikke nye funksjoner.
+Før STG3: test IFC2x3, IFC4, IFC4.3 og IFC4.3_ADD2, alle fire avrundingsnivåer, strukturfilter og Excel/CSV/PDF mot kjente mengder.

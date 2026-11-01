@@ -1,1 +1,1 @@
-import{VERSION}from'./version.js?v=2.02-rc.2.2';export const environment=Object.freeze({name:'STG2',label:'STG2',version:VERSION.value,versionLabel:VERSION.label,readOnly:false,persistence:true,diagnostics:true});
+import{VERSION}from'./version.js?v=2.03-preview.4';export const environment=Object.freeze({name:'STG1',label:'STG1',version:VERSION.value,versionLabel:VERSION.label,readOnly:false,persistence:true,diagnostics:true});
