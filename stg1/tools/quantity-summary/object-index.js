@@ -1,3 +1,4 @@
+import {filterIfcEntities,resolveIfcClass} from './ifc-filter.js?v=2.03-preview.5.3.h';
 // DocLib Mengdesammenstilling - v2.03-preview.5 trinn 3A Fix.1
 // Read-only Model API access. Cache is kept in memory for the tool session.
 const memoryCache = new Map();
@@ -31,7 +32,7 @@ function entityRecord(entity, model, defs) {
     modelName: String(model.name || model.id),
     versionId: model.versionId == null ? null : String(model.versionId),
     entityId: String(entity?.id ?? ''),
-    entityType: String(entity?.type || entity?.entityType || entity?.class || ''),
+    entityType: resolveIfcClass({...entity,properties}),
     properties
   };
 }
@@ -65,7 +66,7 @@ export function createObjectIndex(context = {}) {
     }
     const defs = definitions(definitionsResponse.data);
 
-    const entities = [];
+    let entities = [];
     let offset = 0;
     let total = Infinity;
     while (offset < total) {
@@ -87,6 +88,9 @@ export function createObjectIndex(context = {}) {
       options.onProgress?.({model,stage:'entities',done:Math.min(offset,total),total});
     }
 
+    const readEntityCount=entities.length;
+    const filtered=filterIfcEntities(entities);
+    entities=filtered.entities;
     const propertyKeys = new Set();
     let withProperties = 0;
     for (const entity of entities) {
@@ -96,7 +100,7 @@ export function createObjectIndex(context = {}) {
     }
     const result = {
       key,model:{...model},entities,
-      entityCount:entities.length,
+      entityCount:entities.length,readEntityCount,excludedStructureCount:filtered.excludedCount,excludedByClass:filtered.excludedByClass,unknownClassCount:filtered.unknownCount,
       entitiesWithProperties:withProperties,
       propertyCount:propertyKeys.size,
       definitionCount:defs.size,
@@ -127,6 +131,9 @@ export function createObjectIndex(context = {}) {
       entityCount:results.reduce((sum,item)=>sum+item.entityCount,0),
       entitiesWithProperties:results.reduce((sum,item)=>sum+item.entitiesWithProperties,0),
       propertyCount:new Set(results.flatMap(item=>item.entities.flatMap(entity=>Object.keys(entity.properties)))).size,
+      readEntityCount:results.reduce((n,r)=>n+r.readEntityCount,0),
+      excludedStructureCount:results.reduce((n,r)=>n+r.excludedStructureCount,0),
+      unknownClassCount:results.reduce((n,r)=>n+r.unknownClassCount,0),
       cacheHits:results.filter(item=>item.fromCache).length
     };
   }

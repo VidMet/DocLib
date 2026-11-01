@@ -1,11 +1,52 @@
-# Mengdesammenstilling v2.03-preview.5.3.g
+# Nytt i v2.03-preview.5.3.h
+
+IFC-prosjekt- og romlige strukturobjekter filtreres fra objektindeksen
+før egenskapskatalog, objektantall, summering, avvik og eksport.
+En ekstra kontroll i summeringsmotoren beskytter også direkte bruk.
+
+Eksplisitt liste: IfcProject, IfcSite, IfcBuilding, IfcBuildingStorey,
+IfcSpace, IfcSpatialZone, IfcSpatialElement, IfcSpatialStructureElement,
+IfcExternalSpatialElement, IfcExternalSpatialStructureElement,
+IfcFacility, IfcFacilityPart, IfcFacilityPartCommon, IfcBridge,
+IfcBridgePart, IfcRoad, IfcRoadPart, IfcRailway, IfcRailwayPart,
+IfcMarineFacility og IfcMarinePart.
+Dette gjelder romlige containere, ikke bjelker, vegger eller andre
+fysiske fagobjekter. Objektnavn brukes aldri til å avgjøre klasse.
+
+Klasse leses fra tilgjengelige objektklassefelt eller klasseegenskaper
+som IfcClass, IfcEntity, IfcType, EntityType, Class og Type, bare når
+verdien er et IFC-klassenavn. Numeriske type-ID-er tolkes ikke.
+Ved motstridende klasseverdier prioriteres utelatelse av strukturobjekt.
+
+VIKTIG BEGRENSNING FØR STG2:
+Den eksisterende API-forespørselen ber om id og psets. Vi har ikke
+verifisert mot live API at klasse finnes i alle objekters metadata.
+Ingen udokumenterte API-felt er lagt til. Dersom klassen ikke finnes,
+viser verktøyet antall med ukjent klasse og SPERRER beregning/eksport.
+Dette hindrer at strukturobjekter ubemerket tas med, men kan stoppe
+modeller som tidligere fungerte. Da må klasseinnlesingen tilpasses
+faktiske API-data før STG2. Ikke omgå sperren med navnegjetting.
+
+Status viser utelatte strukturobjekter og ukjent IFC-klasse. Antall
+utelatte følger Excel/PDF-oppsettet. Strukturobjekter vises ikke som
+avvik. Vanlige fagobjekter med manglende mengde/kode gir fortsatt avvik.
+
+Verifikasjon: 6125 eksisterende kontroller (med eksplisitt IFC-klasse i
+syntetiske testobjekter) og 401 nye filterkontroller bestod. Nye tester
+dekker alle utelatte klasser, store/små bokstaver, pset-klasse, cache,
+objektantall, avvik, ukjent klasse og egenskaper som kun finnes på
+strukturobjekter. Filtrerte XLSX/CSV/PDF åpnet med uavhengige lesere.
+Ikke live-testet i Trimble Connect. Før STG2 må Ukjent IFC-klasse være 0,
+utelatte objekter kontrolleres og kjent mengdesum/avvik sammenlignes.
+
+# Mengdesammenstilling v2.03-preview.5.3.h
 
 ## Installering
-Pakk ut i DocLib-roten. Overskriv alle sju filer under
+Pakk ut i DocLib-roten. Overskriv alle åtte filer under
 stg1/tools/quantity-summary/. Ingen endringer i core/shared.
 Last utvidelsen på nytt. Verktøyets byggnummer skal vise
-v2.03-preview.5.3.g. Felles topptekst og Kontrollplan-overskrift
-endres ikke av denne pakken. API-innlesingen er uendret fra 5.3.f.
+v2.03-preview.5.3.h. Felles topptekst og Kontrollplan-overskrift
+endres ikke av denne pakken. API-feltkombinasjonen er beholdt. Objektindeksen filtrerer nå strukturobjekter.
 
 ## Fire avrundingsnivåer
 De tidligere valgene er erstattet med:

@@ -1,4 +1,5 @@
-import {objectLabel} from './view-options.js?v=2.03-preview.5.3.g';
+import {filterIfcEntities} from './ifc-filter.js?v=2.03-preview.5.3.h';
+import {objectLabel} from './view-options.js?v=2.03-preview.5.3.h';
 // Pure object-level aggregation. No network access and no unit conversion.
 export const MODEL = '@model';
 export function parseQuantity(value) {
@@ -36,6 +37,9 @@ export function roundCell(value,config={}) {
   return Object.is(result,-0)?0:result;
 }
 export function summarize(entities, config) {
+  const filtered=filterIfcEntities(entities);
+  if(filtered.unknownCount)throw Error(`IFC-klasse mangler for ${filtered.unknownCount} objekter. Beregning og eksport er sperret fordi strukturobjekter ikke kan identifiseres sikkert. Kontroller at metadata inneholder IFC-klasse (for eksempel IfcClass eller IfcEntity). Objektnavn brukes ikke til klassifisering.`);
+  entities=filtered.entities;
   const rounding=roundingSettings(config);
   const roundScope=config.roundScope||'final';
   if(!['final','group1','group2','group3'].includes(roundScope))throw Error('Ugyldig avrundingsnivå.');
