@@ -1,0 +1,97 @@
+{
+  "version": "2.04-preview.2-fix.5",
+  "type": "Local mocked contract tests, not live API",
+  "results": [
+    {
+      "name": "Source-only contract and readback",
+      "passed": true,
+      "writes": 1,
+      "puts": 1,
+      "polls": 2
+    },
+    {
+      "name": "existing",
+      "passed": true,
+      "writes": 0,
+      "puts": 0,
+      "polls": 0
+    },
+    {
+      "name": "start400",
+      "passed": true,
+      "writes": 1,
+      "puts": 0,
+      "polls": 0
+    },
+    {
+      "name": "missingSource",
+      "passed": true,
+      "writes": 1,
+      "puts": 0,
+      "polls": 0
+    },
+    {
+      "name": "multipart",
+      "passed": true,
+      "writes": 1,
+      "puts": 0,
+      "polls": 0
+    },
+    {
+      "name": "insecureURL",
+      "passed": true,
+      "writes": 1,
+      "puts": 0,
+      "polls": 0
+    },
+    {
+      "name": "put403",
+      "passed": true,
+      "writes": 1,
+      "puts": 1,
+      "polls": 0
+    },
+    {
+      "name": "networkFailure",
+      "passed": true,
+      "writes": 1,
+      "puts": 1,
+      "polls": 0
+    },
+    {
+      "name": "uploadError",
+      "passed": true,
+      "writes": 1,
+      "puts": 1,
+      "polls": 1
+    },
+    {
+      "name": "expired",
+      "passed": true,
+      "writes": 1,
+      "puts": 1,
+      "polls": 1
+    },
+    {
+      "name": "poll403",
+      "passed": true,
+      "writes": 1,
+      "puts": 1,
+      "polls": 1
+    },
+    {
+      "name": "timeout",
+      "passed": true,
+      "writes": 1,
+      "puts": 1,
+      "polls": 30
+    },
+    {
+      "name": "readbackMismatch",
+      "passed": true,
+      "writes": 1,
+      "puts": 1,
+      "polls": 2
+    }
+  ]
+}

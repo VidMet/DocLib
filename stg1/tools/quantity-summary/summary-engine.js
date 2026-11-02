@@ -1,5 +1,5 @@
-import {filterIfcEntities} from './ifc-filter.js?v=2.04-preview.2-fix.4';
-import {objectLabel} from './view-options.js?v=2.04-preview.2-fix.4';
+import {filterIfcEntities} from './ifc-filter.js?v=2.04-preview.2-fix.5';
+import {objectLabel} from './view-options.js?v=2.04-preview.2-fix.5';
 // Pure object-level aggregation. No network access and no unit conversion.
 export const MODEL = '@model';
 export function parseQuantity(value) {
