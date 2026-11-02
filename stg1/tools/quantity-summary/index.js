@@ -1,6 +1,6 @@
-import {visibleReport} from './view-options.js?v=2.04-preview.2-fix.2';
-import {makeSnapshot,downloadExport} from './export.js?v=2.04-preview.2-fix.2';
-import {createObjectIndex} from './object-index.js?v=2.04-preview.2-fix.2';
+import {visibleReport} from './view-options.js?v=2.04-preview.2-fix.3';
+import {makeSnapshot,downloadExport} from './export.js?v=2.04-preview.2-fix.3';
+import {createObjectIndex} from './object-index.js?v=2.04-preview.2-fix.3';
 // DocLib Mengdesammenstilling - v2.03-preview.5, trinn 2
 // Dynamiske valg fra eksisterende, modellaggregerte metadata. Ingen nye API-kall.
 const BUILD = '2.03';
@@ -75,7 +75,7 @@ function option(value,label,selected=false) {
   return `<option value="${esc(value)}"${selected?' selected':''}>${esc(label)}</option>`;
 }
 
-import {MODEL,catalog,summarize} from './summary-engine.js?v=2.04-preview.2-fix.2';
+import {MODEL,catalog,summarize} from './summary-engine.js?v=2.04-preview.2-fix.3';
 export default Object.freeze({id:'quantity-summary',title:'Mengdesammenstilling',legacyMode:'quantities',status:'module',create});
 const signature = models => JSON.stringify(models.map(m=>[m.id,m.versionId]).sort((a,b)=>String(a[0]).localeCompare(String(b[0]))));
 

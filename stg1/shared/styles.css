@@ -9,3 +9,5 @@
 .setup-dialog{max-width:min(650px,92vw);border:1px solid #94a3b8;border-radius:10px;padding:0}.setup-dialog::backdrop{background:#0005}.setup-dialog form{padding:22px}.setup-dialog h2{margin:0 0 10px}.setup-dialog fieldset{display:grid;gap:10px;padding:14px;margin:14px 0}.setup-dialog label{display:flex;gap:8px;align-items:center}.setup-dialog .setup-path{font-size:12px;color:#64748b}.setup-status{min-height:20px;color:#166534}.setup-status.bad{color:#b91c1c}.workspace-nav .btn[hidden]{display:none!important}
 
 .tree-head-actions{display:inline-flex;gap:6px;align-items:center}.tree-head-actions .btn{white-space:nowrap}
+
+.setup-dialog [data-diagnostics]{margin:12px 0}.setup-dialog [data-diagnostics] pre{max-height:220px;overflow:auto;padding:10px;background:#f8fafc;border:1px solid #cbd5e1;white-space:pre-wrap;font-size:11px}
