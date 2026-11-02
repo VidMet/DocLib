@@ -1,5 +1,6 @@
 'use strict';
 window.DocLibLegacyBridge=Object.freeze({
+ getColumnPropertyCatalog:()=>[...propertiesPort.propertyCatalog.values()].map(x=>({...x})),
  start:()=>init(),getProject:()=>project?{id:project.id}:null,getMode:()=>workspaceMode,
  async getProjectRoleData(){
   const projectId=String(project?.id||''),userId=String(mineUser?.id||'');
