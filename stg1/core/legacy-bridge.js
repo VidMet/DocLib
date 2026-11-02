@@ -25,7 +25,7 @@ window.DocLibLegacyBridge=Object.freeze({
  attachShared(tree,properties){treePort=tree;propertiesPort=properties;},
  attachExplorer(port){explorerPort=port;},
  attachProject(controller){projectController=controller;},
- refreshExplorerColumns(){explorerPort.columnFilters.clear();explorerPort.sortState={key:null,dir:0};explorerPort.renderDynamicHeaders();explorerPort.renderTable();},
+ refreshExplorerColumns(){renderProfileControls();explorerPort.columnFilters.clear();explorerPort.sortState={key:null,dir:0};explorerPort.renderDynamicHeaders();explorerPort.renderTable();},
  createSetupContext(){return Object.freeze({get columns(){return columnConfig.map(c=>({...c}));},get CORE(){return CORE;},get projectId(){return String(project?.id||'');},apiRead:(...a)=>req(...a),apiWrite:(url,options={})=>reqWrite(url,{...options,headers:{...(options.headers||{}),'X-DocLib-Write':'setup-json'}})});},
   createProjectContext(){return Object.freeze({
   projectId:()=>project?.id,
@@ -89,7 +89,7 @@ window.DocLibLegacyBridge=Object.freeze({
    get cpMmiEvidence(){return controlPlanPort.cpMmiEvidence;},cpCollectMmi:(...a)=>controlPlanPort.cpCollectMmi(...a)
   })
  });},
- createExplorerContext(){return Object.freeze({get columnPreferenceKey(){return `doclib-visible-columns-v1:${project?.id||'default'}:${mineUser?.id||'unresolved'}`;},get customColumnProfile(){return activeProfile!=='Standard'||!isUnmodifiedPersonalStandard();},
+ createExplorerContext(){return Object.freeze({get sharedView(){return currentSharedView();},refreshProfileControls:()=>renderProfileControls(),get columnPreferenceKey(){return `doclib-visible-columns-v1:${project?.id||'default'}:${mineUser?.id||'unresolved'}`;},get customColumnProfile(){return activeProfile!=='Standard'||!isUnmodifiedPersonalStandard();},
  capabilities:Object.freeze({networkWrites:false,linkStorage:'local',ruleEditor:false}),
  get projectState(){return projectController?.snapshot()||{phase:'idle',stale:true};},
   get VALUE_COLORS(){return VALUE_COLORS;},get activeProfile(){return activeProfile;},get columnConfig(){return columnConfig;},get profiles(){return profiles;},

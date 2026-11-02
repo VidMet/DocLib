@@ -1,7 +1,7 @@
-import {mountViewEditor} from './view-editor.js?v=2.04-preview.6';
-import {mountIfcEditor} from './ifc-schema.js?v=2.04-preview.6';
-import {availableColumns,normalizeColumns} from '../explorer/columns.js?v=2.04-preview.6';
-import {enabledTools,normalizeProjectTools,TOOL_IDS} from './project-tools.js?v=2.04-preview.6';
+import {mountViewEditor} from './view-editor.js?v=2.04-preview.6-fix.1';
+import {mountIfcEditor} from './ifc-schema.js?v=2.04-preview.6-fix.1';
+import {availableColumns,normalizeColumns} from '../explorer/columns.js?v=2.04-preview.6-fix.1';
+import {enabledTools,normalizeProjectTools,TOOL_IDS} from './project-tools.js?v=2.04-preview.6-fix.1';
 const LABELS={'validation':'Egenskapsvalidering','quantity-summary':'Mengdesammenstilling','control-plan':'Kontrollplan','todos':'Todos'};
 const BUTTONS={'validation':'modeValidation','quantity-summary':'modeQuantities','control-plan':'modeDocuments','todos':'modeTodos'};
 export function installToolVisibility({store,access,document:doc=document}){
