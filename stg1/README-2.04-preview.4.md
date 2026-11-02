@@ -1,4 +1,4 @@
-# DocLib STG1 v2.04-preview.5
+# DocLib STG1 v2.04-preview.6
 
 Bygget videre fra preview.3. Opprettings- og oppdateringslogikken i Setup-repository er uendret.
 

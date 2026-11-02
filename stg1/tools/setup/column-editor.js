@@ -1,4 +1,4 @@
-import {normalizeColumns,normalizeDefinitions} from '../explorer/columns.js?v=2.04-preview.5';
+import {normalizeColumns,normalizeDefinitions} from '../explorer/columns.js?v=2.04-preview.6';
 export function mountColumnEditor(box,config,fallback,doc=document){
  const clone=x=>JSON.parse(JSON.stringify(x));
  let columns=clone(normalizeDefinitions(config.explorer?.definitions)??normalizeDefinitions(fallback)??[]);

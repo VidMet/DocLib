@@ -1,0 +1,13 @@
+import {mountColumnEditor} from './column-editor.js?v=2.04-preview.6';
+import {normalizeProjectTools} from './project-tools.js?v=2.04-preview.6';
+export function mountViewEditor(host,config,metadata,doc=document){
+ const explorer=normalizeProjectTools(config).explorer;let views=explorer.views,active=explorer.defaultViewId,defaultId=active,editor;
+ host.replaceChildren();const bar=doc.createElement('div'),select=doc.createElement('select'),name=doc.createElement('input'),standard=doc.createElement('input'),label=doc.createElement('label'),body=doc.createElement('div');select.setAttribute('aria-label','Fellesvisning');name.setAttribute('aria-label','Navn p\u00e5 fellesvisning');name.maxLength=120;standard.type='checkbox';label.append(standard,doc.createTextNode(' Standard for prosjektet'));bar.className='setup-view-toolbar';bar.append(select,name,label);host.append(bar,body);
+ const commit=()=>{if(!editor)return;const data=editor.snapshot();const v=views.find(v=>v.id===active);Object.assign(v,data);v.name=name.value.trim()||v.name;};
+ const render=()=>{select.replaceChildren();for(const v of views){const o=doc.createElement('option');o.value=v.id;o.textContent=v.name;select.append(o);}select.value=active;const v=views.find(v=>v.id===active);name.value=v.name;standard.checked=active===defaultId;editor=mountColumnEditor(body,{...config,explorer:v},metadata,doc);};
+ select.onchange=()=>{try{commit();active=select.value;render();}catch(e){select.value=active;window.alert(e.message);}};
+ name.onchange=()=>{commit();for(const o of select.options)if(o.value===active)o.textContent=name.value;};
+ standard.onchange=()=>{if(standard.checked)defaultId=active;else standard.checked=active===defaultId;};
+ for(const [text,action] of [['Ny visning',()=>{commit();const source=views.find(v=>v.id===active);active='view-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,7);views.push({...JSON.parse(JSON.stringify(source)),id:active,name:'Ny visning'});render();name.focus();name.select();}],['Slett visning',()=>{if(views.length===1){window.alert('Prosjektet m\u00e5 ha minst \u00e9n visning.');return;}if(!window.confirm('Slette denne fellesvisningen? Endringen gjelder f\u00f8rst etter lagring av prosjektoppsettet.'))return;views=views.filter(v=>v.id!==active);active=views[0].id;if(!views.some(v=>v.id===defaultId))defaultId=active;render();}]]){const button=doc.createElement('button');button.type='button';button.textContent=text;button.onclick=()=>{try{action();}catch(e){window.alert(e.message);}};bar.append(button);}
+ render();return {snapshot(){commit();const v=views.find(v=>v.id===defaultId);return {...v,views:JSON.parse(JSON.stringify(views)),defaultViewId:defaultId};}};
+}
