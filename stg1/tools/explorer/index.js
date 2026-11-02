@@ -1,4 +1,4 @@
-import {install,initialize} from './table.js?v=2.04-preview.3';
+import {install,initialize} from './table.js?v=2.04-preview.4';
 export default Object.freeze({id:'explorer',title:'Utforsker',legacyMode:'explorer',status:'module',create:createExplorer});
 export function createExplorer(context){
  const state={};install(state,context);initialize(state,context);
@@ -8,7 +8,7 @@ export function createExplorer(context){
  const api={
  id:'explorer',
  mount(container){if(destroyed)throw Error('Utforsker er lukket permanent.');if(active)return;active=true;host=container;controller=new AbortController();
-  bind('search','input',()=>state.renderTable());
+  bind('explorerVisibleColumns','click',()=>state.openColumnVisibility());bind('search','input',()=>state.renderTable());
   bind('clearSelection','click',()=>{state.selected.clear();state.updateSelection();context.renderTree();state.renderTable();});
   bind('clearFolders','click',()=>{context.workspaceScope().clear();context.clearFolderFocus();context.renderTree();state.renderTable();});
   bind('formatButton','click',e=>{e.stopPropagation();context.$('formatMenu').classList.toggle('open');});
