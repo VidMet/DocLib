@@ -1,4 +1,4 @@
-import {enabledTools,normalizeProjectTools,TOOL_IDS} from './project-tools.js?v=2.04-preview.2-fix.3';
+import {enabledTools,normalizeProjectTools,TOOL_IDS} from './project-tools.js?v=2.04-preview.2-fix.4';
 const LABELS={'validation':'Egenskapsvalidering','quantity-summary':'Mengdesammenstilling','control-plan':'Kontrollplan','todos':'Todos'};
 const BUTTONS={'validation':'modeValidation','quantity-summary':'modeQuantities','control-plan':'modeDocuments','todos':'modeTodos'};
 export function installToolVisibility({store,access,document:doc=document}){

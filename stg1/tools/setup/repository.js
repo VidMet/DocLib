@@ -1,4 +1,4 @@
-import {FILE_NAME,normalizeProjectTools} from './project-tools.js?v=2.04-preview.2-fix.3';
+import {FILE_NAME,normalizeProjectTools} from './project-tools.js?v=2.04-preview.2-fix.4';
 const items=data=>Array.isArray(data)?data:(data?.items||[]);
 const isFolder=item=>String(item?.type||item?.itemType||'').toLowerCase().includes('folder');
 const nameOf=item=>String(item?.name||'');
@@ -16,7 +16,7 @@ export function createProjectToolsRepository(context){
   const requestInfo={method:'POST',endpoint:'/files/fs/upload',queryKeys:['parentId','parentType','name'],bodyKeys:['size','contentType'],parentType:'FOLDER',fileName:FILE_NAME,size:blob.size};
   const init=await context.apiWrite(`${context.CORE}/files/fs/upload?${params}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({size:blob.size,contentType:'application/json'})});
   if(!init.ok){
-    const data=init.data||{},safeResponse={status:init.status,errorCode:data.code||data.errorCode||data.error?.code||'',message:data.message||data.error?.message||data.error||'',responseKeys:data&&typeof data==='object'?Object.keys(data).sort():[]};
+    const data=init.data||{},safeResponse={status:init.status,title:String(data.title||''),detail:String(data.detail||''),instance:String(data.instance||''),errorCode:String(data.code||data.errorCode||data.error?.code||''),message:String(data.message||data.error?.message||(typeof data.error==='string'?data.error:'')),responseKeys:data&&typeof data==='object'?Object.keys(data).sort():[]};
     const error=Error(`Opplasting kunne ikke startes (HTTP ${init.status}). Diagnostikk er tilgjengelig.`);error.setupDiagnostics={request:requestInfo,response:safeResponse};throw error;
   }
   const data=init.data||{},uploadId=data.uploadId||data.id,uploadURL=data.uploadURL||data.uploadUrl||data.url||data.signedUrl;
