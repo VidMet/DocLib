@@ -27,7 +27,7 @@
     "3D excluded by normalization"
   ],
   "pageErrors": [],
-  "version": "2.04-preview.6-fix.1",
+  "version": "2.04-preview.7",
   "scope": "Local Chromium component tests with mocked repository, not Trimble Connect integration",
   "syntaxFiles": 51,
   "liveTested": false

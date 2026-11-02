@@ -1,5 +1,5 @@
-import {mountColumnEditor} from './column-editor.js?v=2.04-preview.6-fix.1';
-import {normalizeProjectTools} from './project-tools.js?v=2.04-preview.6-fix.1';
+import {mountColumnEditor} from './column-editor.js?v=2.04-preview.7';
+import {normalizeProjectTools} from './project-tools.js?v=2.04-preview.7';
 export function mountViewEditor(host,config,metadata,doc=document){
  const explorer=normalizeProjectTools(config).explorer;let views=explorer.views,active=explorer.defaultViewId,defaultId=active,editor;
  host.replaceChildren();const bar=doc.createElement('div'),select=doc.createElement('select'),name=doc.createElement('input'),standard=doc.createElement('input'),label=doc.createElement('label'),body=doc.createElement('div');select.setAttribute('aria-label','Fellesvisning');name.setAttribute('aria-label','Navn p\u00e5 fellesvisning');name.maxLength=120;standard.type='checkbox';label.append(standard,doc.createTextNode(' Standard for prosjektet'));bar.className='setup-view-toolbar';bar.append(select,name,label);host.append(bar,body);
