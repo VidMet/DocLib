@@ -1,6 +1,15 @@
 'use strict';
 window.DocLibLegacyBridge=Object.freeze({
+ getColumnPropertyCatalog:()=>[...propertiesPort.propertyCatalog.values()].map(x=>({...x})),
  start:()=>init(),getProject:()=>project?{id:project.id}:null,getMode:()=>workspaceMode,
+ async getProjectRoleData(){
+  const projectId=String(project?.id||''),userId=String(mineUser?.id||'');
+  if(!projectId||!userId)return{projectId,userId,status:0,rolesStatus:0,member:null,roles:[]};
+  const memberUrl=`${CORE}/projects/${encodeURIComponent(projectId)}/users/${encodeURIComponent(userId)}`;
+  const rolesUrl=`${CORE}/projects/${encodeURIComponent(projectId)}/roles`;
+  const [member,roles]=await Promise.all([req(memberUrl),req(rolesUrl)]);
+  return{projectId,userId,status:member.status,rolesStatus:roles.status,member:member.ok?member.data:null,roles:roles.ok?list(roles.data):[]};
+ },
  getDiagnostics:()=>lines.slice(),getVersion:()=>VERSION,
  attachControlPlan(port,lifecycle){controlPlanPort=port;toolLifecycle=lifecycle;},
  attachValidation(port){validationPort=port;},
@@ -16,7 +25,9 @@ window.DocLibLegacyBridge=Object.freeze({
  attachShared(tree,properties){treePort=tree;propertiesPort=properties;},
  attachExplorer(port){explorerPort=port;},
  attachProject(controller){projectController=controller;},
- createProjectContext(){return Object.freeze({
+ refreshExplorerColumns(){renderProfileControls();explorerPort.columnFilters.clear();explorerPort.sortState={key:null,dir:0};explorerPort.renderDynamicHeaders();explorerPort.renderTable();},
+ createSetupContext(){return Object.freeze({get columns(){return columnConfig.map(c=>({...c}));},get CORE(){return CORE;},get projectId(){return String(project?.id||'');},apiRead:(...a)=>req(...a),apiWrite:(url,options={})=>reqWrite(url,{...options,headers:{...(options.headers||{}),'X-DocLib-Write':'setup-json'}})});},
+  createProjectContext(){return Object.freeze({
   projectId:()=>project?.id,
   canReload(){
    if(validationPort.valBusy||controlPlanPort.cpExportBusy)return false;const validationSnapshot=toolLifecycle.snapshot('validation');if(validationSnapshot?.editorDirty&&!confirm('Du har ulagrede endringer i Regeloppsett. Oppfrisk prosjektet likevel? Regelutkastet beholdes, men eventuelle modellresultater blir utdaterte.'))return false;
@@ -39,12 +50,9 @@ window.DocLibLegacyBridge=Object.freeze({
    explorerPort.renderFormats();explorerPort.updateSelection();
   },
   async loadProfiles(rootId){loadProfiles();await loadProjectProfiles(rootId);},
-  configurationIssues(){
-   const issues=[];
-   if(projectProfileStatus.includes('Kunne')||projectProfileStatus.includes('cache')||projectProfileStatus.includes('ignorert'))issues.push('Prosjektprofiler: '+projectProfileStatus);
-   if(projectConfiguration&&(projectConfiguration.schema!=='DocLibProjectConfiguration'||projectConfiguration.schemaVersion!==1||!Array.isArray(projectConfiguration.profiles)))issues.push('Ugyldig prosjektkonfigurasjon.');
-   return issues;
-  },
+  // Legacy project profiles are retired. Personal settings and shared project views
+  // are handled separately and must not affect global project readiness.
+  configurationIssues(){return[];},
   reloadControlPlan:()=>toolLifecycle.update('control-plan',{type:'reload'}),
   controlIssues:()=>toolLifecycle.snapshot('control-plan')?.issues||[],
   loadPersonalProfiles:rootId=>loadMineProfiles(rootId),
@@ -59,7 +67,7 @@ window.DocLibLegacyBridge=Object.freeze({
    let banner=$('projectLoadState');
    if(!banner){banner=document.createElement('div');banner.id='projectLoadState';banner.className='status project-load-state';banner.setAttribute('aria-live','polite');document.querySelector('header.top')?.appendChild(banner);}
    const labels={idle:'Venter på prosjekt',loading:'Laster prosjekt',ready:'Prosjektgrunnlag klart',incomplete:'Ufullstendig prosjektgrunnlag',error:'Prosjektinnlasting feilet'};
-   banner.dataset.phase=state.phase;banner.dataset.warnings=String(state.warnings?.length||0);banner.textContent=labels[state.phase]+(state.stage?' · '+state.stage:'')+(state.stale&&state.phase!=='idle'?' · Visningen er ikke bekreftet oppdatert.':'')+(state.warnings?.length?' · '+state.warnings.length+' fil(er) med metadataadvarsel. Øvrige filer kan brukes.':'');
+   banner.dataset.phase=state.phase;banner.dataset.warnings=String(state.warnings?.length||0);const issueText=(state.issues||[]).map(x=>String(x)).filter(Boolean).join(' | ');banner.textContent=labels[state.phase]+(state.stage?' · '+state.stage:'')+(issueText?' · Problem: '+issueText:'')+(state.stale&&state.phase!=='idle'?' · Visningen er ikke bekreftet oppdatert.':'')+(state.warnings?.length?' · '+state.warnings.length+' fil(er) med metadataadvarsel. Øvrige filer kan brukes.':'');
    banner.title=[...state.issues,...(state.warnings||[]).map(x=>[x.folder,x.name,'ID: '+x.fileId,x.status?'HTTP '+x.status:'',x.message].filter(Boolean).join(' · '))].join('\n');banner.setAttribute('aria-busy',String(state.phase==='loading'));
    $('refresh').disabled=state.phase==='loading'||validationPort.valBusy;const treeRefresh=$('treeRefresh');if(treeRefresh){treeRefresh.disabled=state.phase==='loading'||validationPort.valBusy||controlPlanPort.cpExportBusy;treeRefresh.setAttribute('aria-busy',String(state.phase==='loading'));}
    for(const id of ['profileSelect','profileSaveAs','profileRename','profileDelete','profileExport','profileImport','settingsBtn','discoveryBtn','analyticsBtn']){const el=$(id);if(el)el.disabled=state.phase==='loading'||workspaceMode!=='explorer';}
@@ -78,7 +86,7 @@ window.DocLibLegacyBridge=Object.freeze({
    get cpMmiEvidence(){return controlPlanPort.cpMmiEvidence;},cpCollectMmi:(...a)=>controlPlanPort.cpCollectMmi(...a)
   })
  });},
- createExplorerContext(){return Object.freeze({
+ createExplorerContext(){return Object.freeze({get sharedView(){return currentSharedView();},refreshProfileControls:()=>renderProfileControls(),get columnPreferenceKey(){return `doclib-visible-columns-v1:${project?.id||'default'}:${mineUser?.id||'unresolved'}`;},get customColumnProfile(){return activeProfile!=='Standard'||!isUnmodifiedPersonalStandard();},
  capabilities:Object.freeze({networkWrites:false,linkStorage:'local',ruleEditor:false}),
  get projectState(){return projectController?.snapshot()||{phase:'idle',stale:true};},
   get VALUE_COLORS(){return VALUE_COLORS;},get activeProfile(){return activeProfile;},get columnConfig(){return columnConfig;},get profiles(){return profiles;},
