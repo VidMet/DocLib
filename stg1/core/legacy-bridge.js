@@ -50,12 +50,9 @@ window.DocLibLegacyBridge=Object.freeze({
    explorerPort.renderFormats();explorerPort.updateSelection();
   },
   async loadProfiles(rootId){loadProfiles();await loadProjectProfiles(rootId);},
-  configurationIssues(){
-   const issues=[];
-   if(projectProfileStatus.includes('Kunne')||projectProfileStatus.includes('cache')||projectProfileStatus.includes('ignorert'))issues.push('Prosjektprofiler: '+projectProfileStatus);
-   if(projectConfiguration&&(projectConfiguration.schema!=='DocLibProjectConfiguration'||projectConfiguration.schemaVersion!==1||!Array.isArray(projectConfiguration.profiles)))issues.push('Ugyldig prosjektkonfigurasjon.');
-   return issues;
-  },
+  // Legacy project profiles are retired. Personal settings and shared project views
+  // are handled separately and must not affect global project readiness.
+  configurationIssues(){return[];},
   reloadControlPlan:()=>toolLifecycle.update('control-plan',{type:'reload'}),
   controlIssues:()=>toolLifecycle.snapshot('control-plan')?.issues||[],
   loadPersonalProfiles:rootId=>loadMineProfiles(rootId),
