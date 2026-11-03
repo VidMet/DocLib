@@ -57,7 +57,7 @@ window.DocLibLegacyBridge=Object.freeze({
    return issues;
   },
   reloadControlPlan:()=>toolLifecycle.update('control-plan',{type:'reload'}),
-  controlIssues:()=>toolLifecycle.snapshot('control-plan')?.issues||[],
+  controlIssues:()=>projectConfiguration?.controlPlan?(toolLifecycle.snapshot('control-plan')?.issues||[]):[],
   loadPersonalProfiles:rootId=>loadMineProfiles(rootId),
   applyProfiles(){applyProfileState(false);renderProfileControls();},
   prepareRows(files){rows=files.map(file=>({file,props:{}}));explorerPort.updateSelection();treePort.renderTree();explorerPort.renderTable();},
