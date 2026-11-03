@@ -1,4 +1,4 @@
-import {VERSION,applyVersionDisplay,installVersionDisplay} from './config/version.js?v=2.04-preview.7';
+import {VERSION,applyVersionDisplay,installVersionDisplay} from './config/version.js?v=2.04-preview.8-workspace.4.3';
 import {createProjectController} from './core/project.js?v=2.04-preview.7';
 import {createFileTree} from './shared/file-tree.js?v=2.04-preview.7';
 import {createProperties} from './shared/properties.js?v=2.04-preview.7';
@@ -6,7 +6,7 @@ import {environment} from './config/environment.js?v=2.04-preview.7';
 import {createToolRegistry} from './core/tool-registry.js?v=2.04-preview.7';
 import {installQuantityHeading} from './core/quantity-heading.js?v=2.04-preview.7';
 import {createProjectAccessController} from './core/project-access.js?v=2.04-preview.7';
-import {installSetupAccess,installToolVisibility} from './tools/setup/index.js?v=2.04-preview.8-workspace.1';
+import {installSetupAccess,installToolVisibility} from './tools/setup/index.js?v=2.04-preview.8-workspace.4.3';
 import {createProjectToolsStore} from './tools/setup/project-tools.js?v=2.04-preview.7';
 import {createProjectToolsRepository} from './tools/setup/repository.js?v=2.04-preview.7';
 import explorer from './tools/explorer/index.js?v=2.04-preview.7';
