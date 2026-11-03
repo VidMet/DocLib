@@ -1,0 +1,14 @@
+{
+  "version": "2.03-preview.3",
+  "modelChecks": 5,
+  "browser": {
+    "checks": [
+      "UI expands list values",
+      "UI blocks empty target"
+    ],
+    "errors": [],
+    "synthetic": true
+  },
+  "liveTested": false,
+  "writesEnabled": false
+}
