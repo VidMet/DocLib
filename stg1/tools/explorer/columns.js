@@ -1,9 +1,0 @@
-export const BASE_COLUMNS=Object.freeze([{id:'name',title:'Filnavn'},{id:'format',title:'Format'},{id:'fag',title:'Fag'},{id:'mmi',title:'MMI'},{id:'revisjon',title:'Revisjon'},{id:'revisjonsdato',title:'Revisjonsdato'},{id:'gjelder',title:'Revisjonen gjelder'}]);
-export function normalizeColumns(raw){const columns=Object.fromEntries(BASE_COLUMNS.map(c=>[c.id,c.id!=='format']));if(raw&&typeof raw==='object'&&!Array.isArray(raw))for(const [id,value] of Object.entries(raw)){if(/^[a-zA-Z0-9_-]{1,100}$/.test(id)&&!['3d','__proto__','constructor','prototype'].includes(id)&&typeof value==='boolean')columns[id]=value;}columns.name=true;return columns;}
-export function columnVisible(id,defaults,personal={},column=null,customProfile=false){if(id==='name')return true;if(id==='3d')return false;if(typeof personal[id]==='boolean')return personal[id];if(column&&customProfile&&personal.__followProject!==true)return column.visible!==false;if(typeof defaults[id]==='boolean')return defaults[id];return column?.visible!==false;}
-export function availableColumns(metadata=[]){const all=new Map(BASE_COLUMNS.map(c=>[c.id,c]));for(const c of metadata)if(c?.id&&!['name','format','3d','__proto__','constructor','prototype'].includes(c.id))all.set(c.id,{id:c.id,title:String(c.title||c.id)});return [...all.values()];}
-
-export function normalizeDefinitions(raw){
- if(!Array.isArray(raw))return null;
- const seen=new Set();return raw.slice(0,100).filter(c=>c&&typeof c.id==='string'&&/^[a-zA-Z0-9_-]{1,100}$/.test(c.id)&&!['name','format','3d','__proto__','constructor','prototype'].includes(c.id)&&!seen.has(c.id)&&seen.add(c.id)).map(c=>{const x={id:c.id,title:String(c.title||c.id).slice(0,200),visible:c.visible!==false,colorize:c.colorize===true};if(typeof c.pset==='string'&&typeof c.property==='string'&&c.pset&&c.property){x.pset=c.pset;x.property=c.property;}if(Array.isArray(c.aliases))x.aliases=c.aliases.filter(a=>typeof a==='string').slice(0,30);return x;});
-}
