@@ -13,7 +13,7 @@ window.fetch=(input,options={})=>{
  const url=new URL(input instanceof Request?input.url:String(input),location.href);
  const headers=new Headers(options.headers||(input instanceof Request?input.headers:undefined));
  const coreOrigin=new URL(CORE).origin;
- const coreWrite=url.protocol==='https:'&&url.origin===coreOrigin&&headers.get('X-DocLib-Write')==='rule-json';
+ const coreWrite=url.protocol==='https:'&&url.origin===coreOrigin&&['rule-json','setup-json'].includes(headers.get('X-DocLib-Write'));
  const permit=doclibSignedWrites.get(url.href);
  const signedPut=method==='PUT'&&url.protocol==='https:'&&permit&&permit.expires>Date.now()&&permit.uses>0;
  if(!coreWrite&&!signedPut)return Promise.reject(Error('DocLib: nettverksskriving er sperret utenfor godkjent regelpublisering.'));

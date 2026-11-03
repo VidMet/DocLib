@@ -1,0 +1,20 @@
+import {normalizeIfcRequirement} from './ifc-schema.js?v=2.04-preview.7';
+import {normalizeColumns,normalizeDefinitions} from '../explorer/columns.js?v=2.04-preview.7';
+export const FILE_NAME='doclib.tools.json';
+export const TOOL_IDS=Object.freeze(['validation','quantity-summary','control-plan','todos']);
+export const DEFAULT_CONFIG=Object.freeze({schema:'DocLibProjectTools',schemaVersion:1,tools:Object.freeze(Object.fromEntries(TOOL_IDS.map(id=>[id,Object.freeze({enabled:true})])))});
+const clone=value=>JSON.parse(JSON.stringify(value));
+export function normalizeProjectTools(raw){
+ const valid=raw?.schema==='DocLibProjectTools'&&raw?.schemaVersion===1;const value={schema:'DocLibProjectTools',schemaVersion:1,tools:{},explorer:{columns:normalizeColumns(valid?raw?.explorer?.columns:undefined)}};
+ const definitions=normalizeDefinitions(valid?raw?.explorer?.definitions:null);if(definitions!==null)value.explorer.definitions=definitions;
+ for(const id of TOOL_IDS)value.tools[id]={enabled:valid?raw?.tools?.[id]?.enabled===true:true};
+ value.requirements={ifc:normalizeIfcRequirement(valid?raw?.requirements?.ifc:null)};
+ const views=valid&&Array.isArray(raw?.explorer?.views)?raw.explorer.views:[];const ids=new Set();
+ value.explorer.views=views.filter(v=>v&&typeof v.id==='string'&&/^[a-zA-Z0-9_-]{1,100}$/.test(v.id)&&!['__proto__','constructor','prototype'].includes(v.id)&&!ids.has(v.id)&&ids.add(v.id)).map(v=>({id:v.id,name:String(v.name||v.id).slice(0,120),columns:normalizeColumns(v.columns),...(normalizeDefinitions(v.definitions)!==null?{definitions:normalizeDefinitions(v.definitions)}:{})}));
+ if(!value.explorer.views.length)value.explorer.views=[{id:'project-standard',name:'Prosjektstandard',columns:clone(value.explorer.columns),...(value.explorer.definitions?{definitions:clone(value.explorer.definitions)}:{})}];
+ value.explorer.defaultViewId=value.explorer.views.some(v=>v.id===raw?.explorer?.defaultViewId)?raw.explorer.defaultViewId:value.explorer.views[0].id;
+ const defaultView=value.explorer.views.find(v=>v.id===value.explorer.defaultViewId);value.explorer.columns=clone(defaultView.columns);if(defaultView.definitions)value.explorer.definitions=clone(defaultView.definitions);else delete value.explorer.definitions;
+ return value;
+}
+export function enabledTools(config){const normalized=normalizeProjectTools(config);return new Set(TOOL_IDS.filter(id=>normalized.tools[id].enabled));}
+export function createProjectToolsStore(){let config=normalizeProjectTools(DEFAULT_CONFIG),source='default',listeners=new Set();const publish=(next,nextSource)=>{config=normalizeProjectTools(next);source=nextSource;for(const fn of listeners)fn(config,source);return config;};return Object.freeze({snapshot:()=>clone(config),source:()=>source,subscribe(fn){listeners.add(fn);fn(clone(config),source);return()=>listeners.delete(fn);},set:(next,nextSource='memory')=>publish(next,nextSource)});}
