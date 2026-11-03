@@ -1,4 +1,0 @@
-Baseline: preview.6-ui.1. Kun STG1.
-Fellesvisninger velges i profilmenyen og styrer tabellens kolonner. Egne profiler kobler fra fellesvisningen. Personlige kolonnevalg er separate per visning/profil.
-Test i Trimble Connect: velg to ulike fellesvisninger, bytt til egen profil, last inn paa nytt, og kontroller prosjektbytte.
-Ikke publisert til live.

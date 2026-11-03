@@ -1,4 +1,4 @@
-import {filterIfcEntities,resolveIfcClass} from './ifc-filter.js?v=2.03-rc.1-fix.1';
+import {filterIfcEntities,resolveIfcClass} from './ifc-filter.js?v=2.04-preview.7';
 // DocLib Mengdesammenstilling - v2.03-preview.5 trinn 3A Fix.1
 // Read-only Model API access. Cache is kept in memory for the tool session.
 const memoryCache = new Map();
