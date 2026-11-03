@@ -1,5 +1,0 @@
-v2.04-preview.5
-Baseline: v2.04-preview.4.
-Setup renamed to Innstillinger (felles). Full shared column editor added. Shared definitions saved in existing project configuration; personal profiles retained.
-Local checks: all JS syntax, local imports, schema roundtrip and editor operations passed.
-Trimble Connect integration and visual layout must be tested in STG1. No production deployment performed.
