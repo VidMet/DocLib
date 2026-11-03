@@ -1,5 +1,5 @@
-import {mountColumnEditor} from './column-editor.js?v=2.04-preview.8';
-import {normalizeProjectTools} from './project-tools.js?v=2.04-preview.8';
+import {mountColumnEditor} from './column-editor.js?v=2.04-preview.7';
+import {normalizeProjectTools} from './project-tools.js?v=2.04-preview.7';
 const clone=value=>JSON.parse(JSON.stringify(value));
 const nextId=views=>{let id;do{id='view-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,7);}while(views.some(v=>v.id===id));return id;};
 export function mountViewEditor(host,config,metadata,doc=document){
