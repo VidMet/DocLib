@@ -1,4 +1,4 @@
-import {mountViewEditor} from './view-editor.js?v=2.04-preview.7';
+import {mountViewEditor} from './view-editor.js?v=2.04-preview.7-views-fix.1';
 import {mountIfcEditor} from './ifc-schema.js?v=2.04-preview.7';
 import {availableColumns,normalizeColumns} from '../explorer/columns.js?v=2.04-preview.7';
 import {enabledTools,normalizeProjectTools,TOOL_IDS} from './project-tools.js?v=2.04-preview.7';
