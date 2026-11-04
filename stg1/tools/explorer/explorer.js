@@ -1,4 +1,4 @@
-import {install,initialize} from './explorer-table.js?v=2.05-preview.3-upload.1-fix.2';
+import {install,initialize} from './explorer-table.js?v=2.05-preview.4-planview.6-ifc-read-test.3';
 import {createFileInfoPanel} from './explorer-file-info.js?v=2.05-preview.3-upload.1-fix.2';
 import {createExplorerUpload} from './explorer-upload.js?v=2.05-preview.3-upload.1-fix.2';
 export default Object.freeze({id:'explorer',title:'Utforsker',legacyMode:'explorer',status:'module',create:createExplorer});
@@ -11,11 +11,11 @@ export function createExplorer(context){
  id:'explorer',
  mount(container){if(destroyed)throw Error('Utforsker er lukket permanent.');if(active)return;active=true;host=container;controller=new AbortController();
   bind('explorerVisibleColumns','click',()=>state.openColumnVisibility());bind('search','input',()=>state.renderTable());
-  bind('clearSelection','click',()=>{state.selected.clear();state.updateSelection();context.renderTree();state.renderTable();});
+  bind('clearSelection','click',()=>{state.selected.clear();state.updateSelection();context.renderTree();state.renderTable();context.selectionChanged?.();});
   bind('clearFolders','click',()=>{context.workspaceScope().clear();context.clearFolderFocus();context.renderTree();state.renderTable();});
   bind('formatButton','click',e=>{e.stopPropagation();context.$('formatMenu').classList.toggle('open');});
   bind('resetFilters','click',()=>state.resetFilters());
-  bind('selectAll','change',e=>{state.visibleRows().forEach(r=>e.target.checked?state.selected.add(r.file.id):state.selected.delete(r.file.id));state.updateSelection();context.renderTree();state.renderTable();});
+  bind('selectAll','change',e=>{state.visibleRows().forEach(r=>e.target.checked?state.selected.add(r.file.id):state.selected.delete(r.file.id));state.updateSelection();context.renderTree();state.renderTable();context.selectionChanged?.();});
   document.addEventListener('click',e=>{if(!e.target.closest('.dropdown'))context.$('formatMenu').classList.remove('open');if(!e.target.closest('.colhead'))context.$('explorerContent').querySelectorAll('.column-menu.open').forEach(x=>x.classList.remove('open'));},{signal:controller.signal});
   state.renderFormats();state.renderDynamicHeaders();upload.mount();
  },

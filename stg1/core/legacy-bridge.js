@@ -2,8 +2,22 @@
 window.DocLibLegacyBridge=Object.freeze({
  getColumnPropertyCatalog:()=>[...propertiesPort.propertyCatalog.values()].map(x=>({...x})),
  start:()=>init(),getProject:()=>project?{id:project.id}:null,getMode:()=>workspaceMode,
- listIfcFiles(){
-  return rows.map(row=>row?.file).filter(file=>file?.id&&(String(file.format||'').toLowerCase()==='ifc'||String(file.name||'').toLowerCase().endsWith('.ifc'))).map(file=>({id:String(file.id),name:String(file.name||'IFC-fil'),folderPath:String(file.folderPath||'/'),versionId:file.versionId?String(file.versionId):''})).sort((a,b)=>`${a.folderPath}/${a.name}`.localeCompare(`${b.folderPath}/${b.name}`,'no',{sensitivity:'base'}));
+ listSelectedIfcFiles(){
+  const selected=explorerPort?.selectedRows?.()||[];
+  const seen=new Set();
+  return selected.map(row=>row?.file).filter(file=>file?.id&&(String(file.format||'').toLowerCase()==='ifc'||String(file.name||'').toLowerCase().endsWith('.ifc'))&&!seen.has(String(file.id))&&seen.add(String(file.id))).map(file=>({id:String(file.id),name:String(file.name||'IFC-fil'),folderPath:String(file.folderPath||'/'),versionId:file.versionId?String(file.versionId):''})).sort((a,b)=>`${a.folderPath}/${a.name}`.localeCompare(`${b.folderPath}/${b.name}`,'no',{sensitivity:'base'}));
+ },
+ buildSelectedIfcViewerUrl(){
+  const files=explorerPort?.selectedRows?.().map(row=>row?.file).filter(file=>file?.id&&String(file.format||'').toLowerCase()==='ifc')||[];
+  const unique=[...new Map(files.map(file=>[String(file.id),file])).values()];
+  if(!unique.length)throw Error('Velg én eller flere IFC-modeller i Utforsker-tabellen først.');
+  const projectId=String(project?.id||'').trim();
+  if(!projectId)throw Error('Mangler prosjekt-ID.');
+  const modelIds=unique.map(file=>String(file.id));
+  const versions=unique.map(file=>file.versionId?String(file.versionId):'');
+  const query=[`projectId=${encodeURIComponent(projectId)}`,`modelId=${modelIds.map(encodeURIComponent).join(',')}`];
+  if(versions.every(Boolean))query.push(`versionId=${versions.map(encodeURIComponent).join(',')}`);
+  return{url:`https://web.connect.trimble.com/projects/${encodeURIComponent(projectId)}/viewer/3d/?${query.join('&')}`,modelCount:unique.length,files:unique.map(file=>({id:String(file.id),name:String(file.name||'IFC-fil')}))};
  },
  async readIfcMetadata(fileId){
   const files=rows.map(row=>row?.file).filter(file=>file&&String(file.id)===String(fileId)&&(String(file.format||'').toLowerCase()==='ifc'||String(file.name||'').toLowerCase().endsWith('.ifc')));
@@ -105,7 +119,7 @@ window.DocLibLegacyBridge=Object.freeze({
    get cpMmiEvidence(){return controlPlanPort.cpMmiEvidence;},cpCollectMmi:(...a)=>controlPlanPort.cpCollectMmi(...a)
   })
  });},
- createExplorerContext(){return Object.freeze({get CORE(){return CORE;},get projectId(){return String(project?.id||'');},apiRead:(...a)=>req(...a),get sharedView(){return currentSharedView();},refreshProfileControls:()=>renderProfileControls(),get columnPreferenceKey(){return `doclib-visible-columns-v1:${project?.id||'default'}:${mineUser?.id||'unresolved'}`;},get customColumnProfile(){return activeProfile!=='Standard'||!isUnmodifiedPersonalStandard();},
+ createExplorerContext(){return Object.freeze({get CORE(){return CORE;},get projectId(){return String(project?.id||'');},apiRead:(...a)=>req(...a),selectionChanged:()=>window.dispatchEvent(new CustomEvent('doclib:explorer-selection-change')),get sharedView(){return currentSharedView();},refreshProfileControls:()=>renderProfileControls(),get columnPreferenceKey(){return `doclib-visible-columns-v1:${project?.id||'default'}:${mineUser?.id||'unresolved'}`;},get customColumnProfile(){return activeProfile!=='Standard'||!isUnmodifiedPersonalStandard();},
  capabilities:Object.freeze({networkWrites:false,linkStorage:'local',ruleEditor:false}),
  get projectState(){return projectController?.snapshot()||{phase:'idle',stale:true};},
   get VALUE_COLORS(){return VALUE_COLORS;},get activeProfile(){return activeProfile;},get columnConfig(){return columnConfig;},get profiles(){return profiles;},
