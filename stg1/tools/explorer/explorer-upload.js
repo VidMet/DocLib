@@ -1,5 +1,4 @@
-const VERSION='2.05-preview.3-upload.1-fix.1';
-const MAX_FILE_BYTES=100*1024*1024;
+const VERSION='2.05-preview.3-upload.1-fix.2';
 const UPLOAD_ENABLED=false;
 
 export function createExplorerUpload(context){
@@ -84,7 +83,7 @@ export function createExplorerUpload(context){
      <p id="doclibUploadEmpty" class="doclib-upload-empty">Ingen filer i køen.</p>
     </div>
     <label class="doclib-upload-consent"><input id="doclibUploadConsent" type="checkbox"> Jeg bekrefter at prosjekt, målmappe og fil(er) er riktige.</label>
-    <p class="doclib-upload-limit">Foreslått grense for første preview: 100 MiB per fil. Dette er en DocLib-grense som må verifiseres.</p>
+    <p class="doclib-upload-limit">Ingen vilkårlig DocLib-grense i køen. Trimble Connects maksgrense og støtte for store filer er ikke bekreftet; opplasting er fortsatt deaktivert.</p>
     <footer class="doclib-upload-footer">
      <button type="button" class="btn" data-close>Lukk</button>
      <button type="button" class="btn primary" id="doclibUploadStart" disabled>Opplasting ikke aktivert</button>
@@ -155,14 +154,14 @@ export function createExplorerUpload(context){
   const targetNode=target?folderNodes(context.treeRoot).find(node=>String(node.id)===String(target.id)):null;
   for(const file of files){
    let error=targetIssue;
-   if(!error&&file.size>MAX_FILE_BYTES)error='Filen overskrider foreslått DocLib-grense på 100 MiB.';
    if(!error&&targetNode?.files?.some(existing=>String(existing.name).toLocaleLowerCase('no')===file.name.toLocaleLowerCase('no'))){
     error='Filnavnet finnes allerede i målmappevisningen. Overskriving er ikke tillatt.';
    }
    if(!error&&session.queue.some(item=>item.targetId===String(target?.id)&&item.file.name.toLocaleLowerCase('no')===file.name.toLocaleLowerCase('no')&&item.state==='queued')){
     error='Samme filnavn ligger allerede i køen for målmappevisningen.';
    }
-   session.queue.push({file,targetId:String(target?.id||''),state:error?'error':'queued',message:error||'Klar i lokal kø · ikke sendt'});
+   const largeFileNotice=file.size>100*1024*1024?' · stor fil; API-grense må verifiseres':'';
+   session.queue.push({file,targetId:String(target?.id||''),state:error?'error':'queued',message:error||`Klar i lokal kø · ikke sendt${largeFileNotice}`});
   }
   renderTarget();
  }
