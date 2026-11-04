@@ -32,6 +32,25 @@ window.DocLibLegacyBridge=Object.freeze({
   if(versions.every(Boolean))query.push(`versionId=${versions.map(encodeURIComponent).join(',')}`);
   return{url:`https://web.connect.trimble.com/projects/${encodeURIComponent(projectId)}/viewer/3d/?${query.join('&')}`,modelCount:unique.length,files:unique.map(file=>({id:String(file.id),name:String(file.name||'IFC-fil')}))};
  },
+ async downloadIfcForSurface(fileId){
+  const files=rows.map(row=>row?.file).filter(file=>file&&String(file.id)===String(fileId)&&(String(file.format||'').toLowerCase()==='ifc'||String(file.name||'').toLowerCase().endsWith('.ifc')));
+  if(files.length!==1)throw Error('Velg nøyaktig én IFC-fil fra det innlastede prosjektet.');
+  const file=files[0];
+  const link=await req(`${CORE}/files/fs/${encodeURIComponent(String(file.id))}/downloadurl`);
+  if(!link.ok)throw Error(`Trimble kunne ikke opprette nedlastingslenke (HTTP ${link.status}).`);
+  const raw=typeof link.data==='string'?link.data:link.data?.url||link.data?.downloadUrl||link.data?.downloadurl;
+  if(!raw)throw Error('Trimble returnerte ingen IFC-nedlastingslenke.');
+  const url=new URL(raw);
+  if(url.protocol!=='https:'||url.username||url.password)throw Error('IFC-nedlastingslenken er ugyldig; bare HTTPS uten innloggingsdata tillates.');
+  const response=await fetch(url.href,{cache:'no-store',redirect:'follow'});
+  if(!response.ok)throw Error(`IFC-filen kunne ikke lastes ned (HTTP ${response.status}).`);
+  const announced=Number(response.headers.get('Content-Length')||0);
+  const maximum=256*1024*1024;
+  if(announced>maximum)throw Error('Denne første geometriprøven er begrenset til IFC-filer på 256 MiB for å beskytte nettleserminnet.');
+  const buffer=await response.arrayBuffer();
+  if(buffer.byteLength>maximum)throw Error('Denne første geometriprøven er begrenset til IFC-filer på 256 MiB for å beskytte nettleserminnet.');
+  return buffer;
+ },
  async readIfcMetadata(fileId){
   const files=rows.map(row=>row?.file).filter(file=>file&&String(file.id)===String(fileId)&&(String(file.format||'').toLowerCase()==='ifc'||String(file.name||'').toLowerCase().endsWith('.ifc')));
   if(files.length!==1)throw Error('Fant ikke nøyaktig én IFC-fil med denne ID-en i det innlastede prosjektet. Oppdater prosjektet og prøv igjen.');
