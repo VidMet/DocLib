@@ -1,4 +1,4 @@
-const VERSION='2.05-preview.3-upload.1';
+const VERSION='2.05-preview.3-upload.1-fix.1';
 const MAX_FILE_BYTES=100*1024*1024;
 const UPLOAD_ENABLED=false;
 
@@ -218,7 +218,7 @@ export function createExplorerUpload(context){
   button.title='Legg enkeltfiler i preview.3-køen';
   button.addEventListener('click',open,{signal:controller.signal});
   const search=toolbar.querySelector('.search');
-  if(search)toolbar.insertBefore(button,search);else toolbar.append(button);
+  if(search?.parentElement)search.parentElement.insertBefore(button,search);else toolbar.append(button);
  }
 
  function unmount(){
