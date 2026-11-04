@@ -1,4 +1,4 @@
-import {FILE_NAME,normalizeProjectTools} from './project-tools.js?v=2.04-preview.7';
+import {FILE_NAME,normalizeProjectTools} from './project-tools.js?v=2.05-preview.4-planview.1';
 const items=data=>Array.isArray(data)?data:(data?.items||[]);
 const isFolder=item=>String(item?.type||item?.itemType||'').toLowerCase().includes('folder');
 const nameOf=item=>String(item?.name||'');

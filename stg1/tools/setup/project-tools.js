@@ -1,13 +1,14 @@
 import {normalizeIfcRequirement} from './ifc-schema.js?v=2.04-preview.7';
 import {normalizeColumns,normalizeDefinitions} from '../explorer/columns.js?v=2.04-preview.7';
 export const FILE_NAME='doclib.tools.json';
-export const TOOL_IDS=Object.freeze(['validation','quantity-summary','control-plan','todos']);
+export const TOOL_IDS=Object.freeze(['validation','quantity-summary','control-plan','todos','plan']);
 export const DEFAULT_CONFIG=Object.freeze({schema:'DocLibProjectTools',schemaVersion:1,tools:Object.freeze(Object.fromEntries(TOOL_IDS.map(id=>[id,Object.freeze({enabled:true})])))});
 const clone=value=>JSON.parse(JSON.stringify(value));
+function normalizePlan(raw){const layers=[],ids=new Set();for(const item of Array.isArray(raw?.layers)?raw.layers:[]){if(layers.length>=20)break;try{const id=String(item?.id||''),name=String(item?.name||'').trim().slice(0,100),layer=String(item?.layer||'').trim().slice(0,200),url=new URL(String(item?.url||'')),host=url.hostname.toLowerCase();const blocked=host==='localhost'||host.endsWith('.localhost')||host.endsWith('.local')||host==='[::1]'||host.startsWith('10.')||host.startsWith('127.')||host.startsWith('192.168.')||/^172\.(1[6-9]|2[0-9]|3[01])\./.test(host);if(!/^[A-Za-z0-9_-]{1,80}$/.test(id)||ids.has(id)||!name||!layer||url.protocol!=='https:'||url.username||url.password||url.hash||url.search||blocked)continue;ids.add(id);layers.push({id,name,url:url.href.replace(/\/$/,''),layer,visibleByDefault:item?.visibleByDefault===true});}catch{}}return{layers};}
 export function normalizeProjectTools(raw){
- const valid=raw?.schema==='DocLibProjectTools'&&raw?.schemaVersion===1;const value={schema:'DocLibProjectTools',schemaVersion:1,tools:{},explorer:{columns:normalizeColumns(valid?raw?.explorer?.columns:undefined)}};
+ const valid=raw?.schema==='DocLibProjectTools'&&raw?.schemaVersion===1;const value={schema:'DocLibProjectTools',schemaVersion:1,tools:{},explorer:{columns:normalizeColumns(valid?raw?.explorer?.columns:undefined)},plan:normalizePlan(valid?raw?.plan:undefined)};
  const definitions=normalizeDefinitions(valid?raw?.explorer?.definitions:null);if(definitions!==null)value.explorer.definitions=definitions;
- for(const id of TOOL_IDS)value.tools[id]={enabled:valid?raw?.tools?.[id]?.enabled===true:true};
+ for(const id of TOOL_IDS)value.tools[id]={enabled:valid?(raw?.tools?.[id]?.enabled===true||(id==='plan'&&raw?.tools?.[id]?.enabled===undefined)):true};
  value.requirements={ifc:normalizeIfcRequirement(valid?raw?.requirements?.ifc:null)};
  const views=valid&&Array.isArray(raw?.explorer?.views)?raw.explorer.views:[];const ids=new Set();
  value.explorer.views=views.filter(v=>v&&typeof v.id==='string'&&/^[a-zA-Z0-9_-]{1,100}$/.test(v.id)&&!['__proto__','constructor','prototype'].includes(v.id)&&!ids.has(v.id)&&ids.add(v.id)).map(v=>({id:v.id,name:String(v.name||v.id).slice(0,120),columns:normalizeColumns(v.columns),...(normalizeDefinitions(v.definitions)!==null?{definitions:normalizeDefinitions(v.definitions)}:{})}));
