@@ -1,6 +1,6 @@
 const WEB_IFC_VERSION='0.0.77';
 const WEB_IFC_BASE=`https://cdn.jsdelivr.net/npm/web-ifc@${WEB_IFC_VERSION}/`;
-const MAX_WEAR_TRIANGLES=120000;
+export const MAX_WEAR_TRIANGLES=120000;
 let webIfcPromise=null;
 
 function loadWebIfc(){
@@ -48,8 +48,9 @@ function modelLineIds(api,modelId){
  throw Error('IFC-leseren returnerte ikke en lesbar objektliste.');
 }
 
-export async function readWearSurface(buffer,onProgress=()=>{}){
+export async function readWearSurface(buffer,onProgress=()=>{},triangleLimit=MAX_WEAR_TRIANGLES){
  if(!(buffer instanceof ArrayBuffer)||buffer.byteLength===0)throw Error('IFC-filen er tom eller ugyldig.');
+ if(!Number.isInteger(triangleLimit)||triangleLimit<1||triangleLimit>MAX_WEAR_TRIANGLES)throw Error('Ugyldig trekantgrense for IFC-geometrien.');
  const WebIFC=await loadWebIfc();
  const api=new WebIFC.IfcAPI();
  api.SetWasmPath(WEB_IFC_BASE,true);
@@ -96,19 +97,19 @@ export async function readWearSurface(buffer,onProgress=()=>{}){
       const normalLength=Math.hypot(normalZ,ab[1]*ac[2]-ab[2]*ac[1],ab[2]*ac[0]-ab[0]*ac[2]);
       if(normalLength>1e-10&&normalZ/normalLength>0.72){
        triangles.push(points);
-       if(triangles.length>=MAX_WEAR_TRIANGLES)break;
+       if(triangles.length>=triangleLimit)break;
       }
      }
     }finally{geometry.delete?.();}
-    if(triangles.length>=MAX_WEAR_TRIANGLES)break;
+    if(triangles.length>=triangleLimit)break;
    }
    labels.push(candidate.label);
    onProgress(`Leser geometri for slitelagsobjekt ${itemIndex+1} av ${candidates.length} …`);
    await new Promise(resolve=>setTimeout(resolve,0));
-   if(triangles.length>=MAX_WEAR_TRIANGLES)break;
+   if(triangles.length>=triangleLimit)break;
   }
   if(!triangles.length)throw Error(`Fant ${candidates.length} merket slitelagsobjekt, men ingen oppovervendt flate kunne leses.`);
-  return{triangles,labels,candidateCount:candidates.length,truncated:triangles.length>=MAX_WEAR_TRIANGLES};
+  return{triangles,labels,candidateCount:candidates.length,truncated:triangles.length>=triangleLimit};
  }finally{
   if(modelId!==null)api.CloseModel(modelId);
  }
