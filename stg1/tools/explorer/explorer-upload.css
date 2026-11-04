@@ -1,0 +1,29 @@
+.doclib-upload-dialog{width:min(760px,calc(100vw - 32px));max-width:none;max-height:calc(100vh - 32px);padding:0;border:1px solid #d8dde6;border-radius:10px;color:#172033;box-shadow:0 20px 60px #17203340}
+.doclib-upload-dialog::backdrop{background:#17203380}
+.doclib-upload-shell{padding:20px;display:grid;gap:14px}
+.doclib-upload-header{display:flex;justify-content:space-between;align-items:flex-start;gap:16px}
+.doclib-upload-header h2{margin:0 0 5px;font-size:20px}
+.doclib-upload-header p{margin:0;color:#667085}
+.doclib-upload-close{border:0;background:transparent;font-size:26px;line-height:1;cursor:pointer;color:#667085}
+.doclib-upload-context{display:grid;grid-template-columns:1fr 1fr;gap:10px 18px;padding:12px;background:#f4f5f7;border-radius:7px}
+.doclib-upload-context>div,.doclib-upload-context>label{display:grid;gap:5px;min-width:0}
+.doclib-upload-context span{overflow-wrap:anywhere}
+.doclib-upload-context select{width:100%;padding:8px;border:1px solid #c6ccd5;border-radius:5px;background:#fff;color:inherit}
+.doclib-upload-drop{min-height:104px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;border:2px dashed #aab5c4;border-radius:8px;background:#fbfcfe;text-align:center;cursor:pointer;padding:16px}
+.doclib-upload-drop input{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)}
+.doclib-upload-drop:focus-within,.doclib-upload-drop.is-dragging{border-color:#1769e0;background:#e8f1ff}
+.doclib-upload-drop span{color:#667085}
+.doclib-upload-message{margin:0;padding:9px 11px;border-radius:5px;background:#f4f5f7;color:#344054}
+.doclib-upload-message[data-kind="error"]{background:#fff0ef;color:#a2291f}
+.doclib-upload-list-wrap{max-height:250px;overflow:auto;border:1px solid #e0e4ea;border-radius:6px}
+.doclib-upload-list{width:100%;border-collapse:collapse}
+.doclib-upload-list th,.doclib-upload-list td{padding:9px 10px;border-bottom:1px solid #e0e4ea;text-align:left;vertical-align:top;overflow-wrap:anywhere}
+.doclib-upload-list th{position:sticky;top:0;background:#f4f5f7}
+.doclib-upload-list td[data-state="error"]{color:#a2291f}
+.doclib-upload-empty{margin:0;padding:16px;text-align:center;color:#667085}
+.doclib-upload-consent{display:flex;align-items:flex-start;gap:8px}
+.doclib-upload-consent input{margin-top:3px}
+.doclib-upload-limit{margin:-8px 0 0;color:#667085;font-size:12px}
+.doclib-upload-footer{display:flex;justify-content:flex-end;gap:8px}
+.doclib-upload-footer button:disabled{opacity:.65;cursor:not-allowed}
+@media(max-width:560px){.doclib-upload-context{grid-template-columns:1fr}.doclib-upload-shell{padding:14px}.doclib-upload-list th,.doclib-upload-list td{padding:7px 6px;font-size:12px}}

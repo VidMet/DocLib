@@ -1,8 +1,9 @@
-import {install,initialize} from './explorer-table.js?v=2.05-preview.2-fix.1';
-import {createFileInfoPanel} from './explorer-file-info.js?v=2.05-preview.2-fix.1';
+import {install,initialize} from './explorer-table.js?v=2.05-preview.3-upload.1';
+import {createFileInfoPanel} from './explorer-file-info.js?v=2.05-preview.3-upload.1';
+import {createExplorerUpload} from './explorer-upload.js?v=2.05-preview.3-upload.1';
 export default Object.freeze({id:'explorer',title:'Utforsker',legacyMode:'explorer',status:'module',create:createExplorer});
 export function createExplorer(context){
- const state={};install(state,context);initialize(state,context);const fileInfo=createFileInfoPanel(context);state.openFileInfo=(file,button)=>fileInfo.open(file,button);
+ const state={};install(state,context);initialize(state,context);const fileInfo=createFileInfoPanel(context);const upload=createExplorerUpload(context);state.openFileInfo=(file,button)=>fileInfo.open(file,button);
  let active=false,destroyed=false,controller=null,host=null;
  const closeMenus=()=>{context.$('formatMenu').classList.remove('open');context.$('explorerContent').querySelectorAll('.column-menu.open').forEach(x=>x.classList.remove('open'));};
  const bind=(id,event,fn)=>context.$(id).addEventListener(event,fn,{signal:controller.signal});
@@ -16,12 +17,12 @@ export function createExplorer(context){
   bind('resetFilters','click',()=>state.resetFilters());
   bind('selectAll','change',e=>{state.visibleRows().forEach(r=>e.target.checked?state.selected.add(r.file.id):state.selected.delete(r.file.id));state.updateSelection();context.renderTree();state.renderTable();});
   document.addEventListener('click',e=>{if(!e.target.closest('.dropdown'))context.$('formatMenu').classList.remove('open');if(!e.target.closest('.colhead'))context.$('explorerContent').querySelectorAll('.column-menu.open').forEach(x=>x.classList.remove('open'));},{signal:controller.signal});
-  state.renderFormats();state.renderDynamicHeaders();
+  state.renderFormats();state.renderDynamicHeaders();upload.mount();
  },
  render(){if(active)state.renderTable();},
  update(){if(active){state.renderFormats();state.renderDynamicHeaders();state.renderTable();state.updateSelection();}},
  canLeave(){return true;},
- unmount(){fileInfo.close();if(!active)return;active=false;controller?.abort();controller=null;closeMenus();context.$('body').replaceChildren();context.$('formatMenu').replaceChildren();context.$('explorerContent').querySelectorAll('.sort-hit,.filter-btn').forEach(x=>x.onclick=null);host=null;},
+ unmount(){fileInfo.close();upload.unmount();if(!active)return;active=false;controller?.abort();controller=null;closeMenus();context.$('body').replaceChildren();context.$('formatMenu').replaceChildren();context.$('explorerContent').querySelectorAll('.sort-hit,.filter-btn').forEach(x=>x.onclick=null);host=null;},
  destroy(){api.unmount();destroyed=true;},
  snapshot(){return Object.freeze({active,selectedCount:state.selected.size,visibleCount:state.visibleRows().length,sort:{...state.sortState},formats:[...state.formatFilters]});},
  port:Object.freeze({colDefs:(...args)=>state.colDefs(...args),

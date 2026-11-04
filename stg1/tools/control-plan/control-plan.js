@@ -1,10 +1,10 @@
 import {install as reports, compose as reportsCompose} from './reports.js?v=2.04-preview.7';
 import {install as requirements} from './requirements.js?v=2.04-preview.7';
 import {install as links} from './links.js?v=2.04-preview.7';
-import {install as repository, compose as repositoryCompose} from './control-plan-repository.js?v=2.05-preview.2-fix.1';
-import {install as table, compose as tableCompose} from './control-plan-table.js?v=2.05-preview.2-fix.1';
+import {install as repository, compose as repositoryCompose} from './control-plan-repository.js?v=2.05-preview.3-upload.1';
+import {install as table, compose as tableCompose} from './control-plan-table.js?v=2.05-preview.3-upload.1';
 import {install as details} from './details.js?v=2.04-preview.7';
-import {initialize} from './control-plan-state.js?v=2.05-preview.2-fix.1';
+import {initialize} from './control-plan-state.js?v=2.05-preview.3-upload.1';
 import {install as pdf} from './pdf.js?v=2.04-preview.7';
 export default Object.freeze({id:'control-plan',title:'Kontrollplan',legacyMode:'documents',status:'module',create:createControlPlan});
 export function createControlPlan(host){

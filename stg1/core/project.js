@@ -35,6 +35,7 @@ export function createProjectController(host) {
       // Scan first. Do not replace a previously visible tree with a failed/partial scan.
       const tree = await host.scanTree(rootId,data?.name||'Prosjekt');
       assertProject();
+      tree.projectFolderId = String(rootId);
       tree.id = '__ROOT__';
       const files = host.flatten(tree);
       host.commitTree(tree,files);
