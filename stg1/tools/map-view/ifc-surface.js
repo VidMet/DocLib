@@ -8,7 +8,7 @@ function loadWebIfc(){
  if(webIfcPromise)return webIfcPromise;
  webIfcPromise=new Promise((resolve,reject)=>{
   const script=document.createElement('script');
-  script.src=`${WEB_IFC_BASE}web-ifc-api.js`;
+  script.src=`${WEB_IFC_BASE}web-ifc-api-iife.js`;
   script.async=true;
   script.onload=()=>window.WebIFC?.IfcAPI?resolve(window.WebIFC):reject(Error('web-ifc ble lastet, men API-et mangler.'));
   script.onerror=()=>reject(Error('Kunne ikke laste IFC-geometribiblioteket fra jsDelivr.'));
