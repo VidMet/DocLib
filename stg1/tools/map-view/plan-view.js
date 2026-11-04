@@ -224,6 +224,7 @@ function createPlanView({store}){
    destroyed=false;
    host.replaceChildren();
    build();
+   host.append(root);
    setPlanConfig(store.snapshot().plan||{});
    unsubscribeStore=store.subscribe(config=>setPlanConfig(config.plan||{}));
   },
