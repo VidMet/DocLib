@@ -2,15 +2,28 @@
 window.DocLibLegacyBridge=Object.freeze({
  getColumnPropertyCatalog:()=>[...propertiesPort.propertyCatalog.values()].map(x=>({...x})),
  start:()=>init(),getProject:()=>project?{id:project.id}:null,getMode:()=>workspaceMode,
+ listIfcFiles(){
+  return rows.map(row=>row?.file).filter(file=>file?.id&&(String(file.format||'').toLowerCase()==='ifc'||String(file.name||'').toLowerCase().endsWith('.ifc'))).map(file=>({id:String(file.id),name:String(file.name||'IFC-fil'),folderPath:String(file.folderPath||'/'),versionId:file.versionId?String(file.versionId):''})).sort((a,b)=>`${a.folderPath}/${a.name}`.localeCompare(`${b.folderPath}/${b.name}`,'no',{sensitivity:'base'}));
+ },
+ setSelectedIfcFiles(fileIds){
+  const allowed=new Set(this.listIfcFiles().map(file=>file.id));
+  const requested=new Set((Array.isArray(fileIds)?fileIds:[]).map(String).filter(id=>allowed.has(id)));
+  const selected=explorerPort.selected;
+  for(const row of rows){const file=row?.file;if(file?.id&&(String(file.format||'').toLowerCase()==='ifc'||String(file.name||'').toLowerCase().endsWith('.ifc')))selected.delete(file.id);}
+  for(const id of requested)selected.add(id);
+  explorerPort.updateSelection();treePort.renderTree();explorerPort.renderTable();
+  window.dispatchEvent(new CustomEvent('doclib:explorer-selection-change'));
+  return this.listSelectedIfcFiles();
+ },
  listSelectedIfcFiles(){
   const selected=explorerPort?.selectedRows?.()||[];
   const seen=new Set();
   return selected.map(row=>row?.file).filter(file=>file?.id&&(String(file.format||'').toLowerCase()==='ifc'||String(file.name||'').toLowerCase().endsWith('.ifc'))&&!seen.has(String(file.id))&&seen.add(String(file.id))).map(file=>({id:String(file.id),name:String(file.name||'IFC-fil'),folderPath:String(file.folderPath||'/'),versionId:file.versionId?String(file.versionId):''})).sort((a,b)=>`${a.folderPath}/${a.name}`.localeCompare(`${b.folderPath}/${b.name}`,'no',{sensitivity:'base'}));
  },
  buildSelectedIfcViewerUrl(){
-  const files=explorerPort?.selectedRows?.().map(row=>row?.file).filter(file=>file?.id&&String(file.format||'').toLowerCase()==='ifc')||[];
-  const unique=[...new Map(files.map(file=>[String(file.id),file])).values()];
-  if(!unique.length)throw Error('Velg én eller flere IFC-modeller i Utforsker-tabellen først.');
+  const selectedIds=new Set(this.listSelectedIfcFiles().map(file=>file.id));
+  const unique=rows.map(row=>row?.file).filter(file=>file?.id&&selectedIds.has(String(file.id)));
+  if(!unique.length)throw Error('Velg én eller flere IFC-modeller i Planvisning først.');
   const projectId=String(project?.id||'').trim();
   if(!projectId)throw Error('Mangler prosjekt-ID.');
   const modelIds=unique.map(file=>String(file.id));
