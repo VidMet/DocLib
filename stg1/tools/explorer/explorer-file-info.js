@@ -7,6 +7,19 @@ export function versionItems(data){
 }
 export function formatBytes(value){if(value===null||value===undefined||value==='')return 'Ikke tilgjengelig';const n=Number(value);if(!Number.isFinite(n)||n<0)return 'Ikke tilgjengelig';return n.toLocaleString('nb-NO')+' byte';}
 export function person(value){if(value&&typeof value==='object')return first(value.name,[value.firstName,value.lastName].filter(Boolean).join(' '),value.email,value.id);return value;}
+export function folderText(...values){
+ const extract=(value,depth=0)=>{
+  if(depth>8||value===null||value===undefined)return '';
+  if(typeof value==='string')return value.includes('[object Object]')?'':value;
+  if(Array.isArray(value))return value.map(v=>extract(v,depth+1)).filter(Boolean).join(' / ');
+  if(typeof value==='object'){
+   for(const key of ['name','folderName','title','path','folderPath']){const text=extract(value[key],depth+1);if(text)return text;}
+  }
+  return '';
+ };
+ for(const value of values){const text=extract(value);if(text)return text;}
+ return 'Ikke tilgjengelig';
+}
 export function dateText(value){if(value===null||value===undefined||value==='')return 'Ikke tilgjengelig';const d=new Date(value);return Number.isNaN(d.getTime())?String(value):d.toLocaleString('nb-NO');}
 export function createFileReader(context){
  const endpoint=id=>context.CORE+'/files/'+encodeURIComponent(String(id));
@@ -29,7 +42,7 @@ export function createFileInfoPanel(context){
   history.append(ht,status,list,more);dialog.append(header,name,note,meta,history);dialog.addEventListener('cancel',e=>{e.preventDefault();close();});document.body.append(dialog);dialog.showModal();
   const row=(dl,label,value)=>{const dt=el('dt',label),dd=el('dd',value===null||value===undefined||value===''?'Ikke tilgjengelig':value);dd.style.cssText='margin:0;overflow-wrap:anywhere';dl.append(dt,dd);};
   const displayMeta=(d,fallback=false)=>{meta.replaceChildren();if(fallback)meta.append(el('p','Viser kun lokalt innlastede opplysninger.'));const dl=el('dl');dl.style.cssText='display:grid;grid-template-columns:140px 1fr;gap:8px';
-   row(dl,'Filnavn',first(d.name,file.name));row(dl,'Fil-ID',file.id);row(dl,'Mappe',first(d.path,d.folderPath,file.folderPath));row(dl,'Størrelse',formatBytes(first(d.size,d.fileSize)));row(dl,'Opprettet',dateText(first(d.createdOn,d.createdAt)));row(dl,'Endret',dateText(first(d.modifiedOn,d.modifiedAt)));row(dl,'Endret av',person(first(d.modifiedBy,d.createdBy)));row(dl,'Versjon',first(d.version,d.versionNumber));row(dl,'Versjons-ID',d.versionId);meta.append(dl);};
+   row(dl,'Filnavn',first(d.name,file.name));row(dl,'Fil-ID',file.id);row(dl,'Mappe',folderText(d.path,d.folderPath,file.folderPath));row(dl,'Størrelse',formatBytes(first(d.size,d.fileSize)));row(dl,'Opprettet',dateText(first(d.createdOn,d.createdAt)));row(dl,'Endret',dateText(first(d.modifiedOn,d.modifiedAt)));row(dl,'Endret av',person(first(d.modifiedBy,d.createdBy)));row(dl,'Versjon',first(d.version,d.versionNumber));row(dl,'Versjons-ID',d.versionId);meta.append(dl);};
   reader.details(file.id,signal).then(d=>{if(valid())displayMeta(d);}).catch(e=>{if(!valid())return;displayMeta(file,true);meta.prepend(el('p',e.message));});
   let loaded=0,busy=false;const seen=new Set();
   async function load(start){if(busy||!valid())return;busy=true;more.disabled=true;status.textContent='Henter historikk …';

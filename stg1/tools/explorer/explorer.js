@@ -1,5 +1,5 @@
-import {install,initialize} from './explorer-table.js?v=2.05-preview.2';
-import {createFileInfoPanel} from './explorer-file-info.js?v=2.05-preview.2';
+import {install,initialize} from './explorer-table.js?v=2.05-preview.2-fix.1';
+import {createFileInfoPanel} from './explorer-file-info.js?v=2.05-preview.2-fix.1';
 export default Object.freeze({id:'explorer',title:'Utforsker',legacyMode:'explorer',status:'module',create:createExplorer});
 export function createExplorer(context){
  const state={};install(state,context);initialize(state,context);const fileInfo=createFileInfoPanel(context);state.openFileInfo=(file,button)=>fileInfo.open(file,button);
