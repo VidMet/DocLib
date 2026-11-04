@@ -9,7 +9,7 @@ window.DocLibLegacyBridge=Object.freeze({
   const allowed=new Set(this.listIfcFiles().map(file=>file.id));
   const requested=new Set((Array.isArray(fileIds)?fileIds:[]).map(String).filter(id=>allowed.has(id)));
   const selected=explorerPort.selected;
-  for(const row of rows){const file=row?.file;if(file?.id&&(String(file.format||'').toLowerCase()==='ifc'||String(file.name||'').toLowerCase().endsWith('.ifc')))selected.delete(file.id);}
+  for(const row of rows){const file=row?.file;if(file?.id&&(String(file.format||'').toLowerCase()==='ifc'||String(file.name||'').toLowerCase().endsWith('.ifc')))selected.delete(String(file.id));}
   for(const id of requested)selected.add(id);
   explorerPort.updateSelection();treePort.renderTree();explorerPort.renderTable();
   window.dispatchEvent(new CustomEvent('doclib:explorer-selection-change'));
@@ -122,7 +122,8 @@ window.DocLibLegacyBridge=Object.freeze({
  });},
  createTreeContext(){return Object.freeze({
   get CORE(){return CORE;},get treeRoot(){return treeRoot;},$:id=>$(id),esc:v=>esc(v),fileExt:v=>fileExt(v),norm:v=>norm(v),req:(...a)=>req(...a),
-  workspaceModeUI:()=>workspaceModeUI(),workspaceScope:()=>workspaceScope(),workspaceSelectionChanged:()=>workspaceSelectionChanged()
+  get workspaceMode(){return workspaceMode;},workspaceModeUI:()=>workspaceModeUI(),workspaceScope:()=>workspaceScope(),workspaceSelectionChanged:()=>workspaceSelectionChanged(),
+  listIfcFiles:()=>window.DocLibLegacyBridge.listIfcFiles(),listSelectedIfcFiles:()=>window.DocLibLegacyBridge.listSelectedIfcFiles(),setSelectedIfcFiles:fileIds=>window.DocLibLegacyBridge.setSelectedIfcFiles(fileIds)
  });},
  createPropertiesContext(){return Object.freeze({
   get CACHE(){return CACHE;},get MODEL(){return MODEL;},get PAGE(){return PAGE;},
