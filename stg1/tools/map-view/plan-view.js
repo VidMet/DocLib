@@ -30,7 +30,7 @@ function mapUrl(layer,bounds,width,height,version='1.1.1'){
 function createPlanView({store}){
  let host=null,root=null,observer=null,timer=0,destroyed=false,unsubscribeStore=null;
  let center={x:1170000,y:8370000},span=1400000,drag=null;
- let baseMap='flyfoto',layers=[],visible=new Set(),images=new Map();
+ let baseMap='flyfoto',sharedBaseMap='flyfoto',userBaseMapSelected=false,layers=[],visible=new Set(),images=new Map();
  const refresh=()=>{if(!root||destroyed)return;clearTimeout(timer);timer=setTimeout(draw,130);};
  const setLayers=next=>{
   const previous=new Set(layers.map(layer=>layer.id));
@@ -41,9 +41,12 @@ function createPlanView({store}){
   refresh();
  };
  const setPlanConfig=plan=>{
-  baseMap=Object.prototype.hasOwnProperty.call(BASEMAPS,plan?.baseMap)?plan.baseMap:'flyfoto';
+  sharedBaseMap=Object.prototype.hasOwnProperty.call(BASEMAPS,plan?.baseMap)?plan.baseMap:'flyfoto';
+  if(!userBaseMapSelected)baseMap=sharedBaseMap;
+  const selector=root?.querySelector('[data-plan-basemap]');
+  if(selector)selector.value=baseMap;
   const summary=root?.querySelector('[data-plan-basemap-label]');
-  if(summary)summary.textContent=`Felles bakgrunnskart: ${BASEMAPS[baseMap].label}`;
+  if(summary)summary.textContent=`Prosjektstandard: ${BASEMAPS[sharedBaseMap].label}${userBaseMapSelected&&baseMap!==sharedBaseMap?` · Ditt valg: ${BASEMAPS[baseMap].label}`:''}`;
   setLayers(plan?.layers);
  };
  const note=(text,bad=false)=>{const el=root?.querySelector('[data-plan-status]');if(el){el.textContent=text;el.dataset.error=String(bad);}};
@@ -197,6 +200,26 @@ function createPlanView({store}){
   refresh();
  }
  function moveEnd(){drag=null;}
+ function zoomWheel(event){
+  const map=root?.querySelector('[data-plan-map]');
+  if(!map)return;
+  const rect=map.getBoundingClientRect();
+  if(rect.width<20||rect.height<20)return;
+  const delta=event.deltaMode===1?event.deltaY*16:event.deltaMode===2?event.deltaY*rect.height:event.deltaY;
+  if(!delta)return;
+  event.preventDefault();
+  const oldSpan=span;
+  const nextSpan=clamp(oldSpan*Math.exp(delta*0.0012),1000,2*WORLD);
+  if(nextSpan===oldSpan)return;
+  const x=event.clientX-rect.left,y=event.clientY-rect.top;
+  const offsetX=x-rect.width/2,offsetY=y-rect.height/2;
+  const pointX=center.x+offsetX*oldSpan/rect.width;
+  const pointY=center.y-offsetY*oldSpan/rect.width;
+  center.x=clamp(pointX-offsetX*nextSpan/rect.width,-WORLD,WORLD);
+  center.y=clamp(pointY+offsetY*nextSpan/rect.width,-WORLD,WORLD);
+  span=nextSpan;
+  refresh();
+ }
  function build(){
   const style=document.createElement('style');
   style.dataset.planStyle='';
@@ -206,8 +229,9 @@ function createPlanView({store}){
   `;
   root=document.createElement('section');
   root.className='plan-view';
-  root.innerHTML='<header class="plan-head"><h2>Planvisning</h2><div class="plan-actions"><button type="button" data-zoom-out aria-label="Zoom ut">−</button><button type="button" data-zoom-in aria-label="Zoom inn">+</button></div></header><div class="plan-body"><div class="plan-map" data-plan-map role="application" aria-label="Kartvisning. Dra for å flytte kartet."><div class="plan-base" data-plan-base></div><div class="plan-tools"><button type="button" data-zoom-in aria-label="Zoom inn">+</button><button type="button" data-zoom-out aria-label="Zoom ut">−</button></div><div class="plan-status" data-plan-status role="status" aria-live="polite"></div><div class="plan-attribution" data-plan-attribution></div></div><aside class="plan-layers-panel"><h3>Bakgrunnskart</h3><div class="plan-basemap-summary" data-plan-basemap-label></div><h3>Kartlag</h3><div data-plan-layers></div></aside></div>';
+  root.innerHTML='<header class="plan-head"><h2>Planvisning</h2><div class="plan-actions"><label>Bakgrunn <select data-plan-basemap aria-label="Velg bakgrunnskart" style="max-width:220px;min-height:34px"><option value="flyfoto">Flyfoto</option><option value="vektorkart">Vektorkart (OpenStreetMap)</option><option value="grunnkart">Grunnkart (Geonorge)</option><option value="none">Ingen bakgrunn</option></select></label><button type="button" data-zoom-out aria-label="Zoom ut">−</button><button type="button" data-zoom-in aria-label="Zoom inn">+</button></div></header><div class="plan-body"><div class="plan-map" data-plan-map role="application" aria-label="Kartvisning. Dra for å flytte kartet. Bruk musehjulet for å zoome."><div class="plan-base" data-plan-base></div><div class="plan-tools"><button type="button" data-zoom-in aria-label="Zoom inn">+</button><button type="button" data-zoom-out aria-label="Zoom ut">−</button></div><div class="plan-status" data-plan-status role="status" aria-live="polite"></div><div class="plan-attribution" data-plan-attribution></div></div><aside class="plan-layers-panel"><h3>Bakgrunnskart</h3><div class="plan-basemap-summary" data-plan-basemap-label></div><h3>Kartlag</h3><div data-plan-layers></div></aside></div>';
   root.prepend(style);
+  root.querySelector('[data-plan-basemap]').addEventListener('change',event=>{baseMap=event.target.value;userBaseMapSelected=true;const summary=root.querySelector('[data-plan-basemap-label]');if(summary)summary.textContent=`Prosjektstandard: ${BASEMAPS[sharedBaseMap].label} · Ditt valg: ${BASEMAPS[baseMap].label}`;refresh();});
   root.querySelectorAll('[data-zoom-in]').forEach(button=>button.addEventListener('click',()=>{span=clamp(span/1.6,1000,2*WORLD);refresh();}));
   root.querySelectorAll('[data-zoom-out]').forEach(button=>button.addEventListener('click',()=>{span=clamp(span*1.6,1000,2*WORLD);refresh();}));
   const map=root.querySelector('[data-plan-map]');
@@ -215,6 +239,7 @@ function createPlanView({store}){
   map.addEventListener('pointermove',move);
   map.addEventListener('pointerup',moveEnd);
   map.addEventListener('pointercancel',moveEnd);
+  map.addEventListener('wheel',zoomWheel,{passive:false});
   observer=new ResizeObserver(refresh);
   observer.observe(map);
  }
@@ -222,6 +247,7 @@ function createPlanView({store}){
   mount(target){
    host=target;
    destroyed=false;
+   userBaseMapSelected=false;
    host.replaceChildren();
    build();
    host.append(root);
