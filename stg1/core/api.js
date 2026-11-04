@@ -5,7 +5,7 @@ async function req(url,options={}){
  const started=performance.now();let used=doclibExtractToken(token);if(!used){used=await auth();token=used}
  for(let attempt=0;attempt<2;attempt++){
   let response;
-  try{response=await fetch(url,{method:'GET',signal:options.signal,headers:{Authorization:'Bearer '+used,Accept:'application/json'}})}
+  try{response=await fetch(url,{method:'GET',signal:options.signal,headers:{Authorization:'Bearer '+used,Accept:'application/json',...(options.range&&/^items=\d+-\d+$/.test(options.range)?{Range:options.range}:{})}})}
   catch(error){if(error?.name==='AbortError')throw error;log('FETCH ERROR',{url:target.origin+target.pathname,reason:'network_failure'});return{ok:false,status:0,data:null}}
   log('HTTP',{status:response.status,attempt:attempt+1,ms:Math.round(performance.now()-started),url:target.origin+target.pathname});
   if(response.status===401&&attempt===0){
@@ -16,7 +16,7 @@ async function req(url,options={}){
   if(response.status===401)throw Error('API-lesing avvist: HTTP 401 etter nytt tokenforsøk. Kontroller testutvidelsens tilgang.');
   const text=await response.text();let data;try{data=text?JSON.parse(text):null}catch{data=text}
   if(!response.ok&&target.pathname===new URL(CORE).pathname+'/projects/'+encodeURIComponent(project.id))throw Error('Prosjektlesing avvist: HTTP '+response.status);
-  return{ok:response.ok,status:response.status,data};
+  return{ok:response.ok,status:response.status,data,contentRange:response.headers.get('Content-Range')};
  }
 };
 
