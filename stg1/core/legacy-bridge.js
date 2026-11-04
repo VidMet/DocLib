@@ -2,6 +2,23 @@
 window.DocLibLegacyBridge=Object.freeze({
  getColumnPropertyCatalog:()=>[...propertiesPort.propertyCatalog.values()].map(x=>({...x})),
  start:()=>init(),getProject:()=>project?{id:project.id}:null,getMode:()=>workspaceMode,
+ async readSelectedIfcMetadata(){
+  const selected=explorerPort?.selectedRows?.()||[];
+  const files=selected.map(row=>row?.file).filter(file=>file&&(String(file.format||'').toLowerCase()==='ifc'||/\.ifc$/i.test(String(file.name||''))));
+  if(files.length!==1)throw Error(`Fant ${files.length} valgte IFC-filer. Velg nøyaktig én.`);
+  const file=files[0];
+  if(!file.id)throw Error('Valgt IFC-fil mangler fil-ID.');
+  const modelId=encodeURIComponent(String(file.id));
+  const version=file.versionId?`&versionId=${encodeURIComponent(String(file.versionId))}`:'';
+  const defs=await req(`${MODEL}/models/${modelId}/psetdefs?offset=0&top=30000${version}`);
+  if(!defs.ok)throw Error(`Property-set-definisjoner kunne ikke leses (HTTP ${defs.status}).`);
+  const definitions=arr(defs.data);
+  if(defs.status===206||(defs.data?.total!==undefined&&Number(defs.data.total)!==definitions.length))throw Error('Property-set-definisjoner kom ikke komplett tilbake.');
+  const entities=await req(`${MODEL}/models/${modelId}/entities?offset=0&top=10&fields=id&fields=psets${version}`);
+  if(!entities.ok||entities.status===206)throw Error(`IFC-objektmetadata kunne ikke leses (HTTP ${entities.status}).`);
+  const sample=arr(entities.data);
+  return{fileName:String(file.name||'IFC-fil'),fileId:String(file.id),versionId:file.versionId?String(file.versionId):'',propertySetDefinitionCount:definitions.length,entityTotal:Number(entities.data?.total??sample.length),sampleEntityIds:sample.map(entity=>String(entity.id)).filter(Boolean)};
+ },
  async getProjectRoleData(){
   const projectId=String(project?.id||''),userId=String(mineUser?.id||'');
   if(!projectId||!userId)return{projectId,userId,status:0,rolesStatus:0,member:null,roles:[]};

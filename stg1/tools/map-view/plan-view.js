@@ -217,6 +217,26 @@ function createPlanView({store}){
   span=nextSpan;
   refresh();
  }
+ async function runIfcReadTest(result,button){
+  button.disabled=true;
+  result.textContent='Leser metadata fra valgt IFC-fil …';
+  try{
+   const data=await window.DocLibLegacyBridge.readSelectedIfcMetadata();
+   result.textContent=[
+    'Lesing OK',
+    `Fil: ${data.fileName}`,
+    `Fil-ID: ${data.fileId}`,
+    `Versjons-ID: ${data.versionId||'ikke oppgitt'}`,
+    `Property-set-definisjoner: ${data.propertySetDefinitionCount}`,
+    `Modellens rapporterte objekter: ${data.entityTotal}`,
+    `Leste eksempelobjekter: ${data.sampleEntityIds.length}${data.sampleEntityIds.length?` (ID ${data.sampleEntityIds.join(', ')})`:''}`,
+    '',
+    'Dette tester metadata via Trimble Model API. Det laster ikke IFC-geometri, koordinater eller tegningsdata.'
+   ].join('\n');
+  }catch(error){
+   result.textContent=`Lesing feilet: ${error?.message||String(error)}\n\nVelg nøyaktig én IFC-fil i Utforsker, og prøv igjen.`;
+  }finally{button.disabled=false;}
+ }
  function build(){
   const style=document.createElement('style');
   style.dataset.planStyle='';
@@ -226,9 +246,10 @@ function createPlanView({store}){
   `;
   root=document.createElement('section');
   root.className='plan-view';
-  root.innerHTML='<header class="plan-head"><h2>Planvisning</h2><div class="plan-actions"><label>Bakgrunn <select data-plan-basemap aria-label="Velg bakgrunnskart" style="max-width:220px;min-height:34px"><option value="flyfoto">Flyfoto</option><option value="vektorkart">Vektorkart (OpenStreetMap)</option><option value="grunnkart">Grunnkart (Geonorge)</option><option value="none">Ingen bakgrunn</option></select></label><button type="button" data-zoom-out aria-label="Zoom ut">−</button><button type="button" data-zoom-in aria-label="Zoom inn">+</button></div></header><div class="plan-body"><div class="plan-map" data-plan-map role="application" aria-label="Kartvisning. Dra for å flytte kartet. Bruk musehjulet for å zoome."><div class="plan-base" data-plan-base></div><div class="plan-tools"><button type="button" data-zoom-in aria-label="Zoom inn">+</button><button type="button" data-zoom-out aria-label="Zoom ut">−</button></div><div class="plan-status" data-plan-status role="status" aria-live="polite"></div><div class="plan-attribution" data-plan-attribution></div></div><aside class="plan-layers-panel"><h3>Bakgrunnskart</h3><div class="plan-basemap-summary" data-plan-basemap-label></div><h3>Kartlag</h3><div data-plan-layers></div></aside></div>';
+  root.innerHTML='<header class="plan-head"><h2>Planvisning</h2><div class="plan-actions"><label>Bakgrunn <select data-plan-basemap aria-label="Velg bakgrunnskart" style="max-width:220px;min-height:34px"><option value="flyfoto">Flyfoto</option><option value="vektorkart">Vektorkart (OpenStreetMap)</option><option value="grunnkart">Grunnkart (Geonorge)</option><option value="none">Ingen bakgrunn</option></select></label><button type="button" data-zoom-out aria-label="Zoom ut">−</button><button type="button" data-zoom-in aria-label="Zoom inn">+</button></div></header><div class="plan-body"><div class="plan-map" data-plan-map role="application" aria-label="Kartvisning. Dra for å flytte kartet. Bruk musehjulet for å zoome."><div class="plan-base" data-plan-base></div><div class="plan-tools"><button type="button" data-zoom-in aria-label="Zoom inn">+</button><button type="button" data-zoom-out aria-label="Zoom ut">−</button></div><div class="plan-status" data-plan-status role="status" aria-live="polite"></div><div class="plan-attribution" data-plan-attribution></div></div><aside class="plan-layers-panel"><h3>Bakgrunnskart</h3><div class="plan-basemap-summary" data-plan-basemap-label></div><h3>Kartlag</h3><div data-plan-layers></div><h3>IFC-lesetest</h3><p style="font-size:12px;color:#526173">Marker én IFC-fil i Utforsker før du tester. Leser bare modellmetadata.</p><button type="button" data-ifc-read style="min-height:34px;padding:6px 10px">Test valgt IFC</button><pre data-ifc-result role="status" aria-live="polite" style="white-space:pre-wrap;overflow-wrap:anywhere;font:12px/1.45 Arial,sans-serif;color:#334155"></pre></aside></div>';
   root.prepend(style);
   root.querySelector('[data-plan-basemap]').addEventListener('change',event=>{baseMap=event.target.value;userBaseMapSelected=true;const summary=root.querySelector('[data-plan-basemap-label]');if(summary)summary.textContent=`Prosjektstandard: ${BASEMAPS[sharedBaseMap].label} · Ditt valg: ${BASEMAPS[baseMap].label}`;refresh();});
+  root.querySelector('[data-ifc-read]').addEventListener('click',event=>runIfcReadTest(root.querySelector('[data-ifc-result]'),event.currentTarget));
   root.querySelectorAll('[data-zoom-in]').forEach(button=>button.addEventListener('click',()=>{span=clamp(span/1.6,1000,2*WORLD);refresh();}));
   root.querySelectorAll('[data-zoom-out]').forEach(button=>button.addEventListener('click',()=>{span=clamp(span*1.6,1000,2*WORLD);refresh();}));
   const map=root.querySelector('[data-plan-map]');
