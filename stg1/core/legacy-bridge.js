@@ -2,10 +2,12 @@
 window.DocLibLegacyBridge=Object.freeze({
  getColumnPropertyCatalog:()=>[...propertiesPort.propertyCatalog.values()].map(x=>({...x})),
  start:()=>init(),getProject:()=>project?{id:project.id}:null,getMode:()=>workspaceMode,
- async readSelectedIfcMetadata(){
-  const selected=explorerPort?.selectedRows?.()||[];
-  const files=selected.map(row=>row?.file).filter(file=>file&&(String(file.format||'').toLowerCase()==='ifc'||/\.ifc$/i.test(String(file.name||''))));
-  if(files.length!==1)throw Error(`Fant ${files.length} valgte IFC-filer. Velg nøyaktig én.`);
+ listIfcFiles(){
+  return rows.map(row=>row?.file).filter(file=>file?.id&&(String(file.format||'').toLowerCase()==='ifc'||String(file.name||'').toLowerCase().endsWith('.ifc'))).map(file=>({id:String(file.id),name:String(file.name||'IFC-fil'),folderPath:String(file.folderPath||'/'),versionId:file.versionId?String(file.versionId):''})).sort((a,b)=>`${a.folderPath}/${a.name}`.localeCompare(`${b.folderPath}/${b.name}`,'no',{sensitivity:'base'}));
+ },
+ async readIfcMetadata(fileId){
+  const files=rows.map(row=>row?.file).filter(file=>file&&String(file.id)===String(fileId)&&(String(file.format||'').toLowerCase()==='ifc'||String(file.name||'').toLowerCase().endsWith('.ifc')));
+  if(files.length!==1)throw Error('Fant ikke nøyaktig én IFC-fil med denne ID-en i det innlastede prosjektet. Oppdater prosjektet og prøv igjen.');
   const file=files[0];
   if(!file.id)throw Error('Valgt IFC-fil mangler fil-ID.');
   const modelId=encodeURIComponent(String(file.id));

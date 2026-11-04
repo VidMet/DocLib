@@ -217,11 +217,34 @@ function createPlanView({store}){
   span=nextSpan;
   refresh();
  }
- async function runIfcReadTest(result,button){
+ function refreshIfcFiles(){
+  const select=root?.querySelector('[data-ifc-file]');
+  if(!select)return;
+  const previous=select.value;
+  const files=window.DocLibLegacyBridge.listIfcFiles();
+  select.replaceChildren();
+  const placeholder=document.createElement('option');
+  placeholder.value='';
+  placeholder.textContent=files.length?'Velg IFC-modell …':'Ingen IFC-filer funnet';
+  select.append(placeholder);
+  for(const file of files){
+   const option=document.createElement('option');
+   option.value=file.id;
+   option.textContent=`${file.folderPath} / ${file.name}`;
+   select.append(option);
+  }
+  select.value=files.some(file=>file.id===previous)?previous:'';
+  const button=root.querySelector('[data-ifc-read]');
+  if(button)button.disabled=!select.value;
+ }
+ async function runIfcReadTest(result,button,select){
+  const fileId=select.value;
+  if(!fileId){result.textContent='Velg en IFC-modell i listen først.';return;}
   button.disabled=true;
+  select.disabled=true;
   result.textContent='Leser metadata fra valgt IFC-fil …';
   try{
-   const data=await window.DocLibLegacyBridge.readSelectedIfcMetadata();
+   const data=await window.DocLibLegacyBridge.readIfcMetadata(fileId);
    result.textContent=[
     'Lesing OK',
     `Fil: ${data.fileName}`,
@@ -234,8 +257,8 @@ function createPlanView({store}){
     'Dette tester metadata via Trimble Model API. Det laster ikke IFC-geometri, koordinater eller tegningsdata.'
    ].join('\n');
   }catch(error){
-   result.textContent=`Lesing feilet: ${error?.message||String(error)}\n\nVelg nøyaktig én IFC-fil i Utforsker, og prøv igjen.`;
-  }finally{button.disabled=false;}
+   result.textContent=`Lesing feilet: ${error?.message||String(error)}\n\nKontroller valgt fil og prosjekt, og prøv igjen.`;
+  }finally{select.disabled=false;button.disabled=!select.value;}
  }
  function build(){
   const style=document.createElement('style');
@@ -246,10 +269,11 @@ function createPlanView({store}){
   `;
   root=document.createElement('section');
   root.className='plan-view';
-  root.innerHTML='<header class="plan-head"><h2>Planvisning</h2><div class="plan-actions"><label>Bakgrunn <select data-plan-basemap aria-label="Velg bakgrunnskart" style="max-width:220px;min-height:34px"><option value="flyfoto">Flyfoto</option><option value="vektorkart">Vektorkart (OpenStreetMap)</option><option value="grunnkart">Grunnkart (Geonorge)</option><option value="none">Ingen bakgrunn</option></select></label><button type="button" data-zoom-out aria-label="Zoom ut">−</button><button type="button" data-zoom-in aria-label="Zoom inn">+</button></div></header><div class="plan-body"><div class="plan-map" data-plan-map role="application" aria-label="Kartvisning. Dra for å flytte kartet. Bruk musehjulet for å zoome."><div class="plan-base" data-plan-base></div><div class="plan-tools"><button type="button" data-zoom-in aria-label="Zoom inn">+</button><button type="button" data-zoom-out aria-label="Zoom ut">−</button></div><div class="plan-status" data-plan-status role="status" aria-live="polite"></div><div class="plan-attribution" data-plan-attribution></div></div><aside class="plan-layers-panel"><h3>Bakgrunnskart</h3><div class="plan-basemap-summary" data-plan-basemap-label></div><h3>Kartlag</h3><div data-plan-layers></div><h3>IFC-lesetest</h3><p style="font-size:12px;color:#526173">Marker én IFC-fil i Utforsker før du tester. Leser bare modellmetadata.</p><button type="button" data-ifc-read style="min-height:34px;padding:6px 10px">Test valgt IFC</button><pre data-ifc-result role="status" aria-live="polite" style="white-space:pre-wrap;overflow-wrap:anywhere;font:12px/1.45 Arial,sans-serif;color:#334155"></pre></aside></div>';
+  root.innerHTML='<header class="plan-head"><h2>Planvisning</h2><div class="plan-actions"><label>Bakgrunn <select data-plan-basemap aria-label="Velg bakgrunnskart" style="max-width:220px;min-height:34px"><option value="flyfoto">Flyfoto</option><option value="vektorkart">Vektorkart (OpenStreetMap)</option><option value="grunnkart">Grunnkart (Geonorge)</option><option value="none">Ingen bakgrunn</option></select></label><button type="button" data-zoom-out aria-label="Zoom ut">−</button><button type="button" data-zoom-in aria-label="Zoom inn">+</button></div></header><div class="plan-body"><div class="plan-map" data-plan-map role="application" aria-label="Kartvisning. Dra for å flytte kartet. Bruk musehjulet for å zoome."><div class="plan-base" data-plan-base></div><div class="plan-tools"><button type="button" data-zoom-in aria-label="Zoom inn">+</button><button type="button" data-zoom-out aria-label="Zoom ut">−</button></div><div class="plan-status" data-plan-status role="status" aria-live="polite"></div><div class="plan-attribution" data-plan-attribution></div></div><aside class="plan-layers-panel"><h3>Bakgrunnskart</h3><div class="plan-basemap-summary" data-plan-basemap-label></div><h3>Kartlag</h3><div data-plan-layers></div><h3>IFC-lesetest</h3><p style="font-size:12px;color:#526173">Velg modell fra prosjektlisten. Lesingen er skrivebeskyttet og gjelder metadata.</p><select data-ifc-file aria-label="Velg IFC-modell for lesetest" style="width:100%;min-height:34px;margin-bottom:8px"><option value="">Henter IFC-filer …</option></select><button type="button" data-ifc-read disabled style="min-height:34px;padding:6px 10px">Test valgt IFC</button><pre data-ifc-result role="status" aria-live="polite" style="white-space:pre-wrap;overflow-wrap:anywhere;font:12px/1.45 Arial,sans-serif;color:#334155"></pre></aside></div>';
   root.prepend(style);
   root.querySelector('[data-plan-basemap]').addEventListener('change',event=>{baseMap=event.target.value;userBaseMapSelected=true;const summary=root.querySelector('[data-plan-basemap-label]');if(summary)summary.textContent=`Prosjektstandard: ${BASEMAPS[sharedBaseMap].label} · Ditt valg: ${BASEMAPS[baseMap].label}`;refresh();});
-  root.querySelector('[data-ifc-read]').addEventListener('click',event=>runIfcReadTest(root.querySelector('[data-ifc-result]'),event.currentTarget));
+  root.querySelector('[data-ifc-file]').addEventListener('change',event=>{root.querySelector('[data-ifc-read]').disabled=!event.currentTarget.value;root.querySelector('[data-ifc-result]').textContent='';});
+  root.querySelector('[data-ifc-read]').addEventListener('click',event=>runIfcReadTest(root.querySelector('[data-ifc-result]'),event.currentTarget,root.querySelector('[data-ifc-file]')));
   root.querySelectorAll('[data-zoom-in]').forEach(button=>button.addEventListener('click',()=>{span=clamp(span/1.6,1000,2*WORLD);refresh();}));
   root.querySelectorAll('[data-zoom-out]').forEach(button=>button.addEventListener('click',()=>{span=clamp(span*1.6,1000,2*WORLD);refresh();}));
   const map=root.querySelector('[data-plan-map]');
@@ -269,11 +293,12 @@ function createPlanView({store}){
    host.replaceChildren();
    build();
    host.append(root);
+   refreshIfcFiles();
    setPlanConfig(store.snapshot().plan||{});
    unsubscribeStore=store.subscribe(config=>setPlanConfig(config.plan||{}));
   },
   render(){refresh();},
-  update(change){if(change?.type==='project-state')refresh();},
+  update(change){if(change?.type==='project-state'){refreshIfcFiles();refresh();}},
   canLeave(){return true;},
   unmount(){
    clearTimeout(timer);
