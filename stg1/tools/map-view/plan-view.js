@@ -1,4 +1,4 @@
-import {readWearSurface,drawWearSurface} from './ifc-surface.js?v=2.05-preview.4-planview.6-ifc-read-test.6-2d-camera.2-wear-surface.3';
+import {readWearSurface,drawWearSurface} from './ifc-surface.js?v=2.05-preview.4-planview.6-ifc-read-test.6-2d-camera.2-wear-surface.4';
 const MAX_WIDTH=1600;
 const MAX_HEIGHT=1200;
 const WORLD=20037508.342789244;
@@ -43,7 +43,7 @@ function mapUrl(layer,bounds,width,height,version='1.1.1'){
 }
 function createPlanView({store}){
  let host=null,root=null,observer=null,timer=0,destroyed=false,unsubscribeStore=null,selectionController=null;
- let center={x:1170000,y:8370000},span=1400000,drag=null;
+ let center={x:1170000,y:8370000},span=1400000,drag=null,pointerPosition=null;
  let currentModelCRS=DEFAULT_MODEL_CRS,lastCameraXY=null,cameraConnectionStarted=false;
  let baseMap='flyfoto',sharedBaseMap='flyfoto',userBaseMapSelected=false,layers=[],visible=new Set(),images=new Map();
  let wearSurface=null,projectedWearSurface=null,wearSurfaceExtent=null,surfaceFileId='',surfaceLoadToken=0;
@@ -67,6 +67,26 @@ function createPlanView({store}){
  };
  const note=(text,bad=false)=>{const el=root?.querySelector('[data-plan-status]');if(el){el.textContent=text;el.dataset.error=String(bad);}};
  const setCameraStatus=(text,bad=false)=>{const el=root?.querySelector('[data-plan-camera-status]');if(el){el.textContent=text;el.dataset.error=String(bad);}};
+ const renderPointerCoordinates=()=>{
+  const label=root?.querySelector('[data-plan-coordinates]');
+  if(!label)return;
+  if(!pointerPosition){label.textContent='Flytt musepekeren over kartet for koordinater';return;}
+  const map=root.querySelector('[data-plan-map]');
+  const rect=map.getBoundingClientRect();
+  const proj4=window.proj4;
+  if(typeof proj4!=='function'){label.textContent=`${currentModelCRS} · koordinatomregning ikke tilgjengelig`;return;}
+  try{
+   registerModelCrs(proj4);
+   const mapX=clamp(center.x+(pointerPosition.x-rect.left-rect.width/2)*span/rect.width,-WORLD,WORLD);
+   const mapY=clamp(center.y-(pointerPosition.y-rect.top-rect.height/2)*span/rect.width,-WORLD,WORLD);
+   const [x,y]=proj4('EPSG:3857',currentModelCRS,[mapX,mapY]);
+   if(!Number.isFinite(x)||!Number.isFinite(y))throw Error('Ugyldig koordinat.');
+   const format=value=>value.toLocaleString('nb-NO',{minimumFractionDigits:2,maximumFractionDigits:2});
+   label.textContent=`${currentModelCRS} · X ${format(x)} m · Y ${format(y)} m`;
+  }catch{label.textContent=`${currentModelCRS} · koordinatet kunne ikke beregnes`;}
+ };
+ const updatePointerCoordinates=event=>{pointerPosition={x:event.clientX,y:event.clientY};renderPointerCoordinates();};
+ const clearPointerCoordinates=()=>{pointerPosition=null;renderPointerCoordinates();};
  const applyCameraPoint=(x,y)=>{
   const proj4=window.proj4;
   if(typeof proj4!=='function'){setCameraStatus('Koordinatomregning er ikke tilgjengelig; kontroller lasting av proj4.',true);return;}
@@ -77,6 +97,7 @@ function createPlanView({store}){
    center.x=clamp(longitude*WORLD/180,-WORLD,WORLD);
    const mercatorY=Math.log(Math.tan((90+latitude)*Math.PI/360))/(Math.PI/180)*WORLD/180;
    center.y=clamp(mercatorY,-WORLD,WORLD);
+   renderPointerCoordinates();
    setCameraStatus(`Kartet følger senterpunktet fra Trimble-viseren · ${currentModelCRS} · X ${x.toFixed(1)}, Y ${y.toFixed(1)} m`);
    refresh();
   }catch(error){setCameraStatus(`Kunne ikke konvertere kamerakoordinatene (${currentModelCRS}): ${error?.message||String(error)}`,true);}
@@ -108,6 +129,7 @@ function createPlanView({store}){
   const aspect=rect?.width&&rect?.height?rect.width/rect.height:1;
   span=clamp(Math.max(width,height*aspect,100)*1.2,1000,2*WORLD);
   setCameraStatus(`Kartet zoomet til slitelagsflaten · ${currentModelCRS}. Kartet kan flyttes manuelt; neste kamerahendelse følger Trimble-viseren igjen.`);
+  renderPointerCoordinates();
   refresh();
  };
  const handleCameraEvent=(event,payload)=>{
@@ -295,6 +317,7 @@ function createPlanView({store}){
   center.x=clamp(pointX-offsetX*nextSpan/rect.width,-WORLD,WORLD);
   center.y=clamp(pointY+offsetY*nextSpan/rect.width,-WORLD,WORLD);
   span=nextSpan;
+  renderPointerCoordinates();
   refresh();
  }
  function refreshSelectedIfcFiles(){
@@ -359,25 +382,28 @@ function createPlanView({store}){
   style.dataset.planStyle='';
   style.textContent=`
   .plan-view{display:flex;flex-direction:column;min-width:0;min-height:0;height:100%;background:#f7f8fa;color:#172033;font:14px/1.45 Arial,sans-serif}
+  .plan-coordinates{position:absolute;z-index:4;left:50%;bottom:8px;transform:translateX(-50%);max-width:calc(100% - 24px);padding:5px 9px;border:1px solid rgba(255,255,255,.35);border-radius:5px;background:rgba(15,23,42,.84);color:#fff;font:12px/1.3 Arial,sans-serif;font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;pointer-events:none;box-shadow:0 1px 4px rgba(0,0,0,.25)}
   .plan-head{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 16px;border-bottom:1px solid #dce2ea;background:#fff}.plan-head h2{margin:0;font-size:18px}.plan-body{display:grid;grid-template-columns:minmax(0,1fr) 250px;gap:0;flex:1;min-height:0}.plan-map{position:relative;overflow:hidden;min-width:0;min-height:280px;background:#e9eef2;touch-action:none;cursor:grab}.plan-map:active{cursor:grabbing}.plan-base{position:absolute;inset:0;z-index:0;overflow:hidden}.plan-base-tile,.plan-base-image{position:absolute;max-width:none;pointer-events:none}.plan-base-image{inset:0;width:100%;height:100%;object-fit:fill}.plan-map-image{position:absolute;z-index:1;inset:0;width:100%;height:100%;object-fit:fill;pointer-events:none}.plan-wear-surface{position:absolute;z-index:2;inset:0;pointer-events:none}.plan-tools{position:absolute;z-index:4;left:12px;top:12px;display:grid;gap:6px}.plan-tools button{width:38px;height:38px;border:1px solid #b9c4d0;border-radius:6px;background:#fff;color:#172033;font-size:20px;cursor:pointer}.plan-layers-panel{overflow:auto;padding:14px;background:#fff;border-left:1px solid #dce2ea}.plan-layers-panel h3{margin:0 0 8px;font-size:15px}.plan-basemap-summary{padding:8px;margin:0 0 12px;border-radius:5px;background:#f1f5f9;color:#334155;font-size:12px}.plan-layer-toggle{display:flex;align-items:flex-start;gap:8px;padding:8px 2px;border-bottom:1px solid #edf0f3;overflow-wrap:anywhere}.plan-layer-toggle input{margin-top:3px;accent-color:#1764df}.plan-empty{color:#566273;font-size:13px}.plan-crs-label{display:grid;gap:5px;font-size:12px;color:#334155}.plan-crs-label select{width:100%;min-height:34px;padding:5px;border:1px solid #b9c4d0;border-radius:5px;background:#fff}.plan-camera-status{margin:7px 0 14px;padding:7px;border-radius:5px;background:#f1f5f9;color:#334155;font-size:11px;overflow-wrap:anywhere}.plan-camera-status[data-error=true]{color:#9f2533;background:#fff1f2}.plan-status{position:absolute;z-index:3;left:62px;bottom:10px;max-width:calc(100% - 170px);padding:6px 9px;border-radius:5px;background:#ffffffdf;color:#334155;font-size:12px;pointer-events:none}.plan-status[data-error=true]{color:#9f2533}.plan-attribution{position:absolute;z-index:3;right:4px;bottom:3px;padding:3px 5px;border-radius:3px;background:#ffffffd9;color:#334155;font-size:10px;pointer-events:auto}.plan-attribution a{color:inherit}.plan-actions{display:flex;gap:6px}.plan-actions button{min-height:34px;padding:6px 10px;border:1px solid #cbd5e1;border-radius:5px;background:#fff;cursor:pointer}.plan-actions button:hover{background:#f1f5f9}@media(max-width:720px){.plan-body{grid-template-columns:minmax(0,1fr)}.plan-layers-panel{max-height:180px;border-left:0;border-top:1px solid #dce2ea}.plan-map{min-height:320px}.plan-status{max-width:calc(100% - 24px);bottom:26px}}
   `;
   root=document.createElement('section');
   root.className='plan-view';
-  root.innerHTML='<header class="plan-head"><h2>Planvisning · 2D</h2><div class="plan-actions"><label>Bakgrunn <select data-plan-basemap aria-label="Velg bakgrunnskart" style="max-width:220px;min-height:34px"><option value="flyfoto">Flyfoto</option><option value="vektorkart">Vektorkart (OpenStreetMap)</option><option value="grunnkart">Grunnkart (Geonorge)</option><option value="none">Ingen bakgrunn</option></select></label><button type="button" data-zoom-out aria-label="Zoom ut">−</button><button type="button" data-zoom-in aria-label="Zoom inn">+</button></div></header><div class="plan-body"><div class="plan-map" data-plan-map role="application" aria-label="2D-kartvisning. Dra for å flytte kartet. Bruk musehjulet for å zoome."><div class="plan-base" data-plan-base></div><canvas class="plan-wear-surface" data-plan-wear-surface aria-label="2D-projisert slitelagsflate"></canvas><div class="plan-tools"><button type="button" data-zoom-in aria-label="Zoom inn">+</button><button type="button" data-zoom-out aria-label="Zoom ut">−</button></div><div class="plan-status" data-plan-status role="status" aria-live="polite"></div><div class="plan-attribution" data-plan-attribution></div></div><aside class="plan-layers-panel"><h3>Posisjon og koordinatsystem</h3><label class="plan-crs-label">Modellens CRS<select data-plan-crs aria-label="Velg koordinatsystem for modellkamera"></select></label><p data-plan-camera-status class="plan-camera-status" role="status" aria-live="polite">Venter på kamerakoordinater …</p><h3>Bakgrunnskart</h3><div class="plan-basemap-summary" data-plan-basemap-label></div><h3>Kartlag</h3><div data-plan-layers></div><h3>Valgte IFC-modeller</h3><p data-ifc-selection-summary style="font-size:12px;color:#526173"></p><ul data-ifc-selection-list aria-label="Valgte IFC-filer fra treet" style="font-size:11px;padding-left:18px;max-height:130px;overflow:auto"></ul><button type="button" data-ifc-read disabled style="min-height:34px;padding:6px 10px;margin:6px 0">Test metadata for valgte</button><p data-ifc-result role="status" aria-live="polite" style="font-size:11px;color:#526173;white-space:pre-wrap;overflow-wrap:anywhere"></p><button type="button" data-ifc-surface disabled style="min-height:34px;padding:6px 10px;margin:6px 0">Vis slitelag på kartet</button><button type="button" data-ifc-focus hidden style="min-height:34px;padding:6px 10px;margin:6px 0">Zoom til slitelaget</button><p data-ifc-surface-result role="status" aria-live="polite" style="font-size:11px;color:#526173;white-space:pre-wrap;overflow-wrap:anywhere">Velg én IFC for å prøve å vise oppovervendte flater i objekter merket «slitelag».</p><p style="font-size:11px;color:#526173">Kartposisjonen følger Trimble-prosjektviserens kamerakoordinater. Velg IFC-er i treet til venstre for metadata-test. Dette verktøyet viser kun 2D-kart; IFC-geometri tegnes ikke i kartet.</p><pre data-ifc-result role="status" aria-live="polite" style="white-space:pre-wrap;overflow-wrap:anywhere;font:12px/1.45 Arial,sans-serif;color:#334155"></pre></aside></div>';
+  root.innerHTML='<header class="plan-head"><h2>Planvisning · 2D</h2><div class="plan-actions"><label>Bakgrunn <select data-plan-basemap aria-label="Velg bakgrunnskart" style="max-width:220px;min-height:34px"><option value="flyfoto">Flyfoto</option><option value="vektorkart">Vektorkart (OpenStreetMap)</option><option value="grunnkart">Grunnkart (Geonorge)</option><option value="none">Ingen bakgrunn</option></select></label><button type="button" data-zoom-out aria-label="Zoom ut">−</button><button type="button" data-zoom-in aria-label="Zoom inn">+</button></div></header><div class="plan-body"><div class="plan-map" data-plan-map role="application" aria-label="2D-kartvisning. Dra for å flytte kartet. Bruk musehjulet for å zoome."><div class="plan-base" data-plan-base></div><canvas class="plan-wear-surface" data-plan-wear-surface aria-label="2D-projisert slitelagsflate"></canvas><div class="plan-tools"><button type="button" data-zoom-in aria-label="Zoom inn">+</button><button type="button" data-zoom-out aria-label="Zoom ut">−</button></div><div class="plan-status" data-plan-status role="status" aria-live="polite"></div><div class="plan-attribution" data-plan-attribution></div><div class="plan-coordinates" data-plan-coordinates role="status" aria-live="off">Flytt musepekeren over kartet for koordinater</div></div><aside class="plan-layers-panel"><h3>Posisjon og koordinatsystem</h3><label class="plan-crs-label">Modellens CRS<select data-plan-crs aria-label="Velg koordinatsystem for modellkamera"></select></label><p data-plan-camera-status class="plan-camera-status" role="status" aria-live="polite">Venter på kamerakoordinater …</p><h3>Bakgrunnskart</h3><div class="plan-basemap-summary" data-plan-basemap-label></div><h3>Kartlag</h3><div data-plan-layers></div><h3>Valgte IFC-modeller</h3><p data-ifc-selection-summary style="font-size:12px;color:#526173"></p><ul data-ifc-selection-list aria-label="Valgte IFC-filer fra treet" style="font-size:11px;padding-left:18px;max-height:130px;overflow:auto"></ul><button type="button" data-ifc-read disabled style="min-height:34px;padding:6px 10px;margin:6px 0">Test metadata for valgte</button><p data-ifc-result role="status" aria-live="polite" style="font-size:11px;color:#526173;white-space:pre-wrap;overflow-wrap:anywhere"></p><button type="button" data-ifc-surface disabled style="min-height:34px;padding:6px 10px;margin:6px 0">Vis slitelag på kartet</button><button type="button" data-ifc-focus hidden style="min-height:34px;padding:6px 10px;margin:6px 0">Zoom til slitelaget</button><p data-ifc-surface-result role="status" aria-live="polite" style="font-size:11px;color:#526173;white-space:pre-wrap;overflow-wrap:anywhere">Velg én IFC for å prøve å vise oppovervendte flater i objekter merket «slitelag».</p><p style="font-size:11px;color:#526173">Kartposisjonen følger Trimble-prosjektviserens kamerakoordinater. Velg IFC-er i treet til venstre for metadata-test. Dette verktøyet viser kun 2D-kart; IFC-geometri tegnes ikke i kartet.</p><pre data-ifc-result role="status" aria-live="polite" style="white-space:pre-wrap;overflow-wrap:anywhere;font:12px/1.45 Arial,sans-serif;color:#334155"></pre></aside></div>';
   root.prepend(style);
   root.querySelector('[data-plan-basemap]').addEventListener('change',event=>{baseMap=event.target.value;userBaseMapSelected=true;const summary=root.querySelector('[data-plan-basemap-label]');if(summary)summary.textContent=`Prosjektstandard: ${BASEMAPS[sharedBaseMap].label} · Ditt valg: ${BASEMAPS[baseMap].label}`;refresh();});
   const crsSelect=root.querySelector('[data-plan-crs]');
   crsSelect.replaceChildren(...MODEL_CRS.map(({code,label})=>{const option=document.createElement('option');option.value=code;option.textContent=`${label} (${code})`;return option;}));
   crsSelect.value=currentModelCRS;
-  crsSelect.addEventListener('change',()=>{currentModelCRS=crsSelect.value;projectWearSurface();if(lastCameraXY)applyCameraPoint(lastCameraXY.x,lastCameraXY.y);else setCameraStatus(`Valgt ${currentModelCRS}. Kartet sentreres når kamerakoordinater mottas.`);refresh();});
+  crsSelect.addEventListener('change',()=>{currentModelCRS=crsSelect.value;projectWearSurface();if(lastCameraXY)applyCameraPoint(lastCameraXY.x,lastCameraXY.y);else setCameraStatus(`Valgt ${currentModelCRS}. Kartet sentreres når kamerakoordinater mottas.`);renderPointerCoordinates();refresh();});
   root.querySelector('[data-ifc-read]').addEventListener('click',event=>runIfcReadTest(root.querySelector('[data-ifc-result]'),event.currentTarget));
   root.querySelector('[data-ifc-surface]').addEventListener('click',event=>runIfcSurfacePreview(event.currentTarget));
   root.querySelector('[data-ifc-focus]').addEventListener('click',focusWearSurface);
-  root.querySelectorAll('[data-zoom-in]').forEach(button=>button.addEventListener('click',()=>{span=clamp(span/1.6,1000,2*WORLD);refresh();}));
-  root.querySelectorAll('[data-zoom-out]').forEach(button=>button.addEventListener('click',()=>{span=clamp(span*1.6,1000,2*WORLD);refresh();}));
+  root.querySelectorAll('[data-zoom-in]').forEach(button=>button.addEventListener('click',()=>{span=clamp(span/1.6,1000,2*WORLD);renderPointerCoordinates();refresh();}));
+  root.querySelectorAll('[data-zoom-out]').forEach(button=>button.addEventListener('click',()=>{span=clamp(span*1.6,1000,2*WORLD);renderPointerCoordinates();refresh();}));
   const map=root.querySelector('[data-plan-map]');
   map.addEventListener('pointerdown',moveStart);
   map.addEventListener('pointermove',move);
+  map.addEventListener('pointermove',updatePointerCoordinates,{passive:true});
+  map.addEventListener('pointerleave',clearPointerCoordinates);
   map.addEventListener('pointerup',moveEnd);
   map.addEventListener('pointercancel',moveEnd);
   map.addEventListener('wheel',zoomWheel,{passive:false});
