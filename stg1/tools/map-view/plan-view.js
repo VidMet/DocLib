@@ -86,15 +86,12 @@ function createPlanView({store}){
   const reportBaseError=()=>{if(baseErrorReported)return;baseErrorReported=true;note('Bakgrunnskartet kunne ikke hentes. Kontroller tjenesten eller nettverkstilgangen.',true);};
   const attribution=root.querySelector('[data-plan-attribution]');
   attribution.replaceChildren();
-  attribution.hidden=!definition.attribution;
-  if(baseMap==='vektorkart'){
-   const link=document.createElement('a');
-   link.href='https://www.openstreetmap.org/copyright';
-   link.target='_blank';
-   link.rel='noopener noreferrer';
-   link.textContent='© OpenStreetMap contributors';
-   attribution.append(link);
-  }else attribution.textContent=definition.attribution;
+  const credits=new Set();
+  if(baseMap==='vektorkart')credits.add('© OpenStreetMap contributors');
+  else if(definition.attribution)credits.add(definition.attribution);
+  for(const layer of layers)if(visible.has(layer.id)&&layer.attribution)credits.add(layer.attribution);
+  attribution.hidden=!credits.size;
+  attribution.textContent=[...credits].join(' · ');
   if(definition.type==='none')return;
   if(definition.type==='wms'){
    const image=document.createElement('img');

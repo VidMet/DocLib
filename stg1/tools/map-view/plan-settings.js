@@ -1,4 +1,6 @@
+import {WMS_CATALOG} from './wms-catalog.js?v=2.05-preview.4-planview.5';
 const MAX_LAYERS=20;
+const CATALOG_IDS=new Set(WMS_CATALOG.map(item=>item.id));
 const BASEMAPS=Object.freeze([
  {id:'flyfoto',label:'Flyfoto'},
  {id:'vektorkart',label:'Vektorkart (OpenStreetMap)'},
@@ -15,7 +17,7 @@ const safeUrl=value=>{
  if(['localhost','127.0.0.1','::1'].includes(host)||/^(10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.)/.test(host))throw Error('Private eller lokale nettverksadresser er ikke tillatt i den åpne WMS-konfigurasjonen.');
  return url.href.replace(/\/$/,'');
 };
-const cleanLayer=layer=>({id:String(layer.id||''),name:String(layer.name||'').trim().slice(0,100),url:safeUrl(layer.url),layer:String(layer.layer||'').trim().slice(0,200),visibleByDefault:layer.visibleByDefault===true});
+const cleanLayer=layer=>({id:String(layer.id||''),name:String(layer.name||'').trim().slice(0,100),url:safeUrl(layer.url),layer:String(layer.layer||'').trim().slice(0,200),visibleByDefault:layer.visibleByDefault===true,attribution:String(layer.attribution||'').trim().slice(0,200)});
 export function normalizePlanConfig(raw){
  const seen=new Set(),layers=[];
  const baseMap=BASEMAPS.some(option=>option.id===raw?.baseMap)?raw.baseMap:'flyfoto';
@@ -30,12 +32,12 @@ export function normalizePlanConfig(raw){
  }
  return{baseMap,layers};
 }
-function makeLayer(){return{id:`wms-${Date.now().toString(36)}-${Math.random().toString(36).slice(2,8)}`,name:'',url:'',layer:'',visibleByDefault:true};}
+function makeLayer(){return{id:`wms-${Date.now().toString(36)}-${Math.random().toString(36).slice(2,8)}`,name:'',url:'',layer:'',visibleByDefault:true,attribution:''};}
 export function mountPlanSettings(host,config,doc=document){
  const normalized=normalizePlanConfig(config?.plan);
  const root=doc.createElement('div');
  root.className='plan-settings';
- root.innerHTML='<p>Velg ett felles bakgrunnskart for prosjektet. Flyfoto er standard; et annet valg erstatter det for alle brukere. Tematiske WMS-lag administreres separat nedenfor.</p><label class="plan-basemap-field">Felles bakgrunnskart <select data-plan-basemap></select></label><div data-wms-rows></div><div class="setup-column-actions"><button type="button" data-wms-add>Legg til WMS-lag</button></div><small>Bakgrunnskart: Flyfoto (Esri), Vektorkart (OpenStreetMap), Grunnkart (Geonorge) eller Ingen bakgrunn. WMS-overlegg må være offentlige og tilgjengelige for nettleserbilder; ingen legitimasjon lagres.</small>';
+ root.innerHTML='<p>Velg prosjektets standardbakgrunn og hvilke tematiske WMS-lag som skal være tilgjengelige for brukerne. Brukerne kan slå tilgjengelige lag av og på i Planvisning.</p><label class="plan-basemap-field">Felles bakgrunnskart <select data-plan-basemap></select></label><fieldset class="plan-wms-catalog"><legend>Forhåndsdefinerte WMS-lag</legend><p>Hak av lagene som skal tilbys i dette prosjektet. Nye lag er av som standard.</p><div data-wms-catalog></div><small data-wms-catalog-status aria-live="polite"></small></fieldset><h3>Egne WMS-lag</h3><div data-wms-rows></div><div class="setup-column-actions"><button type="button" data-wms-add>Legg til eget WMS-lag</button></div><small>Bakgrunnskart: Flyfoto (Esri), Vektorkart (OpenStreetMap), Grunnkart (Geonorge) eller Ingen bakgrunn. WMS-overlegg må være offentlige og tilgjengelige for nettleserbilder; ingen legitimasjon lagres.</small>';
  const baseSelect=root.querySelector('[data-plan-basemap]');
  for(const option of BASEMAPS){
   const element=doc.createElement('option');
@@ -45,15 +47,47 @@ export function mountPlanSettings(host,config,doc=document){
  }
  baseSelect.value=normalized.baseMap;
  const rows=root.querySelector('[data-wms-rows]');
+ const catalogHost=root.querySelector('[data-wms-catalog]');
+ const catalogStatus=root.querySelector('[data-wms-catalog-status]');
  let layers=normalized.layers.map(layer=>({...layer}));
+ function renderCatalog(){
+  const groups=new Map();
+  for(const item of WMS_CATALOG){if(!groups.has(item.category))groups.set(item.category,[]);groups.get(item.category).push(item);}
+  const fragment=doc.createDocumentFragment();
+  for(const [category,items] of groups){
+   const fieldset=doc.createElement('fieldset');
+   const legend=doc.createElement('legend');legend.textContent=category;fieldset.append(legend);
+   for(const item of items){
+    const current=layers.find(layer=>layer.id===item.id);
+    const row=doc.createElement('div');row.className='plan-wms-catalog-row';row.style.cssText='display:flex;align-items:center;gap:16px;flex-wrap:wrap;padding:5px 0;border-bottom:1px solid #edf0f3';
+    const availableLabel=doc.createElement('label');availableLabel.style.cssText='display:inline-flex;align-items:center;gap:7px;flex:1 1 260px';
+    const available=doc.createElement('input');available.type='checkbox';available.checked=Boolean(current);available.title=`${item.layer} · ${new URL(item.url).hostname}`;
+    available.addEventListener('change',()=>{
+     if(available.checked){if(layers.length>=MAX_LAYERS){available.checked=false;if(catalogStatus)catalogStatus.textContent=`Maksimalt ${MAX_LAYERS} WMS-lag kan være tilgjengelige samtidig.`;return;}layers.push({...item,visibleByDefault:false});}
+     else layers=layers.filter(layer=>layer.id!==item.id);
+     if(catalogStatus)catalogStatus.textContent='';
+     render();
+    });
+    const name=doc.createElement('span');name.textContent=item.name;availableLabel.append(available,name);
+    const defaultLabel=doc.createElement('label');defaultLabel.style.cssText='display:inline-flex;align-items:center;gap:7px';
+    const defaultInput=doc.createElement('input');defaultInput.type='checkbox';defaultInput.checked=current?.visibleByDefault===true;defaultInput.disabled=!current;defaultInput.setAttribute('aria-label',`Vis ${item.name} som standard`);
+    defaultInput.addEventListener('change',()=>{const layer=layers.find(value=>value.id===item.id);if(layer)layer.visibleByDefault=defaultInput.checked;});
+    defaultLabel.append(defaultInput,doc.createTextNode('Vis som standard'));
+    row.append(availableLabel,defaultLabel);fieldset.append(row);
+   }
+   fragment.append(fieldset);
+  }
+  catalogHost.replaceChildren(fragment);
+ }
  function render(){
   rows.replaceChildren();
-  if(!layers.length){
+  const customLayers=layers.filter(layer=>!CATALOG_IDS.has(layer.id));
+  if(!customLayers.length){
    const empty=doc.createElement('p');
-   empty.textContent='Ingen tematiske WMS-lag er lagt til ennå.';
+   empty.textContent='Ingen egne WMS-lag er lagt til.';
    rows.append(empty);
   }
-  layers.forEach((layer,index)=>{
+  customLayers.forEach((layer,index)=>{
    const field=doc.createElement('fieldset');
    field.className='plan-wms-row';
    const legend=doc.createElement('legend');
@@ -86,11 +120,12 @@ export function mountPlanSettings(host,config,doc=document){
    const remove=doc.createElement('button');
    remove.type='button';
    remove.textContent='Fjern';
-   remove.addEventListener('click',()=>{layers.splice(index,1);render();});
+   remove.addEventListener('click',()=>{layers=layers.filter(value=>value.id!==layer.id);render();});
    field.append(defaultLabel,remove);
    rows.append(field);
   });
   root.querySelector('[data-wms-add]').disabled=layers.length>=MAX_LAYERS;
+  renderCatalog();
  }
  root.querySelector('[data-wms-add]').addEventListener('click',()=>{
   if(layers.length<MAX_LAYERS){layers.push(makeLayer());render();}
