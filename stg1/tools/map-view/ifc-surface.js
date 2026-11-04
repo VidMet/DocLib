@@ -35,11 +35,11 @@ function entityLabel(entity){
 }
 function matrixPoint(matrix,x,y,z){
  if(!matrix||matrix.length!==16)throw Error('IFC-geometrien mangler en 4×4-plasseringsmatrise.');
- return[
-  matrix[0]*x+matrix[4]*y+matrix[8]*z+matrix[12],
-  matrix[1]*x+matrix[5]*y+matrix[9]*z+matrix[13],
-  matrix[2]*x+matrix[6]*y+matrix[10]*z+matrix[14]
- ];
+ const worldX=matrix[0]*x+matrix[4]*y+matrix[8]*z+matrix[12];
+ const worldY=matrix[1]*x+matrix[5]*y+matrix[9]*z+matrix[13];
+ const worldZ=matrix[2]*x+matrix[6]*y+matrix[10]*z+matrix[14];
+ // web-ifc uses Y-up coordinates: map northing is -Z and elevation is Y.
+ return[worldX,-worldZ,worldY];
 }
 function modelLineIds(api,modelId){
  const ids=api.GetAllLines(modelId);
