@@ -1,4 +1,4 @@
-import {normalizeIfcObjectLayer,resolveIfcObjectColor} from './ifc-object-layer-config.js?v=2.05-preview.4-planview.6-ifc-read-test.6-2d-camera.2-wear-surface.6-multi-surface.2-hatch-cache.3-plan-performance.2-ifc-read-phases.2-yield-accounting.1-batched-yields.1-ifc-object-layer.6';
+import {normalizeIfcObjectLayer,matchIfcObjectColor} from './ifc-object-layer-config.js?v=2.05-preview.4-planview.6-ifc-read-test.6-2d-camera.2-wear-surface.6-multi-surface.2-hatch-cache.3-plan-performance.2-ifc-read-phases.2-yield-accounting.1-batched-yields.1-ifc-object-layer.7';
 const WEB_IFC_VERSION='0.0.77';
 const WEB_IFC_BASE=`https://cdn.jsdelivr.net/npm/web-ifc@${WEB_IFC_VERSION}/`;
 export const MAX_WEAR_TRIANGLES=120000;
@@ -253,7 +253,7 @@ export async function readIfcObjectLayer(buffer,rawConfig,onProgress=()=>{},tria
  try{
   modelId=api.OpenModel(new Uint8Array(buffer),{COORDINATE_TO_ORIGIN:false});
   timings.setup=performance.now()-setupStarted;
-  const ids=modelLineIds(api,modelId),candidates=[];
+  const ids=modelLineIds(api,modelId),candidates=[],matchedValues=new Map(),unmatchedValues=new Map();let mappedObjects=0,defaultObjects=0;
   let scanStarted=performance.now(),scanChunkStart=0;
   for(let index=0;index<ids.length;index++){
    const expressId=Number(unwrap(ids[index]));
@@ -262,8 +262,19 @@ export async function readIfcObjectLayer(buffer,rawConfig,onProgress=()=>{},tria
     const name=String(unwrapIfc(entity?.Name)||'').trim();
     const properties=readConfiguredProperties(api,modelId,expressId,rules);
     if(Object.keys(properties).length){
-     const color=resolveIfcObjectColor(properties,rules,config.defaultColor);
-     candidates.push({expressId,name:name||`IFC-objekt ${expressId}`,properties,color});
+     const match=matchIfcObjectColor(properties,rules,config.defaultColor);
+     if(match.matched){
+      mappedObjects++;const key=JSON.stringify([match.property,match.value,match.color]);const current=matchedValues.get(key);
+      if(current)current.count++;else if(matchedValues.size<8)matchedValues.set(key,{property:match.property,value:match.value,color:match.color,count:1});
+     }else{
+      defaultObjects++;
+      for(const rule of rules){
+       const raw=properties[rule.property],values=Array.isArray(raw)?raw:[raw],present=values.filter(value=>String(value??'').trim());
+       const samples=present.length?present:['(tom verdi)'];
+       for(const value of samples){const key=JSON.stringify([rule.property,String(value).slice(0,100)]),current=unmatchedValues.get(key);if(current)current.count++;else if(unmatchedValues.size<8)unmatchedValues.set(key,{property:rule.property,value:String(value).slice(0,100),count:1});}
+      }
+     }
+     candidates.push({expressId,name:name||`IFC-objekt ${expressId}`,properties,color:match.color});
     }
    }
    const processed=index+1,chunk=processed-scanChunkStart,check=processed%SCAN_YIELD_TIME_CHECK_ITEMS===0;
@@ -331,7 +342,7 @@ export async function readIfcObjectLayer(buffer,rawConfig,onProgress=()=>{},tria
    if(triangles.length>=triangleLimit)break;
   }
   if(!triangles.length)throw Error(`Fant ${candidates.length} objekt(er) med valgte egenskaper, men ingen oppovervendte flater kunne leses.`);
-  return{triangles,colors,labels,candidateCount:candidates.length,truncated,timings};
+  return{triangles,colors,labels,candidateCount:candidates.length,truncated,timings,colorDiagnostics:{mappedObjects,defaultObjects,matchedValues:[...matchedValues.values()],unmatchedValues:[...unmatchedValues.values()]}};
  }finally{if(modelId!==null)api.CloseModel(modelId);}
 }
 

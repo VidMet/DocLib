@@ -1,6 +1,6 @@
-import {readWearSurface,drawWearSurface,readIfcObjectLayer,drawIfcObjectLayer,MAX_WEAR_TRIANGLES,MAX_IFC_OBJECT_TRIANGLES} from './ifc-surface.js?v=2.05-preview.4-planview.6-ifc-read-test.6-2d-camera.2-wear-surface.6-multi-surface.2-hatch-cache.3-plan-performance.2-ifc-read-phases.2-yield-accounting.1-batched-yields.1-ifc-object-layer.6';
-import {normalizeIfcObjectLayer} from './ifc-object-layer-config.js?v=2.05-preview.4-planview.6-ifc-read-test.6-2d-camera.2-wear-surface.6-multi-surface.2-hatch-cache.3-plan-performance.2-ifc-read-phases.2-yield-accounting.1-batched-yields.1-ifc-object-layer.6';
-import {readWearSurfaceCache,writeWearSurfaceCache,wearSurfaceCacheKey} from './ifc-surface-cache.js?v=2.05-preview.4-planview.6-ifc-read-test.6-2d-camera.2-wear-surface.6-multi-surface.2-hatch-cache.3-plan-performance.2-ifc-read-phases.2-yield-accounting.1-batched-yields.1-ifc-object-layer.6';
+import {readWearSurface,drawWearSurface,readIfcObjectLayer,drawIfcObjectLayer,MAX_WEAR_TRIANGLES,MAX_IFC_OBJECT_TRIANGLES} from './ifc-surface.js?v=2.05-preview.4-planview.6-ifc-read-test.6-2d-camera.2-wear-surface.6-multi-surface.2-hatch-cache.3-plan-performance.2-ifc-read-phases.2-yield-accounting.1-batched-yields.1-ifc-object-layer.7';
+import {normalizeIfcObjectLayer} from './ifc-object-layer-config.js?v=2.05-preview.4-planview.6-ifc-read-test.6-2d-camera.2-wear-surface.6-multi-surface.2-hatch-cache.3-plan-performance.2-ifc-read-phases.2-yield-accounting.1-batched-yields.1-ifc-object-layer.7';
+import {readWearSurfaceCache,writeWearSurfaceCache,wearSurfaceCacheKey} from './ifc-surface-cache.js?v=2.05-preview.4-planview.6-ifc-read-test.6-2d-camera.2-wear-surface.6-multi-surface.2-hatch-cache.3-plan-performance.2-ifc-read-phases.2-yield-accounting.1-batched-yields.1-ifc-object-layer.7';
 const MAX_WIDTH=1600;
 const MAX_HEIGHT=1200;
 const WORLD=20037508.342789244;
@@ -470,18 +470,23 @@ function createPlanView({store}){
     if(!selectionIsCurrent())return;
     if(remaining<1){reports.push(`${files[index].name}: hoppet over fordi grensen på ${MAX_IFC_OBJECT_TRIANGLES.toLocaleString('nb-NO')} trekanter er nådd.`);continue;}
     const file=files[index],key=JSON.stringify([String(file.id),String(file.versionId||''),configKey]);let model=memoryObjectLayerCache.get(key),source=model?'minnecache':'ny behandling',started=performance.now();
+    const filesLeft=files.length-index,modelLimit=Math.max(1,Math.ceil(remaining/filesLeft));
     try{
      if(!model){
       if(result)result.textContent=`Henter og leser IFC ${index+1} av ${files.length}: ${file.name} …`;
       const buffer=await window.DocLibLegacyBridge.downloadIfcForSurface(file.id);if(!selectionIsCurrent())return;
-      model=await readIfcObjectLayer(buffer,ifcObjectLayerConfig,message=>{if(result&&selectionIsCurrent())result.textContent=`${file.name} · ${message}`;},remaining);
+      model=await readIfcObjectLayer(buffer,ifcObjectLayerConfig,message=>{if(result&&selectionIsCurrent())result.textContent=`${file.name} · ${message}`;},modelLimit);
       memoryObjectLayerCache.set(key,model);if(memoryObjectLayerCache.size>12)memoryObjectLayerCache.delete(memoryObjectLayerCache.keys().next().value);
      }
      if(!selectionIsCurrent())return;
-     const count=Math.min(model.triangles.length,remaining),displayModel={...model,triangles:model.triangles.slice(0,count),colors:model.colors.slice(0,count),geometrySource:model,fileId:file.id,fileName:file.name};
+     const count=Math.min(model.triangles.length,modelLimit,remaining),displayModel={...model,triangles:model.triangles.slice(0,count),colors:model.colors.slice(0,count),geometrySource:model,fileId:file.id,fileName:file.name};
      if(count)models.push(displayModel);remaining-=count;
      const truncated=model.truncated||count<model.triangles.length;
-     reports.push(`${file.name}: ${count.toLocaleString('nb-NO')} trekanter fra ${model.candidateCount} objekt(er) · ${source}${truncated?' · avkortet av trekantgrensen':''} · ${formatSeconds(performance.now()-started)}`);
+     const diagnostics=model.colorDiagnostics;
+     const mappedText=diagnostics?` · fargemappet ${diagnostics.mappedObjects}, standardfarge ${diagnostics.defaultObjects}`:'';
+     const matchText=diagnostics?.matchedValues?.length?` · treff: ${diagnostics.matchedValues.slice(0,3).map(item=>`«${item.value}» → ${item.color} (${item.count})`).join(', ')}`:'';
+     const unmatchedText=diagnostics?.unmatchedValues?.length?` · uten treff: ${diagnostics.unmatchedValues.slice(0,3).map(item=>`«${item.value}» (${item.count})`).join(', ')}`:'';
+     reports.push(`${file.name}: ${count.toLocaleString('nb-NO')} trekanter fra ${model.candidateCount} objekt(er)${mappedText}${matchText}${unmatchedText} · ${source}${truncated?' · avkortet av trekantgrensen':''} · ${formatSeconds(performance.now()-started)}`);
     }catch(error){reports.push(`${file.name}: ${error?.message||String(error)}`);}
    }
    if(!selectionIsCurrent())return;

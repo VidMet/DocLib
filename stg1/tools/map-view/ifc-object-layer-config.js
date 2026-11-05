@@ -36,7 +36,7 @@ export function normalizeIfcObjectLayer(raw){
  };
 }
 
-export function resolveIfcObjectColor(properties,rules,defaultColor){
+export function matchIfcObjectColor(properties,rules,defaultColor){
  for(const rule of Array.isArray(rules)?rules:[]){
   const values=properties?.[rule.property];
   const candidates=Array.isArray(values)?values:[values];
@@ -44,8 +44,12 @@ export function resolveIfcObjectColor(properties,rules,defaultColor){
    const value=normalizeDisplayValue(candidate);
    if(!value)continue;
    const mapping=(rule.values||[]).find(item=>normalizeDisplayValue(item.value).toLocaleLowerCase('nb-NO')===value.toLocaleLowerCase('nb-NO'));
-   if(mapping)return mapping.color;
+   if(mapping)return{color:mapping.color,matched:true,property:rule.property,value};
   }
  }
- return defaultColor;
+ return{color:defaultColor,matched:false,property:null,value:null};
+}
+
+export function resolveIfcObjectColor(properties,rules,defaultColor){
+ return matchIfcObjectColor(properties,rules,defaultColor).color;
 }
