@@ -66,52 +66,77 @@ async function getWebIfcApi(){
 export async function readWearSurface(buffer,onProgress=()=>{},triangleLimit=MAX_WEAR_TRIANGLES){
  if(!(buffer instanceof ArrayBuffer)||buffer.byteLength===0)throw Error('IFC-filen er tom eller ugyldig.');
  if(!Number.isInteger(triangleLimit)||triangleLimit<1||triangleLimit>MAX_WEAR_TRIANGLES)throw Error('Ugyldig trekantgrense for IFC-geometrien.');
+ const timings={setup:0,lineScan:0,meshExtract:0,triangleFilter:0};
+ const setupStarted=performance.now();
  const api=await getWebIfcApi();
  let modelId=null;
  try{
   modelId=api.OpenModel(new Uint8Array(buffer),{COORDINATE_TO_ORIGIN:false});
+  timings.setup=performance.now()-setupStarted;
+  const idsStarted=performance.now();
   const ids=modelLineIds(api,modelId);
+  timings.lineScan+=performance.now()-idsStarted;
   const candidates=[];
   const wearPattern=/(^|[^a-z])(slitelag|slitelaget|wearing[ _-]?course|asphalt[ _-]?wearing)([^a-z]|$)/i;
+  let scanBlockStarted=performance.now();
   for(let index=0;index<ids.length;index++){
    const expressId=Number(unwrap(ids[index]));
-   if(!Number.isInteger(expressId))continue;
-   const entity=api.GetLine(modelId,expressId);
-   const label=entityLabel(entity);
-   if(label&&wearPattern.test(label))candidates.push({expressId,label});
-   if(index%300===0){onProgress(`Leter etter slitelag: ${index.toLocaleString('nb-NO')} av ${ids.length.toLocaleString('nb-NO')} IFC-linjer …`);await new Promise(resolve=>setTimeout(resolve,0));}
+   if(Number.isInteger(expressId)){
+    const entity=api.GetLine(modelId,expressId);
+    const label=entityLabel(entity);
+    if(label&&wearPattern.test(label))candidates.push({expressId,label});
+   }
+   if(index%300===0){
+    timings.lineScan+=performance.now()-scanBlockStarted;
+    onProgress(`Leter etter slitelag: ${index.toLocaleString('nb-NO')} av ${ids.length.toLocaleString('nb-NO')} IFC-linjer …`);
+    await new Promise(resolve=>setTimeout(resolve,0));
+    scanBlockStarted=performance.now();
+   }
   }
+  timings.lineScan+=performance.now()-scanBlockStarted;
   if(!candidates.length)throw Error('Fant ingen IFC-objekter med «slitelag» eller «wearing course» i navn, beskrivelse eller objekttype.');
   const triangles=[];
   const labels=[];
   for(let itemIndex=0;itemIndex<candidates.length;itemIndex++){
    const candidate=candidates[itemIndex];
+   const meshStarted=performance.now();
    const flat=api.GetFlatMesh(modelId,candidate.expressId);
-   for(const placed of vectorItems(flat?.geometries)){
+   const placedGeometries=vectorItems(flat?.geometries);
+   timings.meshExtract+=performance.now()-meshStarted;
+   for(const placed of placedGeometries){
+    const geometryStarted=performance.now();
     const geometry=api.GetGeometry(modelId,Number(placed.geometryExpressID));
-    if(!geometry)continue;
+    if(!geometry){timings.meshExtract+=performance.now()-geometryStarted;continue;}
     try{
      const vertices=api.GetVertexArray(geometry.GetVertexData(),geometry.GetVertexDataSize());
      const indices=api.GetIndexArray(geometry.GetIndexData(),geometry.GetIndexDataSize());
      const transform=Array.from(placed.flatTransformation||[]);
      if(transform.length!==16)throw Error(`Objekt ${candidate.expressId}: ukjent geometri-transformasjon.`);
+     timings.meshExtract+=performance.now()-geometryStarted;
+     const filterStarted=performance.now();
      for(let offset=0;offset+2<indices.length;offset+=3){
-      const points=[];
-      for(let corner=0;corner<3;corner++){
-       const vertexIndex=Number(indices[offset+corner]);
-       const base=vertexIndex*6;
-       if(base+2>=vertices.length)throw Error('IFC-geometri inneholder en ugyldig vertex-indeks.');
-       points.push(matrixPoint(transform,Number(vertices[base]),Number(vertices[base+1]),Number(vertices[base+2])));
-      }
-      const [a,b,c]=points;
-      const ab=[b[0]-a[0],b[1]-a[1],b[2]-a[2]],ac=[c[0]-a[0],c[1]-a[1],c[2]-a[2]];
-      const normalZ=ab[0]*ac[1]-ab[1]*ac[0];
-      const normalLength=Math.hypot(normalZ,ab[1]*ac[2]-ab[2]*ac[1],ab[2]*ac[0]-ab[0]*ac[2]);
+      const indexA=Number(indices[offset]),indexB=Number(indices[offset+1]),indexC=Number(indices[offset+2]);
+      const baseA=indexA*6,baseB=indexB*6,baseC=indexC*6;
+      if(baseA+2>=vertices.length||baseB+2>=vertices.length||baseC+2>=vertices.length)throw Error('IFC-geometri inneholder en ugyldig vertex-indeks.');
+      const ax=transform[0]*vertices[baseA]+transform[4]*vertices[baseA+1]+transform[8]*vertices[baseA+2]+transform[12];
+      const ay=-(transform[2]*vertices[baseA]+transform[6]*vertices[baseA+1]+transform[10]*vertices[baseA+2]+transform[14]);
+      const az=transform[1]*vertices[baseA]+transform[5]*vertices[baseA+1]+transform[9]*vertices[baseA+2]+transform[13];
+      const bx=transform[0]*vertices[baseB]+transform[4]*vertices[baseB+1]+transform[8]*vertices[baseB+2]+transform[12];
+      const by=-(transform[2]*vertices[baseB]+transform[6]*vertices[baseB+1]+transform[10]*vertices[baseB+2]+transform[14]);
+      const bz=transform[1]*vertices[baseB]+transform[5]*vertices[baseB+1]+transform[9]*vertices[baseB+2]+transform[13];
+      const cx=transform[0]*vertices[baseC]+transform[4]*vertices[baseC+1]+transform[8]*vertices[baseC+2]+transform[12];
+      const cy=-(transform[2]*vertices[baseC]+transform[6]*vertices[baseC+1]+transform[10]*vertices[baseC+2]+transform[14]);
+      const cz=transform[1]*vertices[baseC]+transform[5]*vertices[baseC+1]+transform[9]*vertices[baseC+2]+transform[13];
+      const abx=bx-ax,aby=by-ay,abz=bz-az,acx=cx-ax,acy=cy-ay,acz=cz-az;
+      const normalZ=abx*acy-aby*acx;
+      const normalX=aby*acz-abz*acy,normalY=abz*acx-abx*acz;
+      const normalLength=Math.hypot(normalZ,normalX,normalY);
       if(normalLength>1e-10&&normalZ/normalLength>0.72){
-       triangles.push(points);
+       triangles.push([[ax,ay,az],[bx,by,bz],[cx,cy,cz]]);
        if(triangles.length>=triangleLimit)break;
       }
      }
+     timings.triangleFilter+=performance.now()-filterStarted;
     }finally{geometry.delete?.();}
     if(triangles.length>=triangleLimit)break;
    }
@@ -121,7 +146,7 @@ export async function readWearSurface(buffer,onProgress=()=>{},triangleLimit=MAX
    if(triangles.length>=triangleLimit)break;
   }
   if(!triangles.length)throw Error(`Fant ${candidates.length} merket slitelagsobjekt, men ingen oppovervendt flate kunne leses.`);
-  return{triangles,labels,candidateCount:candidates.length,truncated:triangles.length>=triangleLimit};
+  return{triangles,labels,candidateCount:candidates.length,truncated:triangles.length>=triangleLimit,timings};
  }finally{
   if(modelId!==null)api.CloseModel(modelId);
  }

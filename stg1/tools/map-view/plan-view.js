@@ -1,5 +1,5 @@
-import {readWearSurface,drawWearSurface,MAX_WEAR_TRIANGLES} from './ifc-surface.js?v=2.05-preview.4-planview.6-ifc-read-test.6-2d-camera.2-wear-surface.6-multi-surface.2-hatch-cache.3-plan-performance.1';
-import {readWearSurfaceCache,writeWearSurfaceCache,wearSurfaceCacheKey} from './ifc-surface-cache.js?v=2.05-preview.4-planview.6-ifc-read-test.6-2d-camera.2-wear-surface.6-multi-surface.2-hatch-cache.3-plan-performance.1';
+import {readWearSurface,drawWearSurface,MAX_WEAR_TRIANGLES} from './ifc-surface.js?v=2.05-preview.4-planview.6-ifc-read-test.6-2d-camera.2-wear-surface.6-multi-surface.2-hatch-cache.3-plan-performance.2-ifc-read-phases.1';
+import {readWearSurfaceCache,writeWearSurfaceCache,wearSurfaceCacheKey} from './ifc-surface-cache.js?v=2.05-preview.4-planview.6-ifc-read-test.6-2d-camera.2-wear-surface.6-multi-surface.2-hatch-cache.3-plan-performance.2-ifc-read-phases.1';
 const MAX_WIDTH=1600;
 const MAX_HEIGHT=1200;
 const WORLD=20037508.342789244;
@@ -447,7 +447,7 @@ function createPlanView({store}){
     const file=files[index],key=wearSurfaceCacheKey(projectId,file);
     if(remaining<1){reports.push(`${file.name}: hoppet over fordi samlet sikkerhetsgrense på ${MAX_WEAR_TRIANGLES.toLocaleString('nb-NO')} trekanter er nådd.`);continue;}
     try{
-     const timings={cache:0,download:0,read:0,save:0};
+     const timings={cache:0,download:0,read:0,save:0,readDetails:null};
      let model=key?memoryWearCache.get(key):null;
      let source=model?'minnebuffer':'';
      if(!model&&key){
@@ -467,6 +467,7 @@ function createPlanView({store}){
       const readStarted=performance.now();
       model=await readWearSurface(buffer,message=>{if(result&&selectionIsCurrent())result.textContent=`${file.name} · ${message}`;},MAX_WEAR_TRIANGLES);
       timings.read=performance.now()-readStarted;
+      timings.readDetails=model.timings||null;
       if(!selectionIsCurrent())return;
       source=key?'nybehandlet':'nybehandlet; ikke cachet fordi Trimble mangler versjons-ID';
       if(key){
@@ -486,7 +487,8 @@ function createPlanView({store}){
      const limitNote=aggregateLimited?' (avkortet av samlet visningsgrense)':'';
      const modelLimitNote=model.truncated?' (denne IFC-en nådde grensen på 120 000 trekanter)':'';
      const timingNote=`Tid: cache ${formatSeconds(timings.cache)}, nedlasting ${formatSeconds(timings.download)}, IFC-lesing ${formatSeconds(timings.read)}, lagring ${formatSeconds(timings.save)}`;
-     reports.push(`${file.name}: ${shownCount} trekanter fra ${model.candidateCount} objekt(er) · ${source}${limitNote}${modelLimitNote}. ${timingNote}.`);
+     const readDetailNote=timings.readDetails?` Delmålinger: oppstart/åpning ${formatSeconds(timings.readDetails.setup)}, linjeskanning ${formatSeconds(timings.readDetails.lineScan)}, mesh-uttrekk ${formatSeconds(timings.readDetails.meshExtract)}, trekantfilter ${formatSeconds(timings.readDetails.triangleFilter)}.`:'';
+     reports.push(`${file.name}: ${shownCount} trekanter fra ${model.candidateCount} objekt(er) · ${source}${limitNote}${modelLimitNote}. ${timingNote}.${readDetailNote}`);
     }catch(error){reports.push(`${file.name}: ${error?.message||String(error)}`);}
    }
    if(!selectionIsCurrent())return;
