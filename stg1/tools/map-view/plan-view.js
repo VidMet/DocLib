@@ -1,5 +1,5 @@
-import {readWearSurface,drawWearSurface,MAX_WEAR_TRIANGLES} from './ifc-surface.js?v=2.05-preview.4-planview.6-ifc-read-test.6-2d-camera.2-wear-surface.6-multi-surface.2-hatch-cache.2';
-import {readWearSurfaceCache,writeWearSurfaceCache,wearSurfaceCacheKey} from './ifc-surface-cache.js?v=2.05-preview.4-planview.6-ifc-read-test.6-2d-camera.2-wear-surface.6-multi-surface.2-hatch-cache.2';
+import {readWearSurface,drawWearSurface,MAX_WEAR_TRIANGLES} from './ifc-surface.js?v=2.05-preview.4-planview.6-ifc-read-test.6-2d-camera.2-wear-surface.6-multi-surface.2-hatch-cache.3-plan-performance.1';
+import {readWearSurfaceCache,writeWearSurfaceCache,wearSurfaceCacheKey} from './ifc-surface-cache.js?v=2.05-preview.4-planview.6-ifc-read-test.6-2d-camera.2-wear-surface.6-multi-surface.2-hatch-cache.3-plan-performance.1';
 const MAX_WIDTH=1600;
 const MAX_HEIGHT=1200;
 const WORLD=20037508.342789244;
@@ -47,8 +47,12 @@ function createPlanView({store}){
  let center={x:1170000,y:8370000},span=1400000,drag=null,pointerPosition=null;
  let currentModelCRS=DEFAULT_MODEL_CRS,lastCameraXY=null,cameraConnectionStarted=false;
  let baseMap='flyfoto',sharedBaseMap='flyfoto',userBaseMapSelected=false,layers=[],visible=new Set(),images=new Map();
- let wearSurfaces=[],projectedWearSurface=null,wearSurfaceExtent=null,surfaceFileIds=[],surfaceLoadToken=0,surfaceLoading=false,surfaceRefreshPending=false,wearSurfaceActive=false;
+ let wearSurfaces=[],projectedWearSurface=null,wearSurfaceExtent=null,surfaceFileIds=[],surfaceLoadToken=0,surfaceLoading=false,surfaceRefreshPending=false,wearSurfaceActive=false,lastWearDrawMs=0;
  const memoryWearCache=new Map();
+ let projectedWearCache=new WeakMap();
+ const wearDrawWaiters=[];
+ const waitForWearDraw=()=>new Promise(resolve=>wearDrawWaiters.push(resolve));
+ const finishWearDraw=()=>{for(const resolve of wearDrawWaiters.splice(0))resolve(lastWearDrawMs);};
  const refresh=()=>{if(!root||destroyed)return;clearTimeout(timer);timer=setTimeout(draw,130);};
  const setLayers=next=>{
   const previous=new Set(layers.map(layer=>layer.id));
@@ -104,10 +108,7 @@ function createPlanView({store}){
    refresh();
   }catch(error){setCameraStatus(`Kunne ikke konvertere kamerakoordinatene (${currentModelCRS}): ${error?.message||String(error)}`,true);}
  };
- const projectModelPoint=(x,y)=>{
-  const proj4=window.proj4;
-  if(typeof proj4!=='function')throw Error('Proj4 er ikke tilgjengelig.');
-  registerModelCrs(proj4);
+ const projectModelPoint=(proj4,x,y)=>{
   const [longitude,latitude]=proj4(currentModelCRS,'EPSG:4326',[x,y]);
   if(!Number.isFinite(longitude)||!Number.isFinite(latitude)||Math.abs(latitude)>=90)throw Error('IFC-flaten ga ugyldige geografiske koordinater.');
   const mercatorX=clamp(longitude*WORLD/180,-WORLD,WORLD);
@@ -115,15 +116,50 @@ function createPlanView({store}){
   return[mercatorX,mercatorY];
  };
  const projectWearSurface=()=>{
-  if(!wearSurfaces.length){projectedWearSurface=null;wearSurfaceExtent=null;const focusButton=root?.querySelector('[data-ifc-focus]');if(focusButton)focusButton.hidden=true;return;}
+  if(!wearSurfaces.length){projectedWearSurface=null;wearSurfaceExtent=null;const focusButton=root?.querySelector('[data-ifc-focus]');if(focusButton)focusButton.hidden=true;return{cacheHits:0,cacheMisses:0};}
+  let cacheHits=0,cacheMisses=0;
   try{
-   const triangles=[];
-   for(const model of wearSurfaces)for(const triangle of model.triangles)triangles.push(triangle.map(point=>{const [x,y]=projectModelPoint(point[0],point[1]);return[x,y,point[2]];}));
-   projectedWearSurface={triangles};
-   const points=triangles.flat();
-   wearSurfaceExtent=points.reduce((bounds,point)=>({minX:Math.min(bounds.minX,point[0]),minY:Math.min(bounds.minY,point[1]),maxX:Math.max(bounds.maxX,point[0]),maxY:Math.max(bounds.maxY,point[1])}),{minX:Infinity,minY:Infinity,maxX:-Infinity,maxY:-Infinity});
+   const proj4=window.proj4;
+   if(typeof proj4!=='function')throw Error('Proj4 er ikke tilgjengelig.');
+   registerModelCrs(proj4);
+   const surfaces=[];
+   const extent={minX:Infinity,minY:Infinity,maxX:-Infinity,maxY:-Infinity};
+   let triangleCount=0;
+   for(const model of wearSurfaces){
+    const source=model.geometrySource||model;
+    let modelCache=projectedWearCache.get(source);
+    if(!modelCache){modelCache=new Map();projectedWearCache.set(source,modelCache);}
+    const cacheKey=`${currentModelCRS}:${model.triangles.length}`;
+    let projected=modelCache.get(cacheKey);
+    if(projected)cacheHits++;
+    else{
+     const triangles=new Array(model.triangles.length);
+     const modelExtent={minX:Infinity,minY:Infinity,maxX:-Infinity,maxY:-Infinity};
+     for(let triangleIndex=0;triangleIndex<model.triangles.length;triangleIndex++){
+      const triangle=model.triangles[triangleIndex],points=new Array(3);
+      for(let pointIndex=0;pointIndex<3;pointIndex++){
+       const point=triangle[pointIndex],xy=projectModelPoint(proj4,point[0],point[1]);
+       points[pointIndex]=[xy[0],xy[1],point[2]];
+       modelExtent.minX=Math.min(modelExtent.minX,xy[0]);modelExtent.minY=Math.min(modelExtent.minY,xy[1]);
+       modelExtent.maxX=Math.max(modelExtent.maxX,xy[0]);modelExtent.maxY=Math.max(modelExtent.maxY,xy[1]);
+      }
+      triangles[triangleIndex]=points;
+     }
+     projected={triangles,extent:modelExtent};
+     modelCache.set(cacheKey,projected);
+     if(modelCache.size>4)modelCache.delete(modelCache.keys().next().value);
+     cacheMisses++;
+    }
+    surfaces.push(projected);
+    triangleCount+=projected.triangles.length;
+    extent.minX=Math.min(extent.minX,projected.extent.minX);extent.minY=Math.min(extent.minY,projected.extent.minY);
+    extent.maxX=Math.max(extent.maxX,projected.extent.maxX);extent.maxY=Math.max(extent.maxY,projected.extent.maxY);
+   }
+   projectedWearSurface={surfaces,triangleCount};
+   wearSurfaceExtent=extent;
    const focusButton=root?.querySelector('[data-ifc-focus]');if(focusButton)focusButton.hidden=false;
   }catch(error){projectedWearSurface=null;wearSurfaceExtent=null;setCameraStatus(`Slitelagsflaten kunne ikke projiseres (${currentModelCRS}): ${error?.message||String(error)}`,true);}
+  return{cacheHits,cacheMisses};
  };
  const focusWearSurface=()=>{
   if(!wearSurfaceExtent)return;
@@ -239,10 +275,10 @@ function createPlanView({store}){
   }
  }
  function draw(){
-  if(!root)return;
+  if(!root){finishWearDraw();return;}
   const map=root.querySelector('[data-plan-map]');
   const rect=map.getBoundingClientRect();
-  if(rect.width<20||rect.height<20)return;
+  if(rect.width<20||rect.height<20){lastWearDrawMs=0;finishWearDraw();return;}
   const cssWidth=rect.width;
   const cssHeight=rect.height;
   const pixelRatio=window.devicePixelRatio||1;
@@ -253,7 +289,10 @@ function createPlanView({store}){
   const bounds=[Math.max(-WORLD,center.x-halfX),Math.max(-WORLD,center.y-halfY),Math.min(WORLD,center.x+halfX),Math.min(WORLD,center.y+halfY)];
   drawBase(root.querySelector('[data-plan-base]'),bounds,cssWidth,cssHeight,width,height);
   const surfaceCanvas=root.querySelector('[data-plan-wear-surface]');
+  const wearDrawStarted=performance.now();
   if(surfaceCanvas)drawWearSurface(surfaceCanvas,projectedWearSurface,{center,span,width:cssWidth,height:cssHeight,projectPoint:(x,y)=>({x,y})});
+  lastWearDrawMs=performance.now()-wearDrawStarted;
+  finishWearDraw();
   const current=[...visible].map(id=>layers.find(layer=>layer.id===id)).filter(Boolean);
   for(const[id,image]of images){
    if(!current.some(layer=>layer.id===id)){
@@ -333,8 +372,8 @@ function createPlanView({store}){
    if(remaining<1)break;
    const key=wearSurfaceCacheKey(projectId,file),cached=key?memoryWearCache.get(key):null;
    if(!cached)continue;
-   const triangles=cached.triangles.slice(0,remaining);
-   models.push({...cached,triangles,fileId:file.id,fileName:file.name});
+   const triangles=cached.triangles.length<=remaining?cached.triangles:cached.triangles.slice(0,remaining);
+   models.push({...cached,triangles,geometrySource:cached,fileId:file.id,fileName:file.name});
    remaining-=triangles.length;
   }
   wearSurfaces=models;
@@ -439,9 +478,9 @@ function createPlanView({store}){
       }
      }
      if(!selectionIsCurrent())return;
-     const shownTriangles=model.triangles.slice(0,remaining);
+     const shownTriangles=model.triangles.length<=remaining?model.triangles:model.triangles.slice(0,remaining);
      const aggregateLimited=shownTriangles.length<model.triangles.length;
-     const displayModel={...model,triangles:shownTriangles,fileId:file.id,fileName:file.name};
+     const displayModel={...model,triangles:shownTriangles,geometrySource:model,fileId:file.id,fileName:file.name};
      if(shownTriangles.length){models.push(displayModel);remaining-=shownTriangles.length;}
      const shownCount=shownTriangles.length.toLocaleString('nb-NO');
      const limitNote=aggregateLimited?' (avkortet av samlet visningsgrense)':'';
@@ -452,16 +491,22 @@ function createPlanView({store}){
    }
    if(!selectionIsCurrent())return;
    if(!models.length)throw Error('Ingen av de valgte IFC-modellene ga lesbar slitelagsgeometri.');
-   wearSurfaces=models;surfaceFileIds=selectedKeys;projectWearSurface();
+   wearSurfaces=models;surfaceFileIds=selectedKeys;
+   const projectionStarted=performance.now();
+   const projectionCache=projectWearSurface();
+   const projectionMs=performance.now()-projectionStarted;
    if(!projectedWearSurface||!wearSurfaceExtent)throw Error('Geometrien kunne ikke konverteres til valgt CRS.');
+   const drawWait=waitForWearDraw();
    refresh();
+   const drawMs=await drawWait;
    const extentWidth=wearSurfaceExtent.maxX-wearSurfaceExtent.minX,extentHeight=wearSurfaceExtent.maxY-wearSurfaceExtent.minY;
    const extentCenter={x:(wearSurfaceExtent.minX+wearSurfaceExtent.maxX)/2,y:(wearSurfaceExtent.minY+wearSurfaceExtent.maxY)/2};
    const offset=Math.hypot(extentCenter.x-center.x,extentCenter.y-center.y);
    const fmt=value=>Math.round(value).toLocaleString('nb-NO');
    const cacheNote='Lokal cache lagres bare i denne nettleseren og krever Trimble-versjons-ID.';
    const totalTime=formatSeconds(performance.now()-runStarted);
-   if(result)result.textContent=`Viser slitelag fra ${models.length} av ${files.length} valgte IFC-modeller (${projectedWearSurface.triangles.length.toLocaleString('nb-NO')} trekanter totalt). Samlet utstrekning ca. ${fmt(extentWidth)} × ${fmt(extentHeight)} m i ${currentModelCRS}; sentrum er ca. ${fmt(offset)} m fra kartets nåværende sentrum. Trykk «Zoom til slitelaget» for å vise alle.\nSamlet tid: ${totalTime}. ${automatic?'Utvalget ble oppdatert automatisk. ':''}${cacheNote}\n\n${reports.join('\n')}`;
+   const projectionNote=`Projisering: ${formatSeconds(projectionMs)} (${projectionCache.cacheHits} cachetreff, ${projectionCache.cacheMisses} nye IFC-projiseringer) · tegning: ${formatSeconds(drawMs)}`;
+   if(result)result.textContent=`Viser slitelag fra ${models.length} av ${files.length} valgte IFC-modeller (${projectedWearSurface.triangleCount.toLocaleString('nb-NO')} trekanter totalt). Samlet utstrekning ca. ${fmt(extentWidth)} × ${fmt(extentHeight)} m i ${currentModelCRS}; sentrum er ca. ${fmt(offset)} m fra kartets nåværende sentrum. Trykk «Zoom til slitelaget» for å vise alle.\nSamlet tid: ${totalTime}. ${projectionNote}. ${automatic?'Utvalget ble oppdatert automatisk. ':''}${cacheNote}\n\n${reports.join('\n')}`;
   }catch(error){if(result&&token===surfaceLoadToken)result.textContent=`Slitelagsgeometri ble ikke vist: ${error?.message||String(error)}${reports.length?`\n\n${reports.join('\n')}`:''}`;}
   finally{
    surfaceLoading=false;
@@ -523,6 +568,8 @@ function createPlanView({store}){
   canLeave(){return true;},
   unmount(){
    clearTimeout(timer);
+   lastWearDrawMs=0;
+   finishWearDraw();
    unsubscribeStore?.();
    unsubscribeStore=null;
    selectionController?.abort();

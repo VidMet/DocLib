@@ -136,15 +136,24 @@ export function drawWearSurface(canvas,model,options){
  const context=canvas.getContext('2d');
  context.setTransform(ratio,0,0,ratio,0,0);
  context.clearRect(0,0,width,height);
- if(!model?.triangles?.length)return;
+ const isProjected=Array.isArray(model?.surfaces);
+ const surfaces=isProjected?model.surfaces:(model?.triangles?.length?[model]:[]);
+ if(!surfaces.length)return;
  context.fillStyle='rgba(232,82,35,.72)';
  context.beginPath();
- for(const triangle of model.triangles){
-  const points=triangle.map(point=>projectPoint(point[0],point[1]));
-  if(points.some(point=>!point||!Number.isFinite(point.x)||!Number.isFinite(point.y)))continue;
-  const screen=points.map(point=>[width/2+(point.x-center.x)*width/span,height/2-(point.y-center.y)*width/span]);
-  if(screen.every(([x,y])=>x<0||x>width||y<0||y>height))continue;
-  context.moveTo(screen[0][0],screen[0][1]);context.lineTo(screen[1][0],screen[1][1]);context.lineTo(screen[2][0],screen[2][1]);context.closePath();
+ const scale=width/span;
+ for(const surface of surfaces)for(const triangle of surface.triangles){
+  let x0=triangle[0][0],y0=triangle[0][1],x1=triangle[1][0],y1=triangle[1][1],x2=triangle[2][0],y2=triangle[2][1];
+  if(!isProjected){
+   const p0=projectPoint(x0,y0),p1=projectPoint(x1,y1),p2=projectPoint(x2,y2);
+   if(!p0||!p1||!p2||!Number.isFinite(p0.x)||!Number.isFinite(p0.y)||!Number.isFinite(p1.x)||!Number.isFinite(p1.y)||!Number.isFinite(p2.x)||!Number.isFinite(p2.y))continue;
+   x0=p0.x;y0=p0.y;x1=p1.x;y1=p1.y;x2=p2.x;y2=p2.y;
+  }
+  const sx0=width/2+(x0-center.x)*scale,sy0=height/2-(y0-center.y)*scale;
+  const sx1=width/2+(x1-center.x)*scale,sy1=height/2-(y1-center.y)*scale;
+  const sx2=width/2+(x2-center.x)*scale,sy2=height/2-(y2-center.y)*scale;
+  if(Math.max(sx0,sx1,sx2)<0||Math.min(sx0,sx1,sx2)>width||Math.max(sy0,sy1,sy2)<0||Math.min(sy0,sy1,sy2)>height)continue;
+  context.moveTo(sx0,sy0);context.lineTo(sx1,sy1);context.lineTo(sx2,sy2);context.closePath();
  }
  context.fill();
  context.save();
