@@ -1,5 +1,6 @@
 import {WMS_CATALOG} from './wms-catalog.js?v=2.05-preview.4-planview.5';
-import {DEFAULT_IFC_OBJECT_LAYER,normalizeIfcObjectLayer} from './ifc-object-layer-config.js?v=2.05-preview.7.1';
+import {DEFAULT_IFC_OBJECT_LAYER,normalizeIfcObjectLayer} from './ifc-object-layer-config.js?v=2.05-preview.7.2';
+import {readIfcPropertyCatalog} from './ifc-surface.js?v=2.05-preview.7.2';
 const MAX_LAYERS=20;
 const CATALOG_IDS=new Set(WMS_CATALOG.map(item=>item.id));
 const BASEMAPS=Object.freeze([
@@ -55,27 +56,69 @@ export function mountPlanSettings(host,config,doc=document){
  const catalogHost=root.querySelector('[data-wms-catalog]');
  const catalogStatus=root.querySelector('[data-wms-catalog-status]');
  let layers=normalized.layers.map(layer=>({...layer}));
- let ifcObjectLayer=normalizeIfcObjectLayer(normalized.ifcObjectLayer);
+ let ifcObjectLayer=normalizeIfcObjectLayer(normalized.ifcObjectLayer),propertyCatalog={},catalogLoading=false,catalogStatusText='';
  function renderIfcObjectSettings(){
   objectLayerHost.replaceChildren();
   const legend=doc.createElement('legend');legend.textContent='IFC-objektslag (test)';objectLayerHost.append(legend);
-  const note=doc.createElement('p');note.textContent='Velg objekter på tvers av IFC-typer ved hjelp av inntil tre egenskaper. IFC-modellens egne materialfarger vises som utgangspunkt; fargeregler overstyrer dem. Bare objekter med minst én valgt egenskap vises, med maksimalt 30 000 oppovervendte trekanter totalt.';objectLayerHost.append(note);
+  const note=doc.createElement('p');note.textContent='Velg opptil tre IFC-egenskaper og fargelegg bare verdiene du trenger. Standardregelen #ALL = default tegner øvrige objekter i reservefargen; «Bare eksplisitte treff» skjuler dem.';objectLayerHost.append(note);
   const enabledLabel=doc.createElement('label'),enabled=doc.createElement('input');enabled.type='checkbox';enabled.checked=ifcObjectLayer.enabled;enabledLabel.append(enabled,doc.createTextNode(' Tilby IFC-objektslaget i Planvisning'));objectLayerHost.append(enabledLabel);
-  const defaultLabel=doc.createElement('label');defaultLabel.style.cssText='display:flex;align-items:center;gap:8px;margin:10px 0';defaultLabel.append(doc.createTextNode('Reservefarge når IFC-en mangler materialfarge'));const defaultInput=doc.createElement('input');defaultInput.type='color';defaultInput.value=ifcObjectLayer.defaultColor;defaultInput.addEventListener('input',()=>{ifcObjectLayer.defaultColor=defaultInput.value;});defaultLabel.append(defaultInput);objectLayerHost.append(defaultLabel);
-  const rulesHost=doc.createElement('div');
+  const scanRow=doc.createElement('div');scanRow.style.cssText='display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:10px 0';
+  const scanButton=doc.createElement('button');scanButton.type='button';scanButton.textContent='Hent egenskaper fra valgte IFC-modeller';
+  const scanStatus=doc.createElement('small');scanStatus.setAttribute('aria-live','polite');scanStatus.textContent=catalogStatusText;scanRow.append(scanButton,scanStatus);objectLayerHost.append(scanRow);
+  const defaultGroup=doc.createElement('fieldset');defaultGroup.style.cssText='margin:12px 0;padding:12px;border:1px solid #d6dbe4;border-radius:7px';
+  const defaultLegend=doc.createElement('legend');defaultLegend.textContent='#ALL = default';defaultGroup.append(defaultLegend);
+  const defaultRow=doc.createElement('label');defaultRow.style.cssText='display:flex;align-items:center;gap:8px';defaultRow.append(doc.createTextNode('Reservefarge for objekter uten eksplisitt fargeregel'));
+  const defaultInput=doc.createElement('input');defaultInput.type='color';defaultInput.value=ifcObjectLayer.defaultColor;defaultInput.addEventListener('input',()=>{ifcObjectLayer.defaultColor=defaultInput.value;});defaultRow.append(defaultInput);defaultGroup.append(defaultRow);objectLayerHost.append(defaultGroup);
+  const onlyMatchedLabel=doc.createElement('label');onlyMatchedLabel.style.cssText='display:flex;align-items:center;gap:7px;margin:10px 0';
+  const onlyMatched=doc.createElement('input');onlyMatched.type='checkbox';onlyMatched.checked=ifcObjectLayer.onlyMatched;onlyMatched.addEventListener('change',()=>{ifcObjectLayer.onlyMatched=onlyMatched.checked;});onlyMatchedLabel.append(onlyMatched,doc.createTextNode('Bare objekter med eksplisitt treff på en valgt verdi'));objectLayerHost.append(onlyMatchedLabel);
+  const rulesHost=doc.createElement('div'),palette=['#e85223','#3b82f6','#16a085','#8b5cf6','#d97706','#db2777','#0891b2','#65a30d'];
   for(let index=0;index<3;index++){
-   const rule=ifcObjectLayer.colorRules[index]||{property:'',values:[]};
+   while(ifcObjectLayer.colorRules.length<=index)ifcObjectLayer.colorRules.push({property:'',values:[]});
+   const rule=ifcObjectLayer.colorRules[index];
    const group=doc.createElement('fieldset');group.style.cssText='margin:12px 0;padding:12px;border:1px solid #e2e4e9;border-radius:7px';
    const ruleLegend=doc.createElement('legend');ruleLegend.textContent=`Fargeprioritet ${index+1}`;group.append(ruleLegend);
-   const propertyLabel=doc.createElement('label');propertyLabel.style.cssText='display:grid;gap:4px';propertyLabel.append(doc.createTextNode('Egenskap (PropertySet::Property)'));
-   const propertyInput=doc.createElement('input');propertyInput.type='text';propertyInput.maxLength=200;propertyInput.placeholder='Pset_WallCommon::IsExternal';propertyInput.value=rule.property||'';propertyInput.addEventListener('input',()=>{while(ifcObjectLayer.colorRules.length<=index)ifcObjectLayer.colorRules.push({property:'',values:[]});ifcObjectLayer.colorRules[index].property=propertyInput.value;});propertyLabel.append(propertyInput);group.append(propertyLabel);
-   const mappingsLabel=doc.createElement('label');mappingsLabel.style.cssText='display:grid;gap:4px;margin-top:8px';mappingsLabel.append(doc.createTextNode('Verdier og farger (én per linje: verdi = #RRGGBB)'));
-   const mappings=doc.createElement('textarea');mappings.rows=3;mappings.maxLength=5000;mappings.placeholder='Asfalt = #e85223\nBetong = #3b82f6';mappings.value=(rule.values||[]).map(item=>`${item.value} = ${item.color}`).join('\n');mappings.addEventListener('input',()=>{while(ifcObjectLayer.colorRules.length<=index)ifcObjectLayer.colorRules.push({property:'',values:[]});ifcObjectLayer.colorRules[index].values=mappings.value.split(/\r?\n/).map(line=>{const split=line.indexOf('=');return split<0?null:{value:line.slice(0,split).trim(),color:line.slice(split+1).trim()};}).filter(Boolean);});mappingsLabel.append(mappings);group.append(mappingsLabel);rulesHost.append(group);
+   const propertyLabel=doc.createElement('label');propertyLabel.style.cssText='display:grid;gap:4px';propertyLabel.append(doc.createTextNode('Egenskap'));
+   const propertySelect=doc.createElement('select');propertySelect.style.cssText='max-width:100%;min-height:34px';
+   const empty=doc.createElement('option');empty.value='';empty.textContent='Velg egenskap …';propertySelect.append(empty);
+   const propertyNames=Object.keys(propertyCatalog).sort((a,b)=>a.localeCompare(b,'nb-NO',{sensitivity:'base'}));
+   if(rule.property&&!propertyNames.includes(rule.property))propertyNames.unshift(rule.property);
+   for(const property of propertyNames){const option=doc.createElement('option');option.value=property;option.textContent=property;propertySelect.append(option);}
+   propertySelect.value=rule.property||'';
+   propertySelect.addEventListener('change',()=>{rule.property=propertySelect.value;const oldValues=new Map(rule.values.map(item=>[item.value.toLocaleLowerCase('nb-NO'),item]));rule.values=(propertyCatalog[rule.property]||[]).slice(0,40).map((value,valueIndex)=>oldValues.get(value.toLocaleLowerCase('nb-NO'))||{value,color:palette[(valueIndex+index)%palette.length]});renderIfcObjectSettings();});
+   propertyLabel.append(propertySelect);group.append(propertyLabel);
+   const valuesTitle=doc.createElement('p');valuesTitle.style.cssText='margin:10px 0 4px';valuesTitle.textContent='Verdier som skal få egen farge';group.append(valuesTitle);
+   const valueRows=doc.createElement('div');valueRows.style.cssText='display:grid;gap:5px';
+   for(const [valueIndex,mapping] of (rule.values||[]).entries()){
+    const row=doc.createElement('div');row.style.cssText='display:flex;align-items:center;gap:8px;flex-wrap:wrap';
+    const valueName=doc.createElement('span');valueName.textContent=mapping.value;valueName.style.cssText='flex:1 1 180px;overflow-wrap:anywhere';
+    const color=doc.createElement('input');color.type='color';color.value=/^#[0-9a-f]{6}$/i.test(mapping.color)?mapping.color:palette[valueIndex%palette.length];color.setAttribute('aria-label',`Farge for ${mapping.value}`);color.addEventListener('input',()=>{mapping.color=color.value;});
+    const remove=doc.createElement('button');remove.type='button';remove.textContent='Fjern';remove.addEventListener('click',()=>{rule.values=rule.values.filter((_,itemIndex)=>itemIndex!==valueIndex);renderIfcObjectSettings();});
+    row.append(valueName,color,remove);valueRows.append(row);
+   }
+   if(!rule.values.length){const emptyValues=doc.createElement('small');emptyValues.textContent=rule.property?'Ingen verdier valgt. Velg en egenskap etter å ha hentet IFC-egenskapene.':'Velg en egenskap for å vise tilgjengelige verdier.';valueRows.append(emptyValues);}
+   group.append(valueRows);rulesHost.append(group);
   }
   objectLayerHost.append(rulesHost);
-  const help=doc.createElement('small');help.textContent='Bare objekter med minst én egenskap som er fylt inn her tas med, uansett IFC-type. IFC-materialfargen brukes når den finnes; reglene prøves ovenfra og ned og et fargetreff overstyrer materialfargen. Hvis IFC-en mangler lesbar materialfarge, brukes reservefargen. Egenskapsnavn kan skrives PropertySet:Property eller PropertySet::Property.';objectLayerHost.append(help);
-  const sync=()=>{const disabled=!enabled.checked;defaultInput.disabled=disabled;for(const input of rulesHost.querySelectorAll('input,textarea'))input.disabled=disabled;};
+  const help=doc.createElement('small');help.textContent='Bruk «Hent egenskaper» etter at IFC-modeller er valgt i filtreet. Skanningen leser bare egenskaper, ikke 3D-geometri. Fargereglene prøves ovenfra og ned. #ALL = default er alltid siste regel og gir alle umatchede objekter reservefargen, også når IFC-materialfarge mangler.';objectLayerHost.append(help);
+  const sync=()=>{const disabled=!enabled.checked;scanButton.disabled=disabled||catalogLoading;defaultInput.disabled=disabled;onlyMatched.disabled=disabled;for(const input of rulesHost.querySelectorAll('input,select,button'))input.disabled=disabled;};
   enabled.addEventListener('change',()=>{ifcObjectLayer.enabled=enabled.checked;sync();});
+  scanButton.addEventListener('click',async()=>{
+   const files=window.DocLibLegacyBridge?.listSelectedIfcFiles?.()||[];
+   if(!files.length){catalogStatusText='Velg IFC-modeller i filtreet først.';scanStatus.textContent=catalogStatusText;return;}
+   catalogLoading=true;scanButton.disabled=true;const merged={};
+   try{
+    for(let fileIndex=0;fileIndex<files.length;fileIndex++){
+     catalogStatusText=`Henter egenskaper fra ${fileIndex+1} av ${files.length}: ${files[fileIndex].name} …`;scanStatus.textContent=catalogStatusText;
+     const buffer=await window.DocLibLegacyBridge.downloadIfcForSurface(files[fileIndex].id);
+     const catalog=await readIfcPropertyCatalog(buffer,message=>{catalogStatusText=`${files[fileIndex].name} · ${message}`;scanStatus.textContent=catalogStatusText;});
+     for(const [property,values] of Object.entries(catalog)){const target=merged[property]||(merged[property]=[]);for(const value of values)if(target.length<200&&!target.some(item=>item.toLocaleLowerCase('nb-NO')===value.toLocaleLowerCase('nb-NO')))target.push(value);}
+    }
+    propertyCatalog=merged;
+    for(const rule of ifcObjectLayer.colorRules){if(rule.property&&!rule.values.length)rule.values=(propertyCatalog[rule.property]||[]).slice(0,40).map((value,index)=>({value,color:palette[index%palette.length]}));}
+    catalogStatusText=`Fant ${Object.keys(propertyCatalog).length.toLocaleString('nb-NO')} egenskaper på ${files.length} IFC-modell(er).`;scanStatus.textContent=catalogStatusText;
+   }catch(error){catalogStatusText=`Kunne ikke lese egenskapene: ${error?.message||String(error)}`;scanStatus.textContent=catalogStatusText;}
+   finally{catalogLoading=false;renderIfcObjectSettings();}
+  });
   sync();
  }
  function renderCatalog(){

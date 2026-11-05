@@ -1,4 +1,4 @@
-import {normalizeIfcObjectLayer,matchIfcObjectColor} from './ifc-object-layer-config.js?v=2.05-preview.7.1';
+import {normalizeIfcObjectLayer,matchIfcObjectColor} from './ifc-object-layer-config.js?v=2.05-preview.7.2';
 const WEB_IFC_VERSION='0.0.77';
 const WEB_IFC_BASE=`https://cdn.jsdelivr.net/npm/web-ifc@${WEB_IFC_VERSION}/`;
 export const MAX_WEAR_TRIANGLES=120000;
@@ -248,12 +248,41 @@ function readConfiguredProperties(api,modelId,entityId){
  return result;
 }
 
+export async function readIfcPropertyCatalog(buffer,onProgress=()=>{}){
+ if(!(buffer instanceof ArrayBuffer)||buffer.byteLength===0)throw Error('IFC-filen er tom eller ugyldig.');
+ const api=await getWebIfcApi();let modelId=null;
+ try{
+  modelId=api.OpenModel(new Uint8Array(buffer),{COORDINATE_TO_ORIGIN:false});
+  const ids=modelLineIds(api,modelId),catalog=new Map();let workStarted=performance.now(),chunkStart=0;
+  for(let index=0;index<ids.length;index++){
+   const expressId=Number(unwrap(ids[index]));
+   if(Number.isInteger(expressId)){
+    const entity=api.GetLine(modelId,expressId);
+    if(unwrapIfc(entity?.GlobalId)){
+     const properties=readConfiguredProperties(api,modelId,expressId);
+     for(const [property,rawValues] of Object.entries(properties)){
+      if(!catalog.has(property)&&catalog.size<500)catalog.set(property,new Set());
+      const values=catalog.get(property);if(!values)continue;
+      for(const rawValue of rawValues){const value=String(rawValue).normalize('NFC').replace(/\s+/gu,' ').trim();if(value&&values.size<200)values.add(value);}
+     }
+    }
+   }
+   const processed=index+1;
+   if(processed-chunkStart>=SCAN_YIELD_MAX_ITEMS||(processed%SCAN_YIELD_TIME_CHECK_ITEMS===0&&performance.now()-workStarted>=YIELD_MAX_WORK_MS)){
+    onProgress(`Leser IFC-egenskaper: ${processed.toLocaleString('nb-NO')} av ${ids.length.toLocaleString('nb-NO')} linjer …`);
+    await new Promise(resolve=>setTimeout(resolve,0));workStarted=performance.now();chunkStart=processed;
+   }
+  }
+  return Object.fromEntries([...catalog].map(([property,values])=>[property,[...values].sort((a,b)=>a.localeCompare(b,'nb-NO',{numeric:true,sensitivity:'base'}))]));
+ }finally{if(modelId!==null)api.CloseModel(modelId);}
+}
+
 export async function readIfcObjectLayer(buffer,rawConfig,onProgress=()=>{},triangleLimit=MAX_IFC_OBJECT_TRIANGLES){
  if(!(buffer instanceof ArrayBuffer)||buffer.byteLength===0)throw Error('IFC-filen er tom eller ugyldig.');
  if(!Number.isInteger(triangleLimit)||triangleLimit<1||triangleLimit>MAX_IFC_OBJECT_TRIANGLES)throw Error('Ugyldig trekantgrense for IFC-objektslaget.');
  const config=normalizeIfcObjectLayer(rawConfig);
  const rules=config.colorRules.filter(rule=>rule.property);
- if(!rules.length)throw Error('Angi minst én IFC-egenskap som skal velge objekter, skrevet som PropertySet::Property.');
+ if(config.onlyMatched&&!rules.length)throw Error('«Bare treff» krever minst én valgt IFC-egenskap med fargeregler.');
  const timings={setup:0,lineScan:0,lineScanYield:0,objectProcessing:0,objectYield:0,meshExtract:0,triangleFilter:0};
  const setupStarted=performance.now();
  const api=await getWebIfcApi();
@@ -271,10 +300,11 @@ export async function readIfcObjectLayer(buffer,rawConfig,onProgress=()=>{},tria
     const globalId=String(unwrapIfc(entity?.GlobalId)||'').trim();
     const lineType=typeof api.GetLineType==='function'?api.GetLineType(modelId,expressId):null;
     const ifcType=typeof api.GetNameFromTypeCode==='function'?String(api.GetNameFromTypeCode(lineType)||''):'';
-    const properties=readConfiguredProperties(api,modelId,expressId);
+    const properties=rules.length?readConfiguredProperties(api,modelId,expressId):{};
     const hasConfiguredProperty=rules.some(rule=>Object.keys(properties).some(key=>key.toLocaleLowerCase('nb-NO')===rule.property.toLocaleLowerCase('nb-NO')));
-    if(hasConfiguredProperty){
-     const match=matchIfcObjectColor(properties,rules,config.defaultColor);
+    const productWithRepresentation=Boolean(unwrapIfc(entity?.GlobalId)&&entity?.Representation);
+    const match=matchIfcObjectColor(properties,rules,config.defaultColor);
+    if((config.onlyMatched&&hasConfiguredProperty&&match.matched)||(!config.onlyMatched&&productWithRepresentation)){
      if(match.matched){
       mappedObjects++;const key=JSON.stringify([match.property,match.value,match.color]);const current=matchedValues.get(key);
       if(current)current.count++;else if(matchedValues.size<8)matchedValues.set(key,{property:match.property,value:match.value,color:match.color,count:1});
@@ -298,7 +328,7 @@ export async function readIfcObjectLayer(buffer,rawConfig,onProgress=()=>{},tria
    }
   }
   timings.lineScan+=performance.now()-scanStarted;
-  if(!candidates.length)throw Error('Fant ingen IFC-objekter med minst én av de valgte egenskapene.');
+  if(!candidates.length)throw Error(config.onlyMatched?'Fant ingen IFC-objekter med en eksplisitt fargeregel.':'Fant ingen IFC-objekter med 2D-representasjon å vise.');
   const triangles=[],colors=[],triangleObjectIds=[],labels=[],objects=[],nativeColors=new Map();
   let objectStarted=performance.now(),objectChunkStart=0,truncated=false,overriddenGeometries=0,nativeColorGeometries=0,fallbackColorGeometries=0;
   for(let itemIndex=0;itemIndex<candidates.length;itemIndex++){
@@ -308,7 +338,7 @@ export async function readIfcObjectLayer(buffer,rawConfig,onProgress=()=>{},tria
    timings.meshExtract+=performance.now()-meshStarted;
    for(const placed of placedGeometries){
     const nativeColor=ifcColorToCss(placed?.color);
-    const displayColor=candidate.match.matched?candidate.match.color:nativeColor||config.defaultColor;
+    const displayColor=candidate.match.matched?candidate.match.color:config.defaultColor;
     if(candidate.match.matched)overriddenGeometries++;else if(nativeColor)nativeColorGeometries++;else fallbackColorGeometries++;
     if(nativeColor){const entry=nativeColors.get(nativeColor);if(entry)entry.count++;else if(nativeColors.size<8)nativeColors.set(nativeColor,{color:nativeColor,count:1});}
     const geometryStarted=performance.now(),geometry=api.GetGeometry(modelId,Number(placed.geometryExpressID));
@@ -395,7 +425,7 @@ export function drawWearSurface(canvas,model,options){
  const isProjected=Array.isArray(model?.surfaces);
  const surfaces=isProjected?model.surfaces:(model?.triangles?.length?[model]:[]);
  if(!surfaces.length)return;
- context.fillStyle='rgba(232,82,35,.72)';
+ context.fillStyle='rgba(232,82,35,.38)';
  context.beginPath();
  const scale=width/span;
  for(const surface of surfaces)for(const triangle of surface.triangles){
@@ -414,10 +444,10 @@ export function drawWearSurface(canvas,model,options){
  context.fill();
  context.save();
  context.clip();
- context.strokeStyle='rgba(139,45,20,.78)';
- context.lineWidth=.65;
+ context.strokeStyle='rgba(139,45,20,.34)';
+ context.lineWidth=.45;
  context.beginPath();
- const spacing=8;
+ const spacing=14;
  for(let offset=-height;offset<width;offset+=spacing){
   context.moveTo(offset,0);
   context.lineTo(offset+height,height);

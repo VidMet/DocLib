@@ -1,6 +1,7 @@
 export const DEFAULT_IFC_OBJECT_LAYER=Object.freeze({
  enabled:false,
  defaultColor:'#e85223',
+ onlyMatched:false,
  colorRules:Object.freeze([]),
 });
 
@@ -32,6 +33,7 @@ export function normalizeIfcObjectLayer(raw){
  return{
   enabled:raw?.enabled===true,
   defaultColor:COLOR.test(defaultColor)?defaultColor.toLowerCase():DEFAULT_IFC_OBJECT_LAYER.defaultColor,
+  onlyMatched:raw?.onlyMatched===true,
   colorRules,
  };
 }
