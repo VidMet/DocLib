@@ -1,6 +1,11 @@
 const WEB_IFC_VERSION='0.0.77';
 const WEB_IFC_BASE=`https://cdn.jsdelivr.net/npm/web-ifc@${WEB_IFC_VERSION}/`;
 export const MAX_WEAR_TRIANGLES=120000;
+const SCAN_YIELD_MAX_ITEMS=1000;
+const SCAN_YIELD_TIME_CHECK_ITEMS=100;
+const OBJECT_YIELD_MAX_ITEMS=5;
+const TRIANGLE_YIELD_CHECK_COUNT=2048;
+const YIELD_MAX_WORK_MS=50;
 let webIfcPromise=null;
 let webIfcApiPromise=null;
 
@@ -49,10 +54,10 @@ function modelLineIds(api,modelId){
  throw Error('IFC-leseren returnerte ikke en lesbar objektliste.');
 }
 
-async function yieldToUi(timings){
+async function yieldToUi(timings,timingKey){
  const started=performance.now();
  await new Promise(resolve=>setTimeout(resolve,0));
- timings.yield+=performance.now()-started;
+ timings[timingKey]+=performance.now()-started;
 }
 
 async function getWebIfcApi(){
@@ -72,7 +77,7 @@ async function getWebIfcApi(){
 export async function readWearSurface(buffer,onProgress=()=>{},triangleLimit=MAX_WEAR_TRIANGLES){
  if(!(buffer instanceof ArrayBuffer)||buffer.byteLength===0)throw Error('IFC-filen er tom eller ugyldig.');
  if(!Number.isInteger(triangleLimit)||triangleLimit<1||triangleLimit>MAX_WEAR_TRIANGLES)throw Error('Ugyldig trekantgrense for IFC-geometrien.');
- const timings={setup:0,lineScan:0,meshExtract:0,triangleFilter:0,yield:0};
+ const timings={setup:0,lineScan:0,lineScanYield:0,objectProcessing:0,objectYield:0,meshExtract:0,triangleFilter:0};
  const setupStarted=performance.now();
  const api=await getWebIfcApi();
  let modelId=null;
@@ -85,6 +90,7 @@ export async function readWearSurface(buffer,onProgress=()=>{},triangleLimit=MAX
   const candidates=[];
   const wearPattern=/(^|[^a-z])(slitelag|slitelaget|wearing[ _-]?course|asphalt[ _-]?wearing)([^a-z]|$)/i;
   let scanBlockStarted=performance.now();
+  let scanChunkStartIndex=0;
   for(let index=0;index<ids.length;index++){
    const expressId=Number(unwrap(ids[index]));
    if(Number.isInteger(expressId)){
@@ -92,17 +98,24 @@ export async function readWearSurface(buffer,onProgress=()=>{},triangleLimit=MAX
     const label=entityLabel(entity);
     if(label&&wearPattern.test(label))candidates.push({expressId,label});
    }
-   if(index%300===0){
+   const processedCount=index+1;
+   const chunkItems=processedCount-scanChunkStartIndex;
+   const checkElapsed=processedCount%SCAN_YIELD_TIME_CHECK_ITEMS===0;
+   const chunkElapsed=checkElapsed?performance.now()-scanBlockStarted:0;
+   if(chunkItems>=SCAN_YIELD_MAX_ITEMS||(checkElapsed&&chunkElapsed>=YIELD_MAX_WORK_MS)){
+    onProgress(`Leter etter slitelag: ${processedCount.toLocaleString('nb-NO')} av ${ids.length.toLocaleString('nb-NO')} IFC-linjer …`);
     timings.lineScan+=performance.now()-scanBlockStarted;
-    onProgress(`Leter etter slitelag: ${index.toLocaleString('nb-NO')} av ${ids.length.toLocaleString('nb-NO')} IFC-linjer …`);
-    await yieldToUi(timings);
+    await yieldToUi(timings,'lineScanYield');
     scanBlockStarted=performance.now();
+    scanChunkStartIndex=processedCount;
    }
   }
   timings.lineScan+=performance.now()-scanBlockStarted;
   if(!candidates.length)throw Error('Fant ingen IFC-objekter med «slitelag» eller «wearing course» i navn, beskrivelse eller objekttype.');
   const triangles=[];
   const labels=[];
+  let objectWorkStarted=performance.now();
+  let objectChunkStartIndex=0;
   for(let itemIndex=0;itemIndex<candidates.length;itemIndex++){
    const candidate=candidates[itemIndex];
    const meshStarted=performance.now();
@@ -141,6 +154,13 @@ export async function readWearSurface(buffer,onProgress=()=>{},triangleLimit=MAX
        triangles.push([[ax,ay,az],[bx,by,bz],[cx,cy,cz]]);
        if(triangles.length>=triangleLimit)break;
       }
+      const processedTriangles=offset/3+1;
+      if(processedTriangles%TRIANGLE_YIELD_CHECK_COUNT===0&&performance.now()-objectWorkStarted>=YIELD_MAX_WORK_MS){
+       timings.objectProcessing+=performance.now()-objectWorkStarted;
+       await yieldToUi(timings,'objectYield');
+       objectWorkStarted=performance.now();
+       objectChunkStartIndex=itemIndex+1;
+      }
      }
      timings.triangleFilter+=performance.now()-filterStarted;
     }finally{geometry.delete?.();}
@@ -148,7 +168,18 @@ export async function readWearSurface(buffer,onProgress=()=>{},triangleLimit=MAX
    }
    labels.push(candidate.label);
    onProgress(`Leser geometri for slitelagsobjekt ${itemIndex+1} av ${candidates.length} …`);
-   await yieldToUi(timings);
+   const processedCount=itemIndex+1;
+   const hasMore=processedCount<candidates.length&&triangles.length<triangleLimit;
+   const objectWorkMs=performance.now()-objectWorkStarted;
+   const shouldYield=hasMore&&(processedCount-objectChunkStartIndex>=OBJECT_YIELD_MAX_ITEMS||objectWorkMs>=YIELD_MAX_WORK_MS);
+   if(shouldYield){
+    timings.objectProcessing+=objectWorkMs;
+    await yieldToUi(timings,'objectYield');
+    objectWorkStarted=performance.now();
+    objectChunkStartIndex=processedCount;
+   }else if(!hasMore){
+    timings.objectProcessing+=objectWorkMs;
+   }
    if(triangles.length>=triangleLimit)break;
   }
   if(!triangles.length)throw Error(`Fant ${candidates.length} merket slitelagsobjekt, men ingen oppovervendt flate kunne leses.`);

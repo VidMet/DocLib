@@ -1,5 +1,5 @@
-import {readWearSurface,drawWearSurface,MAX_WEAR_TRIANGLES} from './ifc-surface.js?v=2.05-preview.4-planview.6-ifc-read-test.6-2d-camera.2-wear-surface.6-multi-surface.2-hatch-cache.3-plan-performance.2-ifc-read-phases.2-yield-accounting.1';
-import {readWearSurfaceCache,writeWearSurfaceCache,wearSurfaceCacheKey} from './ifc-surface-cache.js?v=2.05-preview.4-planview.6-ifc-read-test.6-2d-camera.2-wear-surface.6-multi-surface.2-hatch-cache.3-plan-performance.2-ifc-read-phases.2-yield-accounting.1';
+import {readWearSurface,drawWearSurface,MAX_WEAR_TRIANGLES} from './ifc-surface.js?v=2.05-preview.4-planview.6-ifc-read-test.6-2d-camera.2-wear-surface.6-multi-surface.2-hatch-cache.3-plan-performance.2-ifc-read-phases.2-yield-accounting.1-batched-yields.1';
+import {readWearSurfaceCache,writeWearSurfaceCache,wearSurfaceCacheKey} from './ifc-surface-cache.js?v=2.05-preview.4-planview.6-ifc-read-test.6-2d-camera.2-wear-surface.6-multi-surface.2-hatch-cache.3-plan-performance.2-ifc-read-phases.2-yield-accounting.1-batched-yields.1';
 const MAX_WIDTH=1600;
 const MAX_HEIGHT=1200;
 const WORLD=20037508.342789244;
@@ -489,9 +489,9 @@ function createPlanView({store}){
      const modelLimitNote=model.truncated?' (denne IFC-en nådde grensen på 120 000 trekanter)':'';
      const timingNote=`Tid: cache ${formatSeconds(timings.cache)}, nedlasting ${formatSeconds(timings.download)}, IFC-lesing ${formatSeconds(timings.read)}, lagring ${formatSeconds(timings.save)}`;
      const readDetail=timings.readDetails;
-     const measuredReadMs=readDetail?readDetail.setup+readDetail.lineScan+readDetail.meshExtract+readDetail.triangleFilter+readDetail.yield:0;
+     const measuredReadMs=readDetail?readDetail.setup+readDetail.lineScan+readDetail.lineScanYield+readDetail.objectProcessing+readDetail.objectYield:0;
      const unclassifiedReadMs=readDetail?Math.max(0,timings.read-measuredReadMs):0;
-     const readDetailNote=readDetail?` Delmålinger: oppstart/åpning ${formatDetailSeconds(readDetail.setup)}, linjeskanning ${formatDetailSeconds(readDetail.lineScan)}, mesh-uttrekk ${formatDetailSeconds(readDetail.meshExtract)}, trekantfilter ${formatDetailSeconds(readDetail.triangleFilter)}, UI-yield-venting ${formatDetailSeconds(readDetail.yield)}, uklassifisert resttid ${formatDetailSeconds(unclassifiedReadMs)}.`:'';
+     const readDetailNote=readDetail?` Delmålinger: oppstart/åpning ${formatDetailSeconds(readDetail.setup)}, linjeskanningsarbeid ${formatDetailSeconds(readDetail.lineScan)}, objektbehandling inkl. mesh/trekantfilter ${formatDetailSeconds(readDetail.objectProcessing)}, herav mesh-uttrekk ${formatDetailSeconds(readDetail.meshExtract)} og trekantfilter ${formatDetailSeconds(readDetail.triangleFilter)}, yield-venting skanning ${formatDetailSeconds(readDetail.lineScanYield)} + objekt ${formatDetailSeconds(readDetail.objectYield)}, uklassifisert resttid ${formatDetailSeconds(unclassifiedReadMs)}.`:'';
      reports.push(`${file.name}: ${shownCount} trekanter fra ${model.candidateCount} objekt(er) · ${source}${limitNote}${modelLimitNote}. ${timingNote}.${readDetailNote}`);
     }catch(error){reports.push(`${file.name}: ${error?.message||String(error)}`);}
    }
