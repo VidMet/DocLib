@@ -1,4 +1,5 @@
 import {WMS_CATALOG} from './wms-catalog.js?v=2.05-preview.4-planview.5';
+import {DEFAULT_IFC_OBJECT_LAYER,normalizeIfcObjectLayer} from './ifc-object-layer-config.js?v=2.05-preview.4-planview.6-ifc-read-test.6-2d-camera.2-wear-surface.6-multi-surface.2-hatch-cache.3-plan-performance.2-ifc-read-phases.2-yield-accounting.1-batched-yields.1-ifc-object-layer.2-ifc-object-layer.1';
 const MAX_LAYERS=20;
 const CATALOG_IDS=new Set(WMS_CATALOG.map(item=>item.id));
 const BASEMAPS=Object.freeze([
@@ -30,7 +31,7 @@ export function normalizePlanConfig(raw){
    layers.push(layer);
   }catch{}
  }
- return{baseMap,layers};
+ return{baseMap,layers,ifcObjectLayer:normalizeIfcObjectLayer(raw?.ifcObjectLayer)};
 }
 function makeLayer(){return{id:`wms-${Date.now().toString(36)}-${Math.random().toString(36).slice(2,8)}`,name:'',url:'',layer:'',visibleByDefault:true,attribution:''};}
 export function mountPlanSettings(host,config,doc=document){
@@ -38,6 +39,10 @@ export function mountPlanSettings(host,config,doc=document){
  const root=doc.createElement('div');
  root.className='plan-settings';
  root.innerHTML='<p>Velg prosjektets standardbakgrunn og hvilke tematiske WMS-lag som skal være tilgjengelige for brukerne. Brukerne kan slå tilgjengelige lag av og på i Planvisning.</p><label class="plan-basemap-field">Felles bakgrunnskart <select data-plan-basemap></select></label><fieldset class="plan-wms-catalog"><legend>Forhåndsdefinerte WMS-lag</legend><p>Hak av lagene som skal tilbys i dette prosjektet. Nye lag er av som standard.</p><div data-wms-catalog></div><small data-wms-catalog-status aria-live="polite"></small></fieldset><h3>Egne WMS-lag</h3><div data-wms-rows></div><div class="setup-column-actions"><button type="button" data-wms-add>Legg til eget WMS-lag</button></div><small>Bakgrunnskart: Flyfoto (Esri), Vektorkart (OpenStreetMap), Grunnkart (Geonorge) eller Ingen bakgrunn. WMS-overlegg må være offentlige og tilgjengelige for nettleserbilder; ingen legitimasjon lagres.</small>';
+ const objectLayerHost=doc.createElement('fieldset');
+ objectLayerHost.className='plan-ifc-object-settings';
+ objectLayerHost.innerHTML='<legend>IFC-objektslag (test)</legend><p>Vis et avgrenset utvalg IFC-objekter i 2D-plan. Geometrien begrenses til oppovervendte flater og en samlet testgrense på 30&nbsp;000 trekanter.</p>';
+ root.append(objectLayerHost);
  const baseSelect=root.querySelector('[data-plan-basemap]');
  for(const option of BASEMAPS){
   const element=doc.createElement('option');
@@ -50,6 +55,32 @@ export function mountPlanSettings(host,config,doc=document){
  const catalogHost=root.querySelector('[data-wms-catalog]');
  const catalogStatus=root.querySelector('[data-wms-catalog-status]');
  let layers=normalized.layers.map(layer=>({...layer}));
+ let ifcObjectLayer=normalizeIfcObjectLayer(normalized.ifcObjectLayer);
+ function renderIfcObjectSettings(){
+  objectLayerHost.replaceChildren();
+  const legend=doc.createElement('legend');legend.textContent='IFC-objektslag (test)';objectLayerHost.append(legend);
+  const note=doc.createElement('p');note.textContent='Vis et avgrenset utvalg IFC-objekter i 2D-plan. Geometrien begrenses til oppovervendte flater og en samlet testgrense på 30 000 trekanter.';objectLayerHost.append(note);
+  const enabledLabel=doc.createElement('label'),enabled=doc.createElement('input');enabled.type='checkbox';enabled.checked=ifcObjectLayer.enabled;enabledLabel.append(enabled,doc.createTextNode(' Tilby IFC-objektslaget i Planvisning'));objectLayerHost.append(enabledLabel);
+  const field=(title,key,placeholder)=>{const label=doc.createElement('label');label.style.cssText='display:grid;gap:4px;margin:10px 0';label.append(doc.createTextNode(title));const input=doc.createElement('input');input.type='text';input.maxLength=120;input.placeholder=placeholder;input.value=ifcObjectLayer[key]||'';input.addEventListener('input',()=>{ifcObjectLayer[key]=input.value;});label.append(input);objectLayerHost.append(label);return input;};
+  const typeInput=field('IFC-type (for eksempel IfcSlab)','ifcType','IfcSlab');
+  const nameInput=field('Navn inneholder (valgfritt)','nameContains','For eksempel dekke');
+  const defaultLabel=doc.createElement('label');defaultLabel.style.cssText='display:flex;align-items:center;gap:8px;margin:10px 0';defaultLabel.append(doc.createTextNode('Standardfarge'));const defaultInput=doc.createElement('input');defaultInput.type='color';defaultInput.value=ifcObjectLayer.defaultColor;defaultInput.addEventListener('input',()=>{ifcObjectLayer.defaultColor=defaultInput.value;});defaultLabel.append(defaultInput);objectLayerHost.append(defaultLabel);
+  const rulesHost=doc.createElement('div');
+  for(let index=0;index<3;index++){
+   const rule=ifcObjectLayer.colorRules[index]||{property:'',values:[]};
+   const group=doc.createElement('fieldset');group.style.cssText='margin:12px 0;padding:12px;border:1px solid #e2e4e9;border-radius:7px';
+   const ruleLegend=doc.createElement('legend');ruleLegend.textContent=`Fargeprioritet ${index+1}`;group.append(ruleLegend);
+   const propertyLabel=doc.createElement('label');propertyLabel.style.cssText='display:grid;gap:4px';propertyLabel.append(doc.createTextNode('Egenskap (PropertySet::Property)'));
+   const propertyInput=doc.createElement('input');propertyInput.type='text';propertyInput.maxLength=200;propertyInput.placeholder='Pset_WallCommon::IsExternal';propertyInput.value=rule.property||'';propertyInput.addEventListener('input',()=>{while(ifcObjectLayer.colorRules.length<=index)ifcObjectLayer.colorRules.push({property:'',values:[]});ifcObjectLayer.colorRules[index].property=propertyInput.value;});propertyLabel.append(propertyInput);group.append(propertyLabel);
+   const mappingsLabel=doc.createElement('label');mappingsLabel.style.cssText='display:grid;gap:4px;margin-top:8px';mappingsLabel.append(doc.createTextNode('Verdier og farger (én per linje: verdi = #RRGGBB)'));
+   const mappings=doc.createElement('textarea');mappings.rows=3;mappings.maxLength=5000;mappings.placeholder='Asfalt = #e85223\nBetong = #3b82f6';mappings.value=(rule.values||[]).map(item=>`${item.value} = ${item.color}`).join('\n');mappings.addEventListener('input',()=>{while(ifcObjectLayer.colorRules.length<=index)ifcObjectLayer.colorRules.push({property:'',values:[]});ifcObjectLayer.colorRules[index].values=mappings.value.split(/\r?\n/).map(line=>{const split=line.indexOf('=');return split<0?null:{value:line.slice(0,split).trim(),color:line.slice(split+1).trim()};}).filter(Boolean);});mappingsLabel.append(mappings);group.append(mappingsLabel);rulesHost.append(group);
+  }
+  objectLayerHost.append(rulesHost);
+  const help=doc.createElement('small');help.textContent='Reglene prøves ovenfra og ned. Hvis egenskapen mangler, er tom eller verdien ikke har en gyldig farge, prøves neste. Egenskapsnavn må oppgis som PropertySet::Property. Et objekt uten fargetreff får standardfargen.';objectLayerHost.append(help);
+  const sync=()=>{const disabled=!enabled.checked;typeInput.disabled=nameInput.disabled=defaultInput.disabled=disabled;for(const input of objectLayerHost.querySelectorAll('fieldset input,fieldset textarea'))input.disabled=disabled;};
+  enabled.addEventListener('change',()=>{ifcObjectLayer.enabled=enabled.checked;sync();});
+  sync();
+ }
  function renderCatalog(){
   const groups=new Map();
   for(const item of WMS_CATALOG){if(!groups.has(item.category))groups.set(item.category,[]);groups.get(item.category).push(item);}
@@ -131,6 +162,7 @@ export function mountPlanSettings(host,config,doc=document){
   if(layers.length<MAX_LAYERS){layers.push(makeLayer());render();}
  });
  render();
+ renderIfcObjectSettings();
  host.replaceChildren(root);
  return Object.freeze({
   snapshot(){
@@ -141,14 +173,17 @@ export function mountPlanSettings(host,config,doc=document){
      const result=cleanLayer(layer);
      if(!result.name||!result.url||!result.layer)throw Error('Fyll ut visningsnavn, HTTPS-adresse og WMS-lag-ID, eller fjern den tomme raden.');
      return result;
-    })
+    }),
+    ifcObjectLayer:normalizeIfcObjectLayer(ifcObjectLayer)
    };
   },
   set(next){
    const value=normalizePlanConfig(next);
    baseSelect.value=value.baseMap;
    layers=value.layers.map(layer=>({...layer}));
+   ifcObjectLayer=normalizeIfcObjectLayer(value.ifcObjectLayer||DEFAULT_IFC_OBJECT_LAYER);
    render();
+   renderIfcObjectSettings();
   }
  });
 }
