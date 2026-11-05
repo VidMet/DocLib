@@ -1,6 +1,6 @@
-import {readWearSurface,drawWearSurface,readIfcObjectLayer,drawIfcObjectLayer,MAX_WEAR_TRIANGLES,MAX_IFC_OBJECT_TRIANGLES} from './ifc-surface.js?v=2.05-preview.4-planview.6-ifc-read-test.6-2d-camera.2-wear-surface.6-multi-surface.2-hatch-cache.3-plan-performance.2-ifc-read-phases.2-yield-accounting.1-batched-yields.1-ifc-object-layer.11';
-import {normalizeIfcObjectLayer} from './ifc-object-layer-config.js?v=2.05-preview.4-planview.6-ifc-read-test.6-2d-camera.2-wear-surface.6-multi-surface.2-hatch-cache.3-plan-performance.2-ifc-read-phases.2-yield-accounting.1-batched-yields.1-ifc-object-layer.11';
-import {readWearSurfaceCache,writeWearSurfaceCache,wearSurfaceCacheKey,readIfcObjectLayerCache,writeIfcObjectLayerCache,ifcObjectLayerCacheKey} from './ifc-surface-cache.js?v=2.05-preview.4-planview.6-ifc-read-test.6-2d-camera.2-wear-surface.6-multi-surface.2-hatch-cache.3-plan-performance.2-ifc-read-phases.2-yield-accounting.1-batched-yields.1-ifc-object-layer.11';
+import {readWearSurface,drawWearSurface,readIfcObjectLayer,drawIfcObjectLayer,MAX_WEAR_TRIANGLES,MAX_IFC_OBJECT_TRIANGLES} from './ifc-surface.js?v=2.05-preview.7.1';
+import {normalizeIfcObjectLayer} from './ifc-object-layer-config.js?v=2.05-preview.7.1';
+import {readWearSurfaceCache,writeWearSurfaceCache,wearSurfaceCacheKey,readIfcObjectLayerCache,writeIfcObjectLayerCache,ifcObjectLayerCacheKey} from './ifc-surface-cache.js?v=2.05-preview.7.1';
 const MAX_WIDTH=1600;
 const MAX_HEIGHT=1200;
 const WORLD=20037508.342789244;
@@ -45,7 +45,7 @@ function mapUrl(layer,bounds,width,height,version='1.1.1'){
 }
 function createPlanView({store}){
  let host=null,root=null,observer=null,timer=0,destroyed=false,unsubscribeStore=null,selectionController=null;
- let center={x:1170000,y:8370000},span=1400000,drag=null,pointerPosition=null;
+ let center={x:1170000,y:8370000},span=1400000,drag=null,pointerPosition=null,lastGestureMoved=false;
  let currentModelCRS=DEFAULT_MODEL_CRS,lastCameraXY=null,cameraConnectionStarted=false;
  let baseMap='flyfoto',sharedBaseMap='flyfoto',userBaseMapSelected=false,layers=[],visible=new Set(),images=new Map();
  let wearSurfaces=[],projectedWearSurface=null,wearSurfaceExtent=null,surfaceFileIds=[],surfaceLoadToken=0,surfaceLoading=false,surfaceRefreshPending=false,wearSurfaceActive=false,lastWearDrawMs=0;
@@ -408,7 +408,8 @@ function createPlanView({store}){
   }
  }
  function moveStart(event){
-  if(event.button!==0||event.target.closest('button'))return;
+  if(event.button!==0||event.target.closest?.('button'))return;
+  lastGestureMoved=false;
   drag={x:event.clientX,y:event.clientY,centerX:center.x,centerY:center.y,moved:false};
   root.querySelector('[data-plan-map]').setPointerCapture(event.pointerId);
  }
@@ -416,12 +417,18 @@ function createPlanView({store}){
   if(!drag)return;
   const rect=root.querySelector('[data-plan-map]').getBoundingClientRect();
   if(Math.hypot(event.clientX-drag.x,event.clientY-drag.y)>4)drag.moved=true;
+  if(!drag.moved)return;
   const scale=span/rect.width;
   center.x=clamp(drag.centerX-(event.clientX-drag.x)*scale,-WORLD,WORLD);
   center.y=clamp(drag.centerY+(event.clientY-drag.y)*scale,-WORLD,WORLD);
   refresh();
  }
- function moveEnd(event){const previous=drag;drag=null;if(event?.type==='pointerup'&&previous&&!previous.moved)identifyIfcAt(event);}
+ function moveEnd(event){const previous=drag;drag=null;if(event?.type==='pointerup')lastGestureMoved=Boolean(previous?.moved);}
+ function handleMapClick(event){
+  if(event.target.closest?.('button'))return;
+  if(lastGestureMoved){lastGestureMoved=false;return;}
+  identifyIfcAt(event);
+ }
  function pointInTriangle(px,py,a,b,c){const sign=(p1,p2,p3)=>(p1[0]-p3[0])*(p2[1]-p3[1])-(p2[0]-p3[0])*(p1[1]-p3[1]);const d1=sign([px,py],a,b),d2=sign([px,py],b,c),d3=sign([px,py],c,a),negative=d1<0||d2<0||d3<0,positive=d1>0||d2>0||d3>0;return!(negative&&positive);}
  function showIfcObject(surface,object){
   const panel=root?.querySelector('[data-ifc-object-properties]');if(!panel)return;
@@ -435,7 +442,12 @@ function createPlanView({store}){
   if(body.childElementCount){table.append(body);panel.append(table);}else{const empty=document.createElement('p');empty.textContent='Ingen IFC-egenskaper kunne leses for objektet.';panel.append(empty);}
  }
  function identifyIfcAt(event){
-  if(!objectLayerVisible||!projectedObjectLayer)return;
+  if(!objectLayerVisible||!projectedObjectLayer){
+   const panel=root?.querySelector('[data-ifc-object-properties]');
+   const message=objectLayerVisible?'IFC-objektslaget er ikke ferdig lastet. Kontroller statusen for laget.':'Slå på IFC-objektslaget før du klikker på IFC-objekter.';
+   panel?.replaceChildren(Object.assign(document.createElement('h3'),{textContent:'Objektegenskaper'}),Object.assign(document.createElement('p'),{textContent:message}));
+   return;
+  }
   const rect=root.querySelector('[data-plan-map]').getBoundingClientRect();
   const x=center.x+(event.clientX-rect.left-rect.width/2)*span/rect.width,y=center.y-(event.clientY-rect.top-rect.height/2)*span/rect.width;
   for(let surfaceIndex=projectedObjectLayer.surfaces.length-1;surfaceIndex>=0;surfaceIndex--){
@@ -736,6 +748,7 @@ function createPlanView({store}){
   map.addEventListener('pointerleave',clearPointerCoordinates);
   map.addEventListener('pointerup',moveEnd);
   map.addEventListener('pointercancel',moveEnd);
+  map.addEventListener('click',handleMapClick);
   map.addEventListener('wheel',zoomWheel,{passive:false});
   observer=new ResizeObserver(refresh);
   observer.observe(map);
