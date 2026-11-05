@@ -1,6 +1,6 @@
-import {readWearSurface,drawWearSurface,readIfcObjectLayer,drawIfcObjectLayer,MAX_WEAR_TRIANGLES,MAX_IFC_OBJECT_TRIANGLES} from './ifc-surface.js?v=2.05-preview.4-planview.6-ifc-read-test.6-2d-camera.2-wear-surface.6-multi-surface.2-hatch-cache.3-plan-performance.2-ifc-read-phases.2-yield-accounting.1-batched-yields.1-ifc-object-layer.8';
-import {normalizeIfcObjectLayer} from './ifc-object-layer-config.js?v=2.05-preview.4-planview.6-ifc-read-test.6-2d-camera.2-wear-surface.6-multi-surface.2-hatch-cache.3-plan-performance.2-ifc-read-phases.2-yield-accounting.1-batched-yields.1-ifc-object-layer.8';
-import {readWearSurfaceCache,writeWearSurfaceCache,wearSurfaceCacheKey} from './ifc-surface-cache.js?v=2.05-preview.4-planview.6-ifc-read-test.6-2d-camera.2-wear-surface.6-multi-surface.2-hatch-cache.3-plan-performance.2-ifc-read-phases.2-yield-accounting.1-batched-yields.1-ifc-object-layer.8';
+import {readWearSurface,drawWearSurface,readIfcObjectLayer,drawIfcObjectLayer,MAX_WEAR_TRIANGLES,MAX_IFC_OBJECT_TRIANGLES} from './ifc-surface.js?v=2.05-preview.4-planview.6-ifc-read-test.6-2d-camera.2-wear-surface.6-multi-surface.2-hatch-cache.3-plan-performance.2-ifc-read-phases.2-yield-accounting.1-batched-yields.1-ifc-object-layer.9';
+import {normalizeIfcObjectLayer} from './ifc-object-layer-config.js?v=2.05-preview.4-planview.6-ifc-read-test.6-2d-camera.2-wear-surface.6-multi-surface.2-hatch-cache.3-plan-performance.2-ifc-read-phases.2-yield-accounting.1-batched-yields.1-ifc-object-layer.9';
+import {readWearSurfaceCache,writeWearSurfaceCache,wearSurfaceCacheKey,readIfcObjectLayerCache,writeIfcObjectLayerCache,ifcObjectLayerCacheKey} from './ifc-surface-cache.js?v=2.05-preview.4-planview.6-ifc-read-test.6-2d-camera.2-wear-surface.6-multi-surface.2-hatch-cache.3-plan-performance.2-ifc-read-phases.2-yield-accounting.1-batched-yields.1-ifc-object-layer.9';
 const MAX_WIDTH=1600;
 const MAX_HEIGHT=1200;
 const WORLD=20037508.342789244;
@@ -467,13 +467,13 @@ function createPlanView({store}){
    const button=root?.querySelector('[data-ifc-object-read]');if(button)void runIfcObjectLayerPreview(button);
   },delay);
  }
- async function runIfcObjectLayerPreview(button){
+ async function runIfcObjectLayerPreview(button,forceRefresh=false){
   const files=window.DocLibLegacyBridge.listSelectedIfcFiles(),result=root?.querySelector('[data-ifc-object-status]');
   if(!ifcObjectLayerConfig.enabled){if(result)result.textContent='IFC-objektslaget er ikke aktivert i «Innstillinger (felles)».';return;}
   if(!ifcObjectLayerConfig.colorRules.some(rule=>rule.property)){if(result)result.textContent='Velg minst én IFC-egenskap i «Innstillinger (felles)», skrevet som PropertySet::Property.';return;}
   if(!files.length){if(result)result.textContent='Velg én eller flere IFC-modeller fra treet først.';return;}
   if(objectLayerLoading)return;
-  const token=++objectLayerLoadToken,keys=files.map(selectionKey),configKey=JSON.stringify(ifcObjectLayerConfig),models=[],reports=[];
+  const token=++objectLayerLoadToken,keys=files.map(selectionKey),configKey=JSON.stringify(ifcObjectLayerConfig),projectId=String(window.DocLibLegacyBridge.getProject()?.id||''),models=[],reports=[];
   let remaining=MAX_IFC_OBJECT_TRIANGLES;objectLayerLoading=true;button.disabled=true;
   const selectionIsCurrent=()=>token===objectLayerLoadToken&&sameIfcSelection(window.DocLibLegacyBridge.listSelectedIfcFiles(),keys);
   const formatSeconds=ms=>`${(ms/1000).toFixed(2).replace('.',',')} s`;
@@ -481,23 +481,29 @@ function createPlanView({store}){
    for(let index=0;index<files.length;index++){
     if(!selectionIsCurrent())return;
     if(remaining<1){reports.push(`${files[index].name}: hoppet over fordi grensen på ${MAX_IFC_OBJECT_TRIANGLES.toLocaleString('nb-NO')} trekanter er nådd.`);continue;}
-    const file=files[index],filesLeft=files.length-index,modelLimit=Math.max(1,Math.ceil(remaining/filesLeft)),key=JSON.stringify([String(file.id),String(file.versionId||''),configKey,modelLimit]);let model=memoryObjectLayerCache.get(key),source=model?'minnecache':'ny behandling',started=performance.now();
+    const file=files[index],filesLeft=files.length-index,modelLimit=Math.max(1,Math.ceil(remaining/filesLeft)),key=ifcObjectLayerCacheKey(projectId,file,configKey),memoryKey=key||JSON.stringify([String(file.id),String(file.versionId||''),configKey]),started=performance.now();let model=forceRefresh?null:memoryObjectLayerCache.get(memoryKey),source=model?'minnecache':forceRefresh?'ny behandling (manuell)':'ny behandling';
     try{
+     if(!model&&key&&!forceRefresh){
+      try{model=await readIfcObjectLayerCache(key);if(model)source='lokal cache';}catch(error){reports.push(`${file.name}: lokal objektslags-cache kunne ikke leses (${error?.message||String(error)}); bruker originalfilen.`);}
+      if(model)memoryObjectLayerCache.set(memoryKey,model);
+     }
      if(!model){
       if(result)result.textContent=`Henter og leser IFC ${index+1} av ${files.length}: ${file.name} …`;
       const buffer=await window.DocLibLegacyBridge.downloadIfcForSurface(file.id);if(!selectionIsCurrent())return;
       model=await readIfcObjectLayer(buffer,ifcObjectLayerConfig,message=>{if(result&&selectionIsCurrent())result.textContent=`${file.name} · ${message}`;},modelLimit);
-      memoryObjectLayerCache.set(key,model);if(memoryObjectLayerCache.size>12)memoryObjectLayerCache.delete(memoryObjectLayerCache.keys().next().value);
+      source='ny behandling';memoryObjectLayerCache.set(memoryKey,model);if(memoryObjectLayerCache.size>12)memoryObjectLayerCache.delete(memoryObjectLayerCache.keys().next().value);
+      if(key)try{await writeIfcObjectLayerCache(projectId,file,key,model);source='nybehandlet og lagret lokalt';}catch(error){reports.push(`${file.name}: IFC-objektslaget kunne ikke lagres lokalt (${error?.message||String(error)}).`);}
      }
      if(!selectionIsCurrent())return;
      const count=Math.min(model.triangles.length,modelLimit,remaining),displayModel={...model,triangles:model.triangles.slice(0,count),colors:model.colors.slice(0,count),geometrySource:model,fileId:file.id,fileName:file.name};
      if(count)models.push(displayModel);remaining-=count;
      const truncated=model.truncated||count<model.triangles.length;
      const diagnostics=model.colorDiagnostics;
-     const mappedText=diagnostics?` · fargemappet ${diagnostics.mappedObjects}, standardfarge ${diagnostics.defaultObjects}`:'';
+     const mappedText=diagnostics?` · regel-overstyrte geometrier ${diagnostics.overriddenGeometries??diagnostics.mappedObjects}, IFC-fargede geometrier ${diagnostics.nativeColorGeometries??0}, reservefargede geometrier ${diagnostics.fallbackColorGeometries??diagnostics.defaultObjects}`:'';
      const matchText=diagnostics?.matchedValues?.length?` · treff: ${diagnostics.matchedValues.slice(0,3).map(item=>`«${item.value}» → ${item.color} (${item.count})`).join(', ')}`:'';
      const unmatchedText=diagnostics?.unmatchedValues?.length?` · uten treff: ${diagnostics.unmatchedValues.slice(0,3).map(item=>`«${item.value}» (${item.count})`).join(', ')}`:'';
-     reports.push(`${file.name}: ${count.toLocaleString('nb-NO')} trekanter fra ${model.candidateCount} objekt(er)${mappedText}${matchText}${unmatchedText} · ${source}${truncated?' · avkortet av trekantgrensen':''} · ${formatSeconds(performance.now()-started)}`);
+     const nativeText=diagnostics?.nativeColorValues?.length?` · IFC-farger lest: ${diagnostics.nativeColorValues.slice(0,3).map(item=>`${item.color} (${item.count})`).join(', ')}`:'';
+     reports.push(`${file.name}: ${count.toLocaleString('nb-NO')} trekanter fra ${model.candidateCount} objekt(er)${mappedText}${matchText}${unmatchedText}${nativeText} · ${source}${truncated?' · avkortet av trekantgrensen':''} · ${formatSeconds(performance.now()-started)}`);
     }catch(error){reports.push(`${file.name}: ${error?.message||String(error)}`);}
    }
    if(!selectionIsCurrent())return;
@@ -506,7 +512,7 @@ function createPlanView({store}){
    if(!projectedObjectLayer)throw Error('IFC-objektgeometrien kunne ikke konverteres til valgt CRS.');
    objectLayerVisible=true;const toggle=root.querySelector('[data-ifc-object-visible]');if(toggle)toggle.checked=true;
    const drawWait=waitForWearDraw();refresh();const drawMs=await drawWait;
-   if(result)result.textContent=`Viser ${projectedObjectLayer.triangleCount.toLocaleString('nb-NO')} trekanter fra ${models.reduce((sum,model)=>sum+model.candidateCount,0)} objekt(er) i ${models.length} av ${files.length} IFC-modell(er). ${projection.cacheHits} projiseringscachetreff, ${projection.cacheMisses} nye projiseringer; tegning ${formatSeconds(drawMs)}. Fargene følger første egenskap med en definert verdifarge; ellers brukes standardfargen.\n${reports.join('\n')}`;
+   if(result)result.textContent=`Viser ${projectedObjectLayer.triangleCount.toLocaleString('nb-NO')} trekanter fra ${models.reduce((sum,model)=>sum+model.candidateCount,0)} objekt(er) i ${models.length} av ${files.length} IFC-modell(er). ${projection.cacheHits} projiseringscachetreff, ${projection.cacheMisses} nye projiseringer; tegning ${formatSeconds(drawMs)}. IFC-ens materialfarger brukes som grunnlag, fargeregler overstyrer dem, og reservefargen brukes bare når IFC-farge mangler.\n${reports.join('\n')}`;
   }catch(error){if(result&&token===objectLayerLoadToken)result.textContent=`IFC-objektslaget ble ikke vist: ${error?.message||String(error)}${reports.length?`\n${reports.join('\n')}`:''}`;}
   finally{objectLayerLoading=false;if(button.isConnected)button.disabled=!window.DocLibLegacyBridge.listSelectedIfcFiles().length||!ifcObjectLayerConfig.enabled||!ifcObjectLayerConfig.colorRules.some(rule=>rule.property);if(objectLayerAutoPending)scheduleIfcObjectLayerAutoLoad(0);}
  }
@@ -637,7 +643,7 @@ function createPlanView({store}){
   objectControls.innerHTML='<legend>IFC-objektslag</legend><label style="display:flex;gap:7px;align-items:center"><input type="checkbox" data-ifc-object-visible disabled> Vis objektslag</label><button type="button" data-ifc-object-read disabled style="margin-top:8px">Oppdater objektslag</button><small data-ifc-object-status role="status" aria-live="polite" style="display:block;margin-top:7px;color:#526173">Laget oppdateres automatisk fra fellesinnstillingene når IFC-modeller velges. Knappen kan brukes til manuell oppdatering.</small>';
   root.querySelector('.plan-layers-panel').append(objectControls);
   root.querySelector('[data-ifc-object-visible]').addEventListener('change',event=>{objectLayerVisible=event.target.checked;if(objectLayerVisible&&!projectedObjectLayer)root.querySelector('[data-ifc-object-status]').textContent='IFC-objektslaget lastes automatisk når det er aktivert og modeller er valgt.';refresh();});
-  root.querySelector('[data-ifc-object-read]').addEventListener('click',event=>runIfcObjectLayerPreview(event.currentTarget));
+  root.querySelector('[data-ifc-object-read]').addEventListener('click',event=>runIfcObjectLayerPreview(event.currentTarget,true));
   root.querySelector('[data-plan-basemap]').addEventListener('change',event=>{baseMap=event.target.value;userBaseMapSelected=true;const summary=root.querySelector('[data-plan-basemap-label]');if(summary)summary.textContent=`Prosjektstandard: ${BASEMAPS[sharedBaseMap].label} · Ditt valg: ${BASEMAPS[baseMap].label}`;refresh();});
   const crsSelect=root.querySelector('[data-plan-crs]');
   crsSelect.replaceChildren(...MODEL_CRS.map(({code,label})=>{const option=document.createElement('option');option.value=code;option.textContent=`${label} (${code})`;return option;}));

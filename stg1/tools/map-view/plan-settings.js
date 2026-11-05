@@ -1,5 +1,5 @@
 import {WMS_CATALOG} from './wms-catalog.js?v=2.05-preview.4-planview.5';
-import {DEFAULT_IFC_OBJECT_LAYER,normalizeIfcObjectLayer} from './ifc-object-layer-config.js?v=2.05-preview.4-planview.6-ifc-read-test.6-2d-camera.2-wear-surface.6-multi-surface.2-hatch-cache.3-plan-performance.2-ifc-read-phases.2-yield-accounting.1-batched-yields.1-ifc-object-layer.8';
+import {DEFAULT_IFC_OBJECT_LAYER,normalizeIfcObjectLayer} from './ifc-object-layer-config.js?v=2.05-preview.4-planview.6-ifc-read-test.6-2d-camera.2-wear-surface.6-multi-surface.2-hatch-cache.3-plan-performance.2-ifc-read-phases.2-yield-accounting.1-batched-yields.1-ifc-object-layer.9';
 const MAX_LAYERS=20;
 const CATALOG_IDS=new Set(WMS_CATALOG.map(item=>item.id));
 const BASEMAPS=Object.freeze([
@@ -59,9 +59,9 @@ export function mountPlanSettings(host,config,doc=document){
  function renderIfcObjectSettings(){
   objectLayerHost.replaceChildren();
   const legend=doc.createElement('legend');legend.textContent='IFC-objektslag (test)';objectLayerHost.append(legend);
-  const note=doc.createElement('p');note.textContent='Velg objekter på tvers av IFC-typer ved hjelp av inntil tre egenskaper. Bare objekter som har minst én valgt egenskap vises; geometri begrenses til oppovervendte flater og 30 000 trekanter totalt.';objectLayerHost.append(note);
+  const note=doc.createElement('p');note.textContent='Velg objekter på tvers av IFC-typer ved hjelp av inntil tre egenskaper. IFC-modellens egne materialfarger vises som utgangspunkt; fargeregler overstyrer dem. Bare objekter med minst én valgt egenskap vises, med maksimalt 30 000 oppovervendte trekanter totalt.';objectLayerHost.append(note);
   const enabledLabel=doc.createElement('label'),enabled=doc.createElement('input');enabled.type='checkbox';enabled.checked=ifcObjectLayer.enabled;enabledLabel.append(enabled,doc.createTextNode(' Tilby IFC-objektslaget i Planvisning'));objectLayerHost.append(enabledLabel);
-  const defaultLabel=doc.createElement('label');defaultLabel.style.cssText='display:flex;align-items:center;gap:8px;margin:10px 0';defaultLabel.append(doc.createTextNode('Standardfarge'));const defaultInput=doc.createElement('input');defaultInput.type='color';defaultInput.value=ifcObjectLayer.defaultColor;defaultInput.addEventListener('input',()=>{ifcObjectLayer.defaultColor=defaultInput.value;});defaultLabel.append(defaultInput);objectLayerHost.append(defaultLabel);
+  const defaultLabel=doc.createElement('label');defaultLabel.style.cssText='display:flex;align-items:center;gap:8px;margin:10px 0';defaultLabel.append(doc.createTextNode('Reservefarge når IFC-en mangler materialfarge'));const defaultInput=doc.createElement('input');defaultInput.type='color';defaultInput.value=ifcObjectLayer.defaultColor;defaultInput.addEventListener('input',()=>{ifcObjectLayer.defaultColor=defaultInput.value;});defaultLabel.append(defaultInput);objectLayerHost.append(defaultLabel);
   const rulesHost=doc.createElement('div');
   for(let index=0;index<3;index++){
    const rule=ifcObjectLayer.colorRules[index]||{property:'',values:[]};
@@ -73,7 +73,7 @@ export function mountPlanSettings(host,config,doc=document){
    const mappings=doc.createElement('textarea');mappings.rows=3;mappings.maxLength=5000;mappings.placeholder='Asfalt = #e85223\nBetong = #3b82f6';mappings.value=(rule.values||[]).map(item=>`${item.value} = ${item.color}`).join('\n');mappings.addEventListener('input',()=>{while(ifcObjectLayer.colorRules.length<=index)ifcObjectLayer.colorRules.push({property:'',values:[]});ifcObjectLayer.colorRules[index].values=mappings.value.split(/\r?\n/).map(line=>{const split=line.indexOf('=');return split<0?null:{value:line.slice(0,split).trim(),color:line.slice(split+1).trim()};}).filter(Boolean);});mappingsLabel.append(mappings);group.append(mappingsLabel);rulesHost.append(group);
   }
   objectLayerHost.append(rulesHost);
-  const help=doc.createElement('small');help.textContent='Bare objekter med minst én egenskap som er fylt inn her tas med, uansett IFC-type. Reglene prøves ovenfra og ned; verdier uten fargemapping går videre til neste regel. Uten fargetreff brukes standardfargen. Egenskapsnavn kan skrives PropertySet:Property eller PropertySet::Property.';objectLayerHost.append(help);
+  const help=doc.createElement('small');help.textContent='Bare objekter med minst én egenskap som er fylt inn her tas med, uansett IFC-type. IFC-materialfargen brukes når den finnes; reglene prøves ovenfra og ned og et fargetreff overstyrer materialfargen. Hvis IFC-en mangler lesbar materialfarge, brukes reservefargen. Egenskapsnavn kan skrives PropertySet:Property eller PropertySet::Property.';objectLayerHost.append(help);
   const sync=()=>{const disabled=!enabled.checked;defaultInput.disabled=disabled;for(const input of rulesHost.querySelectorAll('input,textarea'))input.disabled=disabled;};
   enabled.addEventListener('change',()=>{ifcObjectLayer.enabled=enabled.checked;sync();});
   sync();
