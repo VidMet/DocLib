@@ -1,6 +1,6 @@
-import {readWearSurface,drawWearSurface,readIfcObjectLayer,drawIfcObjectLayer,MAX_WEAR_TRIANGLES,MAX_IFC_OBJECT_TRIANGLES} from './ifc-surface.js?v=2.05-preview.4-planview.6-ifc-read-test.6-2d-camera.2-wear-surface.6-multi-surface.2-hatch-cache.3-plan-performance.2-ifc-read-phases.2-yield-accounting.1-batched-yields.1-ifc-object-layer.2-ifc-object-layer.1';
-import {normalizeIfcObjectLayer} from './ifc-object-layer-config.js?v=2.05-preview.4-planview.6-ifc-read-test.6-2d-camera.2-wear-surface.6-multi-surface.2-hatch-cache.3-plan-performance.2-ifc-read-phases.2-yield-accounting.1-batched-yields.1-ifc-object-layer.2-ifc-object-layer.1';
-import {readWearSurfaceCache,writeWearSurfaceCache,wearSurfaceCacheKey} from './ifc-surface-cache.js?v=2.05-preview.4-planview.6-ifc-read-test.6-2d-camera.2-wear-surface.6-multi-surface.2-hatch-cache.3-plan-performance.2-ifc-read-phases.2-yield-accounting.1-batched-yields.1-ifc-object-layer.2';
+import {readWearSurface,drawWearSurface,readIfcObjectLayer,drawIfcObjectLayer,MAX_WEAR_TRIANGLES,MAX_IFC_OBJECT_TRIANGLES} from './ifc-surface.js?v=2.05-preview.4-planview.6-ifc-read-test.6-2d-camera.2-wear-surface.6-multi-surface.2-hatch-cache.3-plan-performance.2-ifc-read-phases.2-yield-accounting.1-batched-yields.1-ifc-object-layer.3';
+import {normalizeIfcObjectLayer} from './ifc-object-layer-config.js?v=2.05-preview.4-planview.6-ifc-read-test.6-2d-camera.2-wear-surface.6-multi-surface.2-hatch-cache.3-plan-performance.2-ifc-read-phases.2-yield-accounting.1-batched-yields.1-ifc-object-layer.3';
+import {readWearSurfaceCache,writeWearSurfaceCache,wearSurfaceCacheKey} from './ifc-surface-cache.js?v=2.05-preview.4-planview.6-ifc-read-test.6-2d-camera.2-wear-surface.6-multi-surface.2-hatch-cache.3-plan-performance.2-ifc-read-phases.2-yield-accounting.1-batched-yields.1-ifc-object-layer.3';
 const MAX_WIDTH=1600;
 const MAX_HEIGHT=1200;
 const WORLD=20037508.342789244;
@@ -81,7 +81,7 @@ function createPlanView({store}){
   }
   const toggle=root?.querySelector('[data-ifc-object-visible]'),readButton=root?.querySelector('[data-ifc-object-read]');
   if(toggle){toggle.disabled=!ifcObjectLayerConfig.enabled;toggle.checked=objectLayerVisible;}
-  if(readButton)readButton.disabled=!ifcObjectLayerConfig.enabled||!ifcObjectLayerConfig.ifcType||objectLayerLoading||!window.DocLibLegacyBridge.listSelectedIfcFiles().length;
+  if(readButton)readButton.disabled=!ifcObjectLayerConfig.enabled||!ifcObjectLayerConfig.colorRules.some(rule=>rule.property)||objectLayerLoading||!window.DocLibLegacyBridge.listSelectedIfcFiles().length;
   refresh();
  };
  const note=(text,bad=false)=>{const el=root?.querySelector('[data-plan-status]');if(el){el.textContent=text;el.dataset.error=String(bad);}};
@@ -429,7 +429,7 @@ function createPlanView({store}){
   root.querySelector('[data-ifc-read]').disabled=!files.length;
   const surfaceButton=root.querySelector('[data-ifc-surface]');
   if(surfaceButton)surfaceButton.disabled=!files.length||surfaceLoading;
-  const objectReadButton=root.querySelector('[data-ifc-object-read]');if(objectReadButton)objectReadButton.disabled=!files.length||objectLayerLoading||!ifcObjectLayerConfig.enabled||!ifcObjectLayerConfig.ifcType;
+  const objectReadButton=root.querySelector('[data-ifc-object-read]');if(objectReadButton)objectReadButton.disabled=!files.length||objectLayerLoading||!ifcObjectLayerConfig.enabled||!ifcObjectLayerConfig.colorRules.some(rule=>rule.property);
   if(!sameIfcSelection(files,objectLayerFileIds)){
    objectLayerLoadToken++;objectLayerFileIds=files.map(selectionKey);objectLayerModels=[];projectedObjectLayer=null;
    const objectStatus=root.querySelector('[data-ifc-object-status]');if(objectStatus)objectStatus.textContent=files.length?'IFC-utvalget ble endret. Les objektslaget på nytt for å vise geometrien.':'Velg IFC-modeller og les objektslaget.';
@@ -458,7 +458,7 @@ function createPlanView({store}){
  async function runIfcObjectLayerPreview(button){
   const files=window.DocLibLegacyBridge.listSelectedIfcFiles(),result=root?.querySelector('[data-ifc-object-status]');
   if(!ifcObjectLayerConfig.enabled){if(result)result.textContent='IFC-objektslaget er ikke aktivert i «Innstillinger (felles)».';return;}
-  if(!ifcObjectLayerConfig.ifcType){if(result)result.textContent='Angi IFC-type i «Innstillinger (felles)».';return;}
+  if(!ifcObjectLayerConfig.colorRules.some(rule=>rule.property)){if(result)result.textContent='Velg minst én IFC-egenskap i «Innstillinger (felles)», skrevet som PropertySet::Property.';return;}
   if(!files.length){if(result)result.textContent='Velg én eller flere IFC-modeller fra treet først.';return;}
   if(objectLayerLoading)return;
   const token=++objectLayerLoadToken,keys=files.map(selectionKey),configKey=JSON.stringify(ifcObjectLayerConfig),models=[],reports=[];
@@ -492,7 +492,7 @@ function createPlanView({store}){
    const drawWait=waitForWearDraw();refresh();const drawMs=await drawWait;
    if(result)result.textContent=`Viser ${projectedObjectLayer.triangleCount.toLocaleString('nb-NO')} trekanter fra ${models.reduce((sum,model)=>sum+model.candidateCount,0)} objekt(er) i ${models.length} av ${files.length} IFC-modell(er). ${projection.cacheHits} projiseringscachetreff, ${projection.cacheMisses} nye projiseringer; tegning ${formatSeconds(drawMs)}. Fargene følger første egenskap med en definert verdifarge; ellers brukes standardfargen.\n${reports.join('\n')}`;
   }catch(error){if(result&&token===objectLayerLoadToken)result.textContent=`IFC-objektslaget ble ikke vist: ${error?.message||String(error)}${reports.length?`\n${reports.join('\n')}`:''}`;}
-  finally{objectLayerLoading=false;if(button.isConnected)button.disabled=!window.DocLibLegacyBridge.listSelectedIfcFiles().length||!ifcObjectLayerConfig.enabled||!ifcObjectLayerConfig.ifcType;}
+  finally{objectLayerLoading=false;if(button.isConnected)button.disabled=!window.DocLibLegacyBridge.listSelectedIfcFiles().length||!ifcObjectLayerConfig.enabled||!ifcObjectLayerConfig.colorRules.some(rule=>rule.property);}
  }
  async function runIfcReadTest(result,button){
   const files=window.DocLibLegacyBridge.listSelectedIfcFiles();

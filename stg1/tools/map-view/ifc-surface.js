@@ -1,4 +1,4 @@
-import {normalizeIfcObjectLayer,resolveIfcObjectColor} from './ifc-object-layer-config.js?v=2.05-preview.4-planview.6-ifc-read-test.6-2d-camera.2-wear-surface.6-multi-surface.2-hatch-cache.3-plan-performance.2-ifc-read-phases.2-yield-accounting.1-batched-yields.1-ifc-object-layer.2-ifc-object-layer.1';
+import {normalizeIfcObjectLayer,resolveIfcObjectColor} from './ifc-object-layer-config.js?v=2.05-preview.4-planview.6-ifc-read-test.6-2d-camera.2-wear-surface.6-multi-surface.2-hatch-cache.3-plan-performance.2-ifc-read-phases.2-yield-accounting.1-batched-yields.1-ifc-object-layer.3';
 const WEB_IFC_VERSION='0.0.77';
 const WEB_IFC_BASE=`https://cdn.jsdelivr.net/npm/web-ifc@${WEB_IFC_VERSION}/`;
 export const MAX_WEAR_TRIANGLES=120000;
@@ -207,14 +207,6 @@ function propertyValues(property){
  }
  return values;
 }
-function ifcEntityType(api,modelId,expressId,entity){
- try{
-  const code=api.GetLineType(modelId,expressId);
-  const name=api.GetNameFromTypeCode?.(code);
-  if(name)return String(name);
- }catch{}
- return String(entity?.ifcType||entity?.type||entity?.class||'');
-}
 function readConfiguredProperties(api,modelId,entity,rules){
  const wanted=new Set(rules.map(rule=>String(rule.property).toLocaleLowerCase('nb-NO')));
  const result={};
@@ -250,10 +242,8 @@ export async function readIfcObjectLayer(buffer,rawConfig,onProgress=()=>{},tria
  if(!(buffer instanceof ArrayBuffer)||buffer.byteLength===0)throw Error('IFC-filen er tom eller ugyldig.');
  if(!Number.isInteger(triangleLimit)||triangleLimit<1||triangleLimit>MAX_IFC_OBJECT_TRIANGLES)throw Error('Ugyldig trekantgrense for IFC-objektslaget.');
  const config=normalizeIfcObjectLayer(rawConfig);
- if(!config.ifcType)throw Error('Angi IFC-type i «Innstillinger (felles)» før objektslaget leses.');
- const typeWanted=config.ifcType.toLocaleLowerCase('nb-NO');
- const nameWanted=config.nameContains.toLocaleLowerCase('nb-NO');
- const rules=config.colorRules.filter(rule=>rule.property&&rule.values.length);
+ const rules=config.colorRules.filter(rule=>rule.property);
+ if(!rules.length)throw Error('Angi minst én IFC-egenskap som skal velge objekter, skrevet som PropertySet::Property.');
  const timings={setup:0,lineScan:0,lineScanYield:0,objectProcessing:0,objectYield:0,meshExtract:0,triangleFilter:0};
  const setupStarted=performance.now();
  const api=await getWebIfcApi();
@@ -267,24 +257,23 @@ export async function readIfcObjectLayer(buffer,rawConfig,onProgress=()=>{},tria
    const expressId=Number(unwrap(ids[index]));
    if(Number.isInteger(expressId)){
     const entity=api.GetLine(modelId,expressId);
-    const type=ifcEntityType(api,modelId,expressId,entity);
     const name=String(unwrapIfc(entity?.Name)||'').trim();
-    if(type.toLocaleLowerCase('nb-NO')===typeWanted&&(!nameWanted||name.toLocaleLowerCase('nb-NO').includes(nameWanted))){
-     const properties=readConfiguredProperties(api,modelId,entity,rules);
+    const properties=readConfiguredProperties(api,modelId,entity,rules);
+    if(Object.keys(properties).length){
      const color=resolveIfcObjectColor(properties,rules,config.defaultColor);
-     candidates.push({expressId,name:name||type,properties,color});
+     candidates.push({expressId,name:name||`IFC-objekt ${expressId}`,properties,color});
     }
    }
    const processed=index+1,chunk=processed-scanChunkStart,check=processed%SCAN_YIELD_TIME_CHECK_ITEMS===0;
    if(chunk>=SCAN_YIELD_MAX_ITEMS||(check&&performance.now()-scanStarted>=YIELD_MAX_WORK_MS)){
-    onProgress(`Filtrerer ${config.ifcType}: ${processed.toLocaleString('nb-NO')} av ${ids.length.toLocaleString('nb-NO')} IFC-linjer …`);
+    onProgress(`Filtrerer på IFC-egenskaper: ${processed.toLocaleString('nb-NO')} av ${ids.length.toLocaleString('nb-NO')} IFC-linjer …`);
     timings.lineScan+=performance.now()-scanStarted;
     await yieldToUi(timings,'lineScanYield');
     scanStarted=performance.now();scanChunkStart=processed;
    }
   }
   timings.lineScan+=performance.now()-scanStarted;
-  if(!candidates.length)throw Error(`Fant ingen ${config.ifcType}-objekter${config.nameContains?` med «${config.nameContains}» i navn`:''}.`);
+  if(!candidates.length)throw Error('Fant ingen IFC-objekter med minst én av de valgte egenskapene.');
   const triangles=[],colors=[],labels=[];
   let objectStarted=performance.now(),objectChunkStart=0,truncated=false;
   for(let itemIndex=0;itemIndex<candidates.length;itemIndex++){
@@ -332,14 +321,14 @@ export async function readIfcObjectLayer(buffer,rawConfig,onProgress=()=>{},tria
     if(triangles.length>=triangleLimit)break;
    }
    labels.push(candidate.name);
-   onProgress(`Leser ${config.ifcType}-objekt ${itemIndex+1} av ${candidates.length} …`);
+   onProgress(`Leser IFC-objekt ${itemIndex+1} av ${candidates.length} …`);
    const processed=itemIndex+1,hasMore=processed<candidates.length&&triangles.length<triangleLimit,work=performance.now()-objectStarted;
    if(hasMore&&(processed-objectChunkStart>=OBJECT_YIELD_MAX_ITEMS||work>=YIELD_MAX_WORK_MS)){
     timings.objectProcessing+=work;await yieldToUi(timings,'objectYield');objectStarted=performance.now();objectChunkStart=processed;
    }else if(!hasMore)timings.objectProcessing+=work;
    if(triangles.length>=triangleLimit)break;
   }
-  if(!triangles.length)throw Error(`Fant ${candidates.length} ${config.ifcType}-objekt(er), men ingen oppovervendte flater kunne leses.`);
+  if(!triangles.length)throw Error(`Fant ${candidates.length} objekt(er) med valgte egenskaper, men ingen oppovervendte flater kunne leses.`);
   return{triangles,colors,labels,candidateCount:candidates.length,truncated,timings};
  }finally{if(modelId!==null)api.CloseModel(modelId);}
 }

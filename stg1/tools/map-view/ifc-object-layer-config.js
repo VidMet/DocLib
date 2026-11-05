@@ -1,7 +1,5 @@
 export const DEFAULT_IFC_OBJECT_LAYER=Object.freeze({
  enabled:false,
- ifcType:'',
- nameContains:'',
  defaultColor:'#e85223',
  colorRules:Object.freeze([]),
 });
@@ -31,8 +29,6 @@ export function normalizeIfcObjectLayer(raw){
  const defaultColor=String(raw?.defaultColor??'').trim();
  return{
   enabled:raw?.enabled===true,
-  ifcType:cleanText(raw?.ifcType,120),
-  nameContains:cleanText(raw?.nameContains,120),
   defaultColor:COLOR.test(defaultColor)?defaultColor.toLowerCase():DEFAULT_IFC_OBJECT_LAYER.defaultColor,
   colorRules,
  };
