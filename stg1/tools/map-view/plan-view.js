@@ -1,6 +1,6 @@
-import {readWearSurface,drawWearSurface,readIfcObjectLayer,drawIfcObjectLayer,MAX_WEAR_TRIANGLES,MAX_IFC_OBJECT_TRIANGLES} from './ifc-surface.js?v=2.05-preview.7.2';
-import {normalizeIfcObjectLayer} from './ifc-object-layer-config.js?v=2.05-preview.7.2';
-import {readWearSurfaceCache,writeWearSurfaceCache,wearSurfaceCacheKey,readIfcObjectLayerCache,writeIfcObjectLayerCache,ifcObjectLayerCacheKey} from './ifc-surface-cache.js?v=2.05-preview.7.2';
+import {readWearSurface,drawWearSurface,readIfcObjectLayer,drawIfcObjectLayer,MAX_WEAR_TRIANGLES,MAX_IFC_OBJECT_TRIANGLES} from './ifc-surface.js?v=2.05-preview.7.3';
+import {normalizeIfcObjectLayer} from './ifc-object-layer-config.js?v=2.05-preview.7.3';
+import {readWearSurfaceCache,writeWearSurfaceCache,wearSurfaceCacheKey,readIfcObjectLayerCache,writeIfcObjectLayerCache,ifcObjectLayerCacheKey} from './ifc-surface-cache.js?v=2.05-preview.7.3';
 const MAX_WIDTH=1600;
 const MAX_HEIGHT=1200;
 const WORLD=20037508.342789244;
@@ -267,7 +267,8 @@ function createPlanView({store}){
   const add=(label,color,legendImageUrl='')=>{
    const item=document.createElement('div');item.className='plan-legend-item';
    const swatch=document.createElement('span');swatch.className='plan-legend-swatch';
-   if(color)swatch.style.background=color;
+   if(Array.isArray(color)&&color.length){const colors=[...new Set(color)];swatch.style.background=colors.length===1?colors[0]:`linear-gradient(90deg,${colors.map((value,index)=>`${value} ${index*100/colors.length}% ${(index+1)*100/colors.length}%`).join(',')})`;}
+   else if(color)swatch.style.background=color;
    if(legendImageUrl){const image=document.createElement('img');image.className='plan-legend-wms-image';image.alt='';image.src=legendImageUrl;image.onerror=()=>{image.remove();const note=document.createElement('small');note.className='plan-legend-extra';note.textContent='Tjenesten tilbyr ikke et lesbart legendebilde.';item.append(note);};item.append(image);}
    else item.append(swatch);
    const name=document.createElement('span');name.textContent=label;item.append(name);
@@ -287,12 +288,13 @@ function createPlanView({store}){
   if(wearSurfaceActive&&projectedWearSurface)add('IFC · slitelagsflate','#e85223');
   if(objectLayerVisible&&projectedObjectLayer){
    add('IFC · objektslag',null);
-   for(const model of objectLayerModels){
-    const diagnostics=model.colorDiagnostics||{};
-    for(const item of diagnostics.matchedValues||[])add(`Regel · ${item.value}`,item.color);
-    for(const item of diagnostics.nativeColorValues||[])add('IFC-materialfarge',item.color);
-    if(diagnostics.fallbackColorGeometries)add('Reservefarge','#e85223');
+   const types=new Map();
+   for(const model of objectLayerModels)for(const type of model.colorDiagnostics?.typeLegend||[]){
+    const entry=types.get(type.ifcType)||new Set();
+    for(const color of type.colors||[])entry.add(color);
+    types.set(type.ifcType,entry);
    }
+   for(const [ifcType,colors] of types)add(ifcType,[...colors]);
   }
   if(!legend.childElementCount){const empty=document.createElement('p');empty.className='plan-empty';empty.textContent='Slå på et kartlag for å se tegnforklaringen.';legend.append(empty);}
  }
@@ -581,7 +583,15 @@ function createPlanView({store}){
      }
      if(!selectionIsCurrent())return;
      const count=Math.min(model.triangles.length,modelLimit,remaining),displayModel={...model,triangles:model.triangles.slice(0,count),colors:model.colors.slice(0,count),triangleObjectIds:model.triangleObjectIds.slice(0,count),geometrySource:model,fileId:file.id,fileName:file.name};
-     if(count)models.push(displayModel);remaining-=count;
+     if(count){
+      models.push(displayModel);objectLayerModels=models.slice();objectLayerFileIds=keys;
+      const partialProjection=projectIfcObjectLayer();
+      if(!projectedObjectLayer)throw Error('Delresultatet fra IFC-modellen kunne ikke konverteres til valgt CRS.');
+      objectLayerVisible=true;const visibleToggle=root.querySelector('[data-ifc-object-visible]');if(visibleToggle)visibleToggle.checked=true;
+      renderLegend();refresh();
+      if(result)result.textContent=`Viser delresultat fra ${models.length} av ${files.length} IFC-modell(er) (${projectedObjectLayer.triangleCount.toLocaleString('nb-NO')} trekanter); behandler neste modell. ${partialProjection.cacheHits} projiseringscachetreff, ${partialProjection.cacheMisses} nye projiseringer.`;
+     }
+     remaining-=count;
      const truncated=model.truncated||count<model.triangles.length;
      const diagnostics=model.colorDiagnostics;
      const mappedText=diagnostics?` · regel-overstyrte geometrier ${diagnostics.overriddenGeometries??diagnostics.mappedObjects}, #ALL-reservefargede geometrier ${diagnostics.fallbackColorGeometries??diagnostics.defaultObjects}`:'';

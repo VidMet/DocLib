@@ -1,6 +1,6 @@
 import {WMS_CATALOG} from './wms-catalog.js?v=2.05-preview.4-planview.5';
-import {DEFAULT_IFC_OBJECT_LAYER,normalizeIfcObjectLayer} from './ifc-object-layer-config.js?v=2.05-preview.7.2';
-import {readIfcPropertyCatalog} from './ifc-surface.js?v=2.05-preview.7.2';
+import {DEFAULT_IFC_OBJECT_LAYER,normalizeIfcObjectLayer} from './ifc-object-layer-config.js?v=2.05-preview.7.3';
+import {readIfcPropertyCatalog} from './ifc-surface.js?v=2.05-preview.7.3';
 const MAX_LAYERS=20;
 const CATALOG_IDS=new Set(WMS_CATALOG.map(item=>item.id));
 const BASEMAPS=Object.freeze([
@@ -56,14 +56,14 @@ export function mountPlanSettings(host,config,doc=document){
  const catalogHost=root.querySelector('[data-wms-catalog]');
  const catalogStatus=root.querySelector('[data-wms-catalog-status]');
  let layers=normalized.layers.map(layer=>({...layer}));
- let ifcObjectLayer=normalizeIfcObjectLayer(normalized.ifcObjectLayer),propertyCatalog={},catalogLoading=false,catalogStatusText='';
+ let ifcObjectLayer=normalizeIfcObjectLayer(normalized.ifcObjectLayer),propertyCatalog={},catalogLoading=false,catalogAutoStarted=false,catalogStatusText='';
  function renderIfcObjectSettings(){
   objectLayerHost.replaceChildren();
   const legend=doc.createElement('legend');legend.textContent='IFC-objektslag (test)';objectLayerHost.append(legend);
   const note=doc.createElement('p');note.textContent='Velg opptil tre IFC-egenskaper og fargelegg bare verdiene du trenger. Standardregelen #ALL = default tegner øvrige objekter i reservefargen; «Bare eksplisitte treff» skjuler dem.';objectLayerHost.append(note);
   const enabledLabel=doc.createElement('label'),enabled=doc.createElement('input');enabled.type='checkbox';enabled.checked=ifcObjectLayer.enabled;enabledLabel.append(enabled,doc.createTextNode(' Tilby IFC-objektslaget i Planvisning'));objectLayerHost.append(enabledLabel);
   const scanRow=doc.createElement('div');scanRow.style.cssText='display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:10px 0';
-  const scanButton=doc.createElement('button');scanButton.type='button';scanButton.textContent='Hent egenskaper fra valgte IFC-modeller';
+  const scanButton=doc.createElement('button');scanButton.type='button';scanButton.textContent='Oppdater egenskaper fra valgte IFC-modeller';
   const scanStatus=doc.createElement('small');scanStatus.setAttribute('aria-live','polite');scanStatus.textContent=catalogStatusText;scanRow.append(scanButton,scanStatus);objectLayerHost.append(scanRow);
   const defaultGroup=doc.createElement('fieldset');defaultGroup.style.cssText='margin:12px 0;padding:12px;border:1px solid #d6dbe4;border-radius:7px';
   const defaultLegend=doc.createElement('legend');defaultLegend.textContent='#ALL = default';defaultGroup.append(defaultLegend);
@@ -79,11 +79,12 @@ export function mountPlanSettings(host,config,doc=document){
    const ruleLegend=doc.createElement('legend');ruleLegend.textContent=`Fargeprioritet ${index+1}`;group.append(ruleLegend);
    const propertyLabel=doc.createElement('label');propertyLabel.style.cssText='display:grid;gap:4px';propertyLabel.append(doc.createTextNode('Egenskap'));
    const propertySelect=doc.createElement('select');propertySelect.style.cssText='max-width:100%;min-height:34px';
-   const empty=doc.createElement('option');empty.value='';empty.textContent='Velg egenskap …';propertySelect.append(empty);
+   const empty=doc.createElement('option');empty.value='';empty.disabled=true;empty.textContent=Object.keys(propertyCatalog).length?'Velg egenskap …':'Hent egenskaper fra valgte IFC-modeller først';propertySelect.append(empty);
    const propertyNames=Object.keys(propertyCatalog).sort((a,b)=>a.localeCompare(b,'nb-NO',{sensitivity:'base'}));
    if(rule.property&&!propertyNames.includes(rule.property))propertyNames.unshift(rule.property);
    for(const property of propertyNames){const option=doc.createElement('option');option.value=property;option.textContent=property;propertySelect.append(option);}
    propertySelect.value=rule.property||'';
+   propertySelect.addEventListener('focus',()=>{if(!Object.keys(propertyCatalog).length&&!catalogLoading)scanButton.click();});
    propertySelect.addEventListener('change',()=>{rule.property=propertySelect.value;const oldValues=new Map(rule.values.map(item=>[item.value.toLocaleLowerCase('nb-NO'),item]));rule.values=(propertyCatalog[rule.property]||[]).slice(0,40).map((value,valueIndex)=>oldValues.get(value.toLocaleLowerCase('nb-NO'))||{value,color:palette[(valueIndex+index)%palette.length]});renderIfcObjectSettings();});
    propertyLabel.append(propertySelect);group.append(propertyLabel);
    const valuesTitle=doc.createElement('p');valuesTitle.style.cssText='margin:10px 0 4px';valuesTitle.textContent='Verdier som skal få egen farge';group.append(valuesTitle);
@@ -100,9 +101,10 @@ export function mountPlanSettings(host,config,doc=document){
   }
   objectLayerHost.append(rulesHost);
   const help=doc.createElement('small');help.textContent='Bruk «Hent egenskaper» etter at IFC-modeller er valgt i filtreet. Skanningen leser bare egenskaper, ikke 3D-geometri. Fargereglene prøves ovenfra og ned. #ALL = default er alltid siste regel og gir alle umatchede objekter reservefargen, også når IFC-materialfarge mangler.';objectLayerHost.append(help);
-  const sync=()=>{const disabled=!enabled.checked;scanButton.disabled=disabled||catalogLoading;defaultInput.disabled=disabled;onlyMatched.disabled=disabled;for(const input of rulesHost.querySelectorAll('input,select,button'))input.disabled=disabled;};
+  const sync=()=>{scanButton.disabled=catalogLoading;defaultInput.disabled=false;onlyMatched.disabled=false;for(const input of rulesHost.querySelectorAll('input,select,button'))input.disabled=false;};
   enabled.addEventListener('change',()=>{ifcObjectLayer.enabled=enabled.checked;sync();});
   scanButton.addEventListener('click',async()=>{
+   catalogAutoStarted=true;
    const files=window.DocLibLegacyBridge?.listSelectedIfcFiles?.()||[];
    if(!files.length){catalogStatusText='Velg IFC-modeller i filtreet først.';scanStatus.textContent=catalogStatusText;return;}
    catalogLoading=true;scanButton.disabled=true;const merged={};
@@ -120,6 +122,8 @@ export function mountPlanSettings(host,config,doc=document){
    finally{catalogLoading=false;renderIfcObjectSettings();}
   });
   sync();
+  const selectedFiles=window.DocLibLegacyBridge?.listSelectedIfcFiles?.()||[];
+  if(!catalogAutoStarted&&selectedFiles.length){catalogAutoStarted=true;queueMicrotask(()=>{if(scanButton.isConnected)scanButton.click();});}
  }
  function renderCatalog(){
   const groups=new Map();
