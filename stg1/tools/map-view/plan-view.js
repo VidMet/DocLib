@@ -1,5 +1,5 @@
-import {readWearSurface,drawWearSurface,MAX_WEAR_TRIANGLES} from './ifc-surface.js?v=2.05-preview.4-planview.6-ifc-read-test.6-2d-camera.2-wear-surface.6-multi-surface.2-hatch-cache.3-plan-performance.2-ifc-read-phases.1';
-import {readWearSurfaceCache,writeWearSurfaceCache,wearSurfaceCacheKey} from './ifc-surface-cache.js?v=2.05-preview.4-planview.6-ifc-read-test.6-2d-camera.2-wear-surface.6-multi-surface.2-hatch-cache.3-plan-performance.2-ifc-read-phases.1';
+import {readWearSurface,drawWearSurface,MAX_WEAR_TRIANGLES} from './ifc-surface.js?v=2.05-preview.4-planview.6-ifc-read-test.6-2d-camera.2-wear-surface.6-multi-surface.2-hatch-cache.3-plan-performance.2-ifc-read-phases.2-yield-accounting.1';
+import {readWearSurfaceCache,writeWearSurfaceCache,wearSurfaceCacheKey} from './ifc-surface-cache.js?v=2.05-preview.4-planview.6-ifc-read-test.6-2d-camera.2-wear-surface.6-multi-surface.2-hatch-cache.3-plan-performance.2-ifc-read-phases.2-yield-accounting.1';
 const MAX_WIDTH=1600;
 const MAX_HEIGHT=1200;
 const WORLD=20037508.342789244;
@@ -438,6 +438,7 @@ function createPlanView({store}){
   const projectId=String(window.DocLibLegacyBridge.getProject()?.id||'');
   const runStarted=performance.now();
   const formatSeconds=milliseconds=>`${(milliseconds/1000).toFixed(1).replace('.',',')} s`;
+   const formatDetailSeconds=milliseconds=>`${(milliseconds/1000).toFixed(2).replace('.',',')} s`;
   let remaining=MAX_WEAR_TRIANGLES;
   surfaceLoading=true;button.disabled=true;
   const selectionIsCurrent=()=>token===surfaceLoadToken&&sameIfcSelection(window.DocLibLegacyBridge.listSelectedIfcFiles(),selectedKeys);
@@ -487,7 +488,10 @@ function createPlanView({store}){
      const limitNote=aggregateLimited?' (avkortet av samlet visningsgrense)':'';
      const modelLimitNote=model.truncated?' (denne IFC-en nådde grensen på 120 000 trekanter)':'';
      const timingNote=`Tid: cache ${formatSeconds(timings.cache)}, nedlasting ${formatSeconds(timings.download)}, IFC-lesing ${formatSeconds(timings.read)}, lagring ${formatSeconds(timings.save)}`;
-     const readDetailNote=timings.readDetails?` Delmålinger: oppstart/åpning ${formatSeconds(timings.readDetails.setup)}, linjeskanning ${formatSeconds(timings.readDetails.lineScan)}, mesh-uttrekk ${formatSeconds(timings.readDetails.meshExtract)}, trekantfilter ${formatSeconds(timings.readDetails.triangleFilter)}.`:'';
+     const readDetail=timings.readDetails;
+     const measuredReadMs=readDetail?readDetail.setup+readDetail.lineScan+readDetail.meshExtract+readDetail.triangleFilter+readDetail.yield:0;
+     const unclassifiedReadMs=readDetail?Math.max(0,timings.read-measuredReadMs):0;
+     const readDetailNote=readDetail?` Delmålinger: oppstart/åpning ${formatDetailSeconds(readDetail.setup)}, linjeskanning ${formatDetailSeconds(readDetail.lineScan)}, mesh-uttrekk ${formatDetailSeconds(readDetail.meshExtract)}, trekantfilter ${formatDetailSeconds(readDetail.triangleFilter)}, UI-yield-venting ${formatDetailSeconds(readDetail.yield)}, uklassifisert resttid ${formatDetailSeconds(unclassifiedReadMs)}.`:'';
      reports.push(`${file.name}: ${shownCount} trekanter fra ${model.candidateCount} objekt(er) · ${source}${limitNote}${modelLimitNote}. ${timingNote}.${readDetailNote}`);
     }catch(error){reports.push(`${file.name}: ${error?.message||String(error)}`);}
    }

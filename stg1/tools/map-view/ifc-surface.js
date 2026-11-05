@@ -49,6 +49,12 @@ function modelLineIds(api,modelId){
  throw Error('IFC-leseren returnerte ikke en lesbar objektliste.');
 }
 
+async function yieldToUi(timings){
+ const started=performance.now();
+ await new Promise(resolve=>setTimeout(resolve,0));
+ timings.yield+=performance.now()-started;
+}
+
 async function getWebIfcApi(){
  if(!webIfcApiPromise){
   webIfcApiPromise=(async()=>{
@@ -66,7 +72,7 @@ async function getWebIfcApi(){
 export async function readWearSurface(buffer,onProgress=()=>{},triangleLimit=MAX_WEAR_TRIANGLES){
  if(!(buffer instanceof ArrayBuffer)||buffer.byteLength===0)throw Error('IFC-filen er tom eller ugyldig.');
  if(!Number.isInteger(triangleLimit)||triangleLimit<1||triangleLimit>MAX_WEAR_TRIANGLES)throw Error('Ugyldig trekantgrense for IFC-geometrien.');
- const timings={setup:0,lineScan:0,meshExtract:0,triangleFilter:0};
+ const timings={setup:0,lineScan:0,meshExtract:0,triangleFilter:0,yield:0};
  const setupStarted=performance.now();
  const api=await getWebIfcApi();
  let modelId=null;
@@ -89,7 +95,7 @@ export async function readWearSurface(buffer,onProgress=()=>{},triangleLimit=MAX
    if(index%300===0){
     timings.lineScan+=performance.now()-scanBlockStarted;
     onProgress(`Leter etter slitelag: ${index.toLocaleString('nb-NO')} av ${ids.length.toLocaleString('nb-NO')} IFC-linjer …`);
-    await new Promise(resolve=>setTimeout(resolve,0));
+    await yieldToUi(timings);
     scanBlockStarted=performance.now();
    }
   }
@@ -142,7 +148,7 @@ export async function readWearSurface(buffer,onProgress=()=>{},triangleLimit=MAX
    }
    labels.push(candidate.label);
    onProgress(`Leser geometri for slitelagsobjekt ${itemIndex+1} av ${candidates.length} …`);
-   await new Promise(resolve=>setTimeout(resolve,0));
+   await yieldToUi(timings);
    if(triangles.length>=triangleLimit)break;
   }
   if(!triangles.length)throw Error(`Fant ${candidates.length} merket slitelagsobjekt, men ingen oppovervendt flate kunne leses.`);
