@@ -1,4 +1,4 @@
-import {normalizeIfcObjectLayer,resolveIfcObjectColor} from './ifc-object-layer-config.js?v=2.05-preview.4-planview.6-ifc-read-test.6-2d-camera.2-wear-surface.6-multi-surface.2-hatch-cache.3-plan-performance.2-ifc-read-phases.2-yield-accounting.1-batched-yields.1-ifc-object-layer.4';
+import {normalizeIfcObjectLayer,resolveIfcObjectColor} from './ifc-object-layer-config.js?v=2.05-preview.4-planview.6-ifc-read-test.6-2d-camera.2-wear-surface.6-multi-surface.2-hatch-cache.3-plan-performance.2-ifc-read-phases.2-yield-accounting.1-batched-yields.1-ifc-object-layer.5';
 const WEB_IFC_VERSION='0.0.77';
 const WEB_IFC_BASE=`https://cdn.jsdelivr.net/npm/web-ifc@${WEB_IFC_VERSION}/`;
 export const MAX_WEAR_TRIANGLES=120000;
@@ -207,16 +207,18 @@ function propertyValues(property){
  }
  return values;
 }
-function readConfiguredProperties(api,modelId,entity,rules){
+function readConfiguredProperties(api,modelId,entityId,rules){
  const wanted=new Set(rules.map(rule=>String(rule.property).toLocaleLowerCase('nb-NO')));
  const result={};
  const psets=[];
- for(const relationId of referenceIds(entity?.IsDefinedBy)){
+ // IsDefinedBy and IsTypedBy are inverse attributes in IFC. WebIFC omits them unless inverse lookup is explicitly enabled.
+ const inverse=api.GetLine(modelId,entityId,false,true);
+ for(const relationId of referenceIds(inverse?.IsDefinedBy)){
   const relation=api.GetLine(modelId,relationId);
   const definition=relation?.RelatingPropertyDefinition;
   for(const id of referenceIds(definition))psets.push(api.GetLine(modelId,id));
  }
- for(const relationId of referenceIds(entity?.IsTypedBy)){
+ for(const relationId of referenceIds(inverse?.IsTypedBy)){
   const relation=api.GetLine(modelId,relationId);
   for(const typeId of referenceIds(relation?.RelatingType)){
    const type=api.GetLine(modelId,typeId);
@@ -258,7 +260,7 @@ export async function readIfcObjectLayer(buffer,rawConfig,onProgress=()=>{},tria
    if(Number.isInteger(expressId)){
     const entity=api.GetLine(modelId,expressId);
     const name=String(unwrapIfc(entity?.Name)||'').trim();
-    const properties=readConfiguredProperties(api,modelId,entity,rules);
+    const properties=readConfiguredProperties(api,modelId,expressId,rules);
     if(Object.keys(properties).length){
      const color=resolveIfcObjectColor(properties,rules,config.defaultColor);
      candidates.push({expressId,name:name||`IFC-objekt ${expressId}`,properties,color});
