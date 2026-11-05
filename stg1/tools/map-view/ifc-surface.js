@@ -126,8 +126,6 @@ export function drawWearSurface(canvas,model,options){
  context.clearRect(0,0,width,height);
  if(!model?.triangles?.length)return;
  context.fillStyle='rgba(232,82,35,.72)';
- context.strokeStyle='rgba(139,45,20,.75)';
- context.lineWidth=.35;
  context.beginPath();
  for(const triangle of model.triangles){
   const points=triangle.map(point=>projectPoint(point[0],point[1]));
@@ -136,5 +134,17 @@ export function drawWearSurface(canvas,model,options){
   if(screen.every(([x,y])=>x<0||x>width||y<0||y>height))continue;
   context.moveTo(screen[0][0],screen[0][1]);context.lineTo(screen[1][0],screen[1][1]);context.lineTo(screen[2][0],screen[2][1]);context.closePath();
  }
- context.fill();context.stroke();
+ context.fill();
+ context.save();
+ context.clip();
+ context.strokeStyle='rgba(139,45,20,.78)';
+ context.lineWidth=.65;
+ context.beginPath();
+ const spacing=8;
+ for(let offset=-height;offset<width;offset+=spacing){
+  context.moveTo(offset,0);
+  context.lineTo(offset+height,height);
+ }
+ context.stroke();
+ context.restore();
 }

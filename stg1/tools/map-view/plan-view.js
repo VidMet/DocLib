@@ -1,4 +1,5 @@
-import {readWearSurface,drawWearSurface,MAX_WEAR_TRIANGLES} from './ifc-surface.js?v=2.05-preview.4-planview.6-ifc-read-test.6-2d-camera.2-wear-surface.6-multi-surface.1';
+import {readWearSurface,drawWearSurface,MAX_WEAR_TRIANGLES} from './ifc-surface.js?v=2.05-preview.4-planview.6-ifc-read-test.6-2d-camera.2-wear-surface.6-multi-surface.2-hatch-cache.1';
+import {readWearSurfaceCache,writeWearSurfaceCache,wearSurfaceCacheKey} from './ifc-surface-cache.js?v=2.05-preview.4-planview.6-ifc-read-test.6-2d-camera.2-wear-surface.6-multi-surface.2-hatch-cache.1';
 const MAX_WIDTH=1600;
 const MAX_HEIGHT=1200;
 const WORLD=20037508.342789244;
@@ -46,7 +47,8 @@ function createPlanView({store}){
  let center={x:1170000,y:8370000},span=1400000,drag=null,pointerPosition=null;
  let currentModelCRS=DEFAULT_MODEL_CRS,lastCameraXY=null,cameraConnectionStarted=false;
  let baseMap='flyfoto',sharedBaseMap='flyfoto',userBaseMapSelected=false,layers=[],visible=new Set(),images=new Map();
- let wearSurfaces=[],projectedWearSurface=null,wearSurfaceExtent=null,surfaceFileIds=[],surfaceLoadToken=0,surfaceLoading=false;
+ let wearSurfaces=[],projectedWearSurface=null,wearSurfaceExtent=null,surfaceFileIds=[],surfaceLoadToken=0,surfaceLoading=false,surfaceRefreshPending=false,wearSurfaceActive=false;
+ const memoryWearCache=new Map();
  const refresh=()=>{if(!root||destroyed)return;clearTimeout(timer);timer=setTimeout(draw,130);};
  const setLayers=next=>{
   const previous=new Set(layers.map(layer=>layer.id));
@@ -113,7 +115,7 @@ function createPlanView({store}){
   return[mercatorX,mercatorY];
  };
  const projectWearSurface=()=>{
-  if(!wearSurfaces.length){projectedWearSurface=null;wearSurfaceExtent=null;return;}
+  if(!wearSurfaces.length){projectedWearSurface=null;wearSurfaceExtent=null;const focusButton=root?.querySelector('[data-ifc-focus]');if(focusButton)focusButton.hidden=true;return;}
   try{
    const triangles=[];
    for(const model of wearSurfaces)for(const triangle of model.triangles)triangles.push(triangle.map(point=>{const [x,y]=projectModelPoint(point[0],point[1]);return[x,y,point[2]];}));
@@ -322,6 +324,23 @@ function createPlanView({store}){
   renderPointerCoordinates();
   refresh();
  }
+ function selectionKey(file){return JSON.stringify([String(file.id),String(file.versionId||'')]);}
+ function sameIfcSelection(files,keys){return files.length===keys.length&&files.every((file,index)=>selectionKey(file)===keys[index]);}
+ function showMemorySelection(files){
+  const projectId=String(window.DocLibLegacyBridge.getProject()?.id||''),models=[];
+  let remaining=MAX_WEAR_TRIANGLES;
+  for(const file of files){
+   if(remaining<1)break;
+   const key=wearSurfaceCacheKey(projectId,file),cached=key?memoryWearCache.get(key):null;
+   if(!cached)continue;
+   const triangles=cached.triangles.slice(0,remaining);
+   models.push({...cached,triangles,fileId:file.id,fileName:file.name});
+   remaining-=triangles.length;
+  }
+  wearSurfaces=models;
+  projectWearSurface();
+  refresh();
+ }
  function refreshSelectedIfcFiles(){
   if(!root)return;
   const files=window.DocLibLegacyBridge.listSelectedIfcFiles();
@@ -333,11 +352,23 @@ function createPlanView({store}){
   root.querySelector('[data-ifc-read]').disabled=!files.length;
   const surfaceButton=root.querySelector('[data-ifc-surface]');
   if(surfaceButton)surfaceButton.disabled=!files.length||surfaceLoading;
-  const sameSelection=files.length===surfaceFileIds.length&&files.every((file,index)=>file.id===surfaceFileIds[index]);
-  if(wearSurfaces.length&&!sameSelection){
-   surfaceLoadToken++;wearSurfaces=[];projectedWearSurface=null;wearSurfaceExtent=null;surfaceFileIds=[];
-   const focusButton=root.querySelector('[data-ifc-focus]');if(focusButton)focusButton.hidden=true;
-   const surfaceResult=root.querySelector('[data-ifc-surface-result]');if(surfaceResult)surfaceResult.textContent='Slitelagsflatene ble fjernet fordi IFC-utvalget ble endret.';
+  if(sameIfcSelection(files,surfaceFileIds))return;
+  const hadPreview=wearSurfaceActive;
+  const hadDisplayed=wearSurfaces.length>0;
+  if(!files.length)surfaceRefreshPending=false;
+  surfaceLoadToken++;
+  surfaceFileIds=files.map(selectionKey);
+  if(hadPreview){
+   showMemorySelection(files);
+   const surfaceResult=root.querySelector('[data-ifc-surface-result]');
+   if(surfaceResult)surfaceResult.textContent=files.length?'IFC-utvalget ble endret. Leser hurtigbuffer og behandler bare manglende filer …':'Ingen IFC-modeller valgt; slitelagsflaten er skjult.';
+   if(files.length){
+    if(surfaceLoading)surfaceRefreshPending=true;
+    else void runIfcSurfacePreview(surfaceButton,true);
+   }
+  }else if(hadDisplayed){
+   wearSurfaces=[];projectWearSurface();
+   const surfaceResult=root.querySelector('[data-ifc-surface-result]');if(surfaceResult)surfaceResult.textContent='Slitelagsflatene ble skjult fordi IFC-utvalget ble endret.';
    refresh();
   }
  }
@@ -358,42 +389,72 @@ function createPlanView({store}){
    result.textContent=`Testet ${files.length} valgte IFC-modell${files.length===1?'':'er'}:\n\n${reports.join('\n\n')}\n\nDette tester metadata via Trimble Model API. Bruk den separate slitelag-knappen for en avgrenset geometriprøve.`;
   }finally{refreshSelectedIfcFiles();}
  }
- async function runIfcSurfacePreview(button){
+ async function runIfcSurfacePreview(button,automatic=false){
   const files=window.DocLibLegacyBridge.listSelectedIfcFiles();
   const result=root?.querySelector('[data-ifc-surface-result]');
-  if(!files.length){if(result)result.textContent='Velg én eller flere IFC-modeller i treet til venstre.';return;}
-  if(surfaceLoading)return;
-  const token=++surfaceLoadToken,selectedIds=files.map(file=>file.id),models=[],reports=[];
+  if(!files.length){surfaceRefreshPending=false;if(result)result.textContent='Velg én eller flere IFC-modeller i treet til venstre.';return;}
+  if(surfaceLoading){surfaceRefreshPending=true;return;}
+  wearSurfaceActive=true;
+  const token=++surfaceLoadToken,selectedKeys=files.map(selectionKey),models=[],reports=[];
+  const projectId=String(window.DocLibLegacyBridge.getProject()?.id||'');
   let remaining=MAX_WEAR_TRIANGLES;
   surfaceLoading=true;button.disabled=true;
-  const selectionIsCurrent=()=>token===surfaceLoadToken&&(()=>{const current=window.DocLibLegacyBridge.listSelectedIfcFiles();return current.length===selectedIds.length&&current.every((file,index)=>file.id===selectedIds[index]);})();
+  const selectionIsCurrent=()=>token===surfaceLoadToken&&sameIfcSelection(window.DocLibLegacyBridge.listSelectedIfcFiles(),selectedKeys);
   try{
    for(let index=0;index<files.length;index++){
     if(!selectionIsCurrent())return;
-    const file=files[index];
+    const file=files[index],key=wearSurfaceCacheKey(projectId,file);
     if(remaining<1){reports.push(`${file.name}: hoppet over fordi samlet sikkerhetsgrense på ${MAX_WEAR_TRIANGLES.toLocaleString('nb-NO')} trekanter er nådd.`);continue;}
     try{
-     if(result)result.textContent=`Henter IFC ${index+1} av ${files.length}: ${file.name} …`;
-     const buffer=await window.DocLibLegacyBridge.downloadIfcForSurface(file.id);
+     let model=key?memoryWearCache.get(key):null;
+     let source=model?'minnebuffer':'';
+     if(!model&&key){
+      if(result)result.textContent=`Sjekker lokal cache ${index+1} av ${files.length}: ${file.name} …`;
+      try{model=await readWearSurfaceCache(key);}catch(error){reports.push(`${file.name}: lokal cache kunne ikke leses (${error?.message||String(error)}); henter originalfilen.`);}
+      if(!selectionIsCurrent())return;
+      if(model){memoryWearCache.set(key,model);source='lokal cache';}
+     }
+     if(!model){
+      if(result)result.textContent=`Henter og behandler IFC ${index+1} av ${files.length}: ${file.name} …`;
+      const buffer=await window.DocLibLegacyBridge.downloadIfcForSurface(file.id);
+      if(!selectionIsCurrent())return;
+      model=await readWearSurface(buffer,message=>{if(result&&selectionIsCurrent())result.textContent=`${file.name} · ${message}`;},MAX_WEAR_TRIANGLES);
+      if(!selectionIsCurrent())return;
+      source=key?'nybehandlet':'nybehandlet; ikke cachet fordi Trimble mangler versjons-ID';
+      if(key){
+       memoryWearCache.set(key,model);
+       try{await writeWearSurfaceCache(projectId,file,key,model);source='nybehandlet og lagret lokalt';}
+       catch(error){source=`nybehandlet; lokal lagring feilet (${error?.message||String(error)})`;}
+      }
+     }
      if(!selectionIsCurrent())return;
-     const model=await readWearSurface(buffer,message=>{if(result&&selectionIsCurrent())result.textContent=`${file.name} · ${message}`;},remaining);
-     if(!selectionIsCurrent())return;
-     model.fileId=file.id;model.fileName=file.name;models.push(model);remaining=Math.max(0,remaining-model.triangles.length);
-     reports.push(`${file.name}: ${model.triangles.length.toLocaleString('nb-NO')} trekanter fra ${model.candidateCount} objekt(er)${model.truncated?' (avkortet ved felles sikkerhetsgrense)':''}.`);
+     const shownTriangles=model.triangles.slice(0,remaining);
+     const aggregateLimited=shownTriangles.length<model.triangles.length;
+     const displayModel={...model,triangles:shownTriangles,fileId:file.id,fileName:file.name};
+     if(shownTriangles.length){models.push(displayModel);remaining-=shownTriangles.length;}
+     const shownCount=shownTriangles.length.toLocaleString('nb-NO');
+     const limitNote=aggregateLimited?' (avkortet av samlet visningsgrense)':'';
+     const modelLimitNote=model.truncated?' (denne IFC-en nådde grensen på 120 000 trekanter)':'';
+     reports.push(`${file.name}: ${shownCount} trekanter fra ${model.candidateCount} objekt(er) · ${source}${limitNote}${modelLimitNote}.`);
     }catch(error){reports.push(`${file.name}: ${error?.message||String(error)}`);}
    }
    if(!selectionIsCurrent())return;
    if(!models.length)throw Error('Ingen av de valgte IFC-modellene ga lesbar slitelagsgeometri.');
-   wearSurfaces=models;surfaceFileIds=selectedIds;projectWearSurface();
+   wearSurfaces=models;surfaceFileIds=selectedKeys;projectWearSurface();
    if(!projectedWearSurface||!wearSurfaceExtent)throw Error('Geometrien kunne ikke konverteres til valgt CRS.');
    refresh();
    const extentWidth=wearSurfaceExtent.maxX-wearSurfaceExtent.minX,extentHeight=wearSurfaceExtent.maxY-wearSurfaceExtent.minY;
    const extentCenter={x:(wearSurfaceExtent.minX+wearSurfaceExtent.maxX)/2,y:(wearSurfaceExtent.minY+wearSurfaceExtent.maxY)/2};
    const offset=Math.hypot(extentCenter.x-center.x,extentCenter.y-center.y);
    const fmt=value=>Math.round(value).toLocaleString('nb-NO');
-   if(result)result.textContent=`Viser slitelag fra ${models.length} av ${files.length} valgte IFC-modeller (${projectedWearSurface.triangles.length.toLocaleString('nb-NO')} trekanter totalt). Samlet utstrekning ca. ${fmt(extentWidth)} × ${fmt(extentHeight)} m i ${currentModelCRS}; sentrum er ca. ${fmt(offset)} m fra kartets nåværende sentrum. Trykk «Zoom til slitelaget» for å vise alle.\n\n${reports.join('\n')}`;
+   const cacheNote='Lokal cache lagres bare i denne nettleseren og krever Trimble-versjons-ID.';
+   if(result)result.textContent=`Viser slitelag fra ${models.length} av ${files.length} valgte IFC-modeller (${projectedWearSurface.triangles.length.toLocaleString('nb-NO')} trekanter totalt). Samlet utstrekning ca. ${fmt(extentWidth)} × ${fmt(extentHeight)} m i ${currentModelCRS}; sentrum er ca. ${fmt(offset)} m fra kartets nåværende sentrum. Trykk «Zoom til slitelaget» for å vise alle.\n${automatic?'Utvalget ble oppdatert automatisk. ':''}${cacheNote}\n\n${reports.join('\n')}`;
   }catch(error){if(result&&token===surfaceLoadToken)result.textContent=`Slitelagsgeometri ble ikke vist: ${error?.message||String(error)}${reports.length?`\n\n${reports.join('\n')}`:''}`;}
-  finally{surfaceLoading=false;if(button.isConnected)button.disabled=!window.DocLibLegacyBridge.listSelectedIfcFiles().length;}
+  finally{
+   surfaceLoading=false;
+   if(button.isConnected)button.disabled=!window.DocLibLegacyBridge.listSelectedIfcFiles().length;
+   if(surfaceRefreshPending&&wearSurfaceActive&&root){surfaceRefreshPending=false;queueMicrotask(()=>runIfcSurfacePreview(button,true));}
+  }
  }
  function build(){
   const style=document.createElement('style');
