@@ -1,4 +1,4 @@
-import {normalizeIfcObjectLayer,matchIfcObjectColor} from './ifc-object-layer-config.js?v=2.05-preview.7.4';
+import {normalizeIfcObjectLayer,matchIfcObjectColor} from './ifc-object-layer-config.js?v=2.05-preview.7.6';
 const WEB_IFC_VERSION='0.0.77';
 const WEB_IFC_BASE=`https://cdn.jsdelivr.net/npm/web-ifc@${WEB_IFC_VERSION}/`;
 export const MAX_WEAR_TRIANGLES=120000;
@@ -44,6 +44,13 @@ export function ifcColorToCss(color){
  if(rgb.some(value=>!Number.isFinite(value)||value<0||value>1))return null;
  const alpha=components.length>3&&Number.isFinite(Number(components[3]))?Math.max(0,Math.min(1,Number(components[3]))):1;
  return`rgba(${rgb.map(value=>Math.round(value*255)).join(',')},${Number(alpha.toFixed(3))})`;
+}
+function colorWithTransparency(color,transparency=0){
+ const match=String(color||'').match(/^#([0-9a-f]{6})$/i);
+ if(!match)return color;
+ const rgb=[0,2,4].map(index=>parseInt(match[1].slice(index,index+2),16));
+ const alpha=Number(((100-Math.min(90,Math.max(0,Number(transparency)||0)))/100).toFixed(2));
+ return`rgba(${rgb.join(',')},${alpha})`;
 }
 function entityLabel(entity){
  return ['Name','ObjectType','Description','Tag','PredefinedType'].map(key=>unwrap(entity?.[key])).filter(value=>value!=null).map(String).join(' ').replace(/\\X2\\([0-9A-F]+)\\X0\\/gi,(_,hex)=>{try{return String.fromCodePoint(...hex.match(/.{4}/g).map(code=>parseInt(code,16)));}catch{return'';}});
@@ -303,7 +310,7 @@ export async function readIfcObjectLayer(buffer,rawConfig,onProgress=()=>{},tria
     const properties=rules.length?readConfiguredProperties(api,modelId,expressId):{};
     const hasConfiguredProperty=rules.some(rule=>Object.keys(properties).some(key=>key.toLocaleLowerCase('nb-NO')===rule.property.toLocaleLowerCase('nb-NO')));
     const productWithRepresentation=Boolean(unwrapIfc(entity?.GlobalId)&&entity?.Representation);
-    const match=matchIfcObjectColor(properties,rules,config.defaultColor);
+    const match=matchIfcObjectColor(properties,rules,config.defaultColor,config.defaultTransparency);
     if((config.onlyMatched&&hasConfiguredProperty&&match.matched)||(!config.onlyMatched&&productWithRepresentation)){
      if(match.matched){
       mappedObjects++;const key=JSON.stringify([match.property,match.value,match.color]);const current=matchedValues.get(key);
@@ -338,7 +345,7 @@ export async function readIfcObjectLayer(buffer,rawConfig,onProgress=()=>{},tria
    timings.meshExtract+=performance.now()-meshStarted;
    for(const placed of placedGeometries){
     const nativeColor=ifcColorToCss(placed?.color);
-    const displayColor=candidate.match.matched?candidate.match.color:config.defaultColor;
+    const displayColor=colorWithTransparency(candidate.match.color,candidate.match.transparency);
     if(candidate.match.matched)overriddenGeometries++;else if(nativeColor)nativeColorGeometries++;else fallbackColorGeometries++;
     if(nativeColor){const entry=nativeColors.get(nativeColor);if(entry)entry.count++;else if(nativeColors.size<8)nativeColors.set(nativeColor,{color:nativeColor,count:1});}
     const geometryStarted=performance.now(),geometry=api.GetGeometry(modelId,Number(placed.geometryExpressID));

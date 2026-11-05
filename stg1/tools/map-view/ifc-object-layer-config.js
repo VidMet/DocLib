@@ -1,6 +1,7 @@
 export const DEFAULT_IFC_OBJECT_LAYER=Object.freeze({
  enabled:false,
  defaultColor:'#e85223',
+ defaultTransparency:0,
  onlyMatched:false,
  colorRules:Object.freeze([]),
 });
@@ -25,7 +26,8 @@ export function normalizeIfcObjectLayer(raw){
    const key=normalizeDisplayValue(value).toLocaleLowerCase('nb-NO');
    if(!value||!COLOR.test(color)||seen.has(key))continue;
    seen.add(key);
-   values.push({value,color:color.toLowerCase()});
+   const transparency=Number.isFinite(Number(mapping?.transparency))?Math.min(90,Math.max(0,Number(mapping.transparency))):0;
+   values.push({value,color:color.toLowerCase(),transparency});
   }
   colorRules.push({property,values});
  }
@@ -33,12 +35,13 @@ export function normalizeIfcObjectLayer(raw){
  return{
   enabled:raw?.enabled===true,
   defaultColor:COLOR.test(defaultColor)?defaultColor.toLowerCase():DEFAULT_IFC_OBJECT_LAYER.defaultColor,
+  defaultTransparency:Number.isFinite(Number(raw?.defaultTransparency))?Math.min(90,Math.max(0,Number(raw.defaultTransparency))):0,
   onlyMatched:raw?.onlyMatched===true,
   colorRules,
  };
 }
 
-export function matchIfcObjectColor(properties,rules,defaultColor){
+export function matchIfcObjectColor(properties,rules,defaultColor,defaultTransparency=0){
  for(const rule of Array.isArray(rules)?rules:[]){
   const values=properties?.[rule.property];
   const candidates=Array.isArray(values)?values:[values];
@@ -46,12 +49,12 @@ export function matchIfcObjectColor(properties,rules,defaultColor){
    const value=normalizeDisplayValue(candidate);
    if(!value)continue;
    const mapping=(rule.values||[]).find(item=>normalizeDisplayValue(item.value).toLocaleLowerCase('nb-NO')===value.toLocaleLowerCase('nb-NO'));
-   if(mapping)return{color:mapping.color,matched:true,property:rule.property,value};
+   if(mapping)return{color:mapping.color,transparency:mapping.transparency??0,matched:true,property:rule.property,value};
   }
  }
- return{color:defaultColor,matched:false,property:null,value:null};
+ return{color:defaultColor,transparency:defaultTransparency,matched:false,property:null,value:null};
 }
 
-export function resolveIfcObjectColor(properties,rules,defaultColor){
- return matchIfcObjectColor(properties,rules,defaultColor).color;
+export function resolveIfcObjectColor(properties,rules,defaultColor,defaultTransparency=0){
+ return matchIfcObjectColor(properties,rules,defaultColor,defaultTransparency).color;
 }
