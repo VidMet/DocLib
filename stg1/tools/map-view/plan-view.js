@@ -1,5 +1,5 @@
-import {readWearSurface,drawWearSurface,MAX_WEAR_TRIANGLES} from './ifc-surface.js?v=2.05-preview.4-planview.6-ifc-read-test.6-2d-camera.2-wear-surface.6-multi-surface.2-hatch-cache.1';
-import {readWearSurfaceCache,writeWearSurfaceCache,wearSurfaceCacheKey} from './ifc-surface-cache.js?v=2.05-preview.4-planview.6-ifc-read-test.6-2d-camera.2-wear-surface.6-multi-surface.2-hatch-cache.1';
+import {readWearSurface,drawWearSurface,MAX_WEAR_TRIANGLES} from './ifc-surface.js?v=2.05-preview.4-planview.6-ifc-read-test.6-2d-camera.2-wear-surface.6-multi-surface.2-hatch-cache.2';
+import {readWearSurfaceCache,writeWearSurfaceCache,wearSurfaceCacheKey} from './ifc-surface-cache.js?v=2.05-preview.4-planview.6-ifc-read-test.6-2d-camera.2-wear-surface.6-multi-surface.2-hatch-cache.2';
 const MAX_WIDTH=1600;
 const MAX_HEIGHT=1200;
 const WORLD=20037508.342789244;
@@ -397,6 +397,8 @@ function createPlanView({store}){
   wearSurfaceActive=true;
   const token=++surfaceLoadToken,selectedKeys=files.map(selectionKey),models=[],reports=[];
   const projectId=String(window.DocLibLegacyBridge.getProject()?.id||'');
+  const runStarted=performance.now();
+  const formatSeconds=milliseconds=>`${(milliseconds/1000).toFixed(1).replace('.',',')} s`;
   let remaining=MAX_WEAR_TRIANGLES;
   surfaceLoading=true;button.disabled=true;
   const selectionIsCurrent=()=>token===surfaceLoadToken&&sameIfcSelection(window.DocLibLegacyBridge.listSelectedIfcFiles(),selectedKeys);
@@ -406,25 +408,34 @@ function createPlanView({store}){
     const file=files[index],key=wearSurfaceCacheKey(projectId,file);
     if(remaining<1){reports.push(`${file.name}: hoppet over fordi samlet sikkerhetsgrense på ${MAX_WEAR_TRIANGLES.toLocaleString('nb-NO')} trekanter er nådd.`);continue;}
     try{
+     const timings={cache:0,download:0,read:0,save:0};
      let model=key?memoryWearCache.get(key):null;
      let source=model?'minnebuffer':'';
      if(!model&&key){
       if(result)result.textContent=`Sjekker lokal cache ${index+1} av ${files.length}: ${file.name} …`;
+      const cacheStarted=performance.now();
       try{model=await readWearSurfaceCache(key);}catch(error){reports.push(`${file.name}: lokal cache kunne ikke leses (${error?.message||String(error)}); henter originalfilen.`);}
+      timings.cache+=performance.now()-cacheStarted;
       if(!selectionIsCurrent())return;
       if(model){memoryWearCache.set(key,model);source='lokal cache';}
      }
      if(!model){
       if(result)result.textContent=`Henter og behandler IFC ${index+1} av ${files.length}: ${file.name} …`;
+      const downloadStarted=performance.now();
       const buffer=await window.DocLibLegacyBridge.downloadIfcForSurface(file.id);
+      timings.download=performance.now()-downloadStarted;
       if(!selectionIsCurrent())return;
+      const readStarted=performance.now();
       model=await readWearSurface(buffer,message=>{if(result&&selectionIsCurrent())result.textContent=`${file.name} · ${message}`;},MAX_WEAR_TRIANGLES);
+      timings.read=performance.now()-readStarted;
       if(!selectionIsCurrent())return;
       source=key?'nybehandlet':'nybehandlet; ikke cachet fordi Trimble mangler versjons-ID';
       if(key){
        memoryWearCache.set(key,model);
+       const saveStarted=performance.now();
        try{await writeWearSurfaceCache(projectId,file,key,model);source='nybehandlet og lagret lokalt';}
        catch(error){source=`nybehandlet; lokal lagring feilet (${error?.message||String(error)})`;}
+       timings.save=performance.now()-saveStarted;
       }
      }
      if(!selectionIsCurrent())return;
@@ -435,7 +446,8 @@ function createPlanView({store}){
      const shownCount=shownTriangles.length.toLocaleString('nb-NO');
      const limitNote=aggregateLimited?' (avkortet av samlet visningsgrense)':'';
      const modelLimitNote=model.truncated?' (denne IFC-en nådde grensen på 120 000 trekanter)':'';
-     reports.push(`${file.name}: ${shownCount} trekanter fra ${model.candidateCount} objekt(er) · ${source}${limitNote}${modelLimitNote}.`);
+     const timingNote=`Tid: cache ${formatSeconds(timings.cache)}, nedlasting ${formatSeconds(timings.download)}, IFC-lesing ${formatSeconds(timings.read)}, lagring ${formatSeconds(timings.save)}`;
+     reports.push(`${file.name}: ${shownCount} trekanter fra ${model.candidateCount} objekt(er) · ${source}${limitNote}${modelLimitNote}. ${timingNote}.`);
     }catch(error){reports.push(`${file.name}: ${error?.message||String(error)}`);}
    }
    if(!selectionIsCurrent())return;
@@ -448,7 +460,8 @@ function createPlanView({store}){
    const offset=Math.hypot(extentCenter.x-center.x,extentCenter.y-center.y);
    const fmt=value=>Math.round(value).toLocaleString('nb-NO');
    const cacheNote='Lokal cache lagres bare i denne nettleseren og krever Trimble-versjons-ID.';
-   if(result)result.textContent=`Viser slitelag fra ${models.length} av ${files.length} valgte IFC-modeller (${projectedWearSurface.triangles.length.toLocaleString('nb-NO')} trekanter totalt). Samlet utstrekning ca. ${fmt(extentWidth)} × ${fmt(extentHeight)} m i ${currentModelCRS}; sentrum er ca. ${fmt(offset)} m fra kartets nåværende sentrum. Trykk «Zoom til slitelaget» for å vise alle.\n${automatic?'Utvalget ble oppdatert automatisk. ':''}${cacheNote}\n\n${reports.join('\n')}`;
+   const totalTime=formatSeconds(performance.now()-runStarted);
+   if(result)result.textContent=`Viser slitelag fra ${models.length} av ${files.length} valgte IFC-modeller (${projectedWearSurface.triangles.length.toLocaleString('nb-NO')} trekanter totalt). Samlet utstrekning ca. ${fmt(extentWidth)} × ${fmt(extentHeight)} m i ${currentModelCRS}; sentrum er ca. ${fmt(offset)} m fra kartets nåværende sentrum. Trykk «Zoom til slitelaget» for å vise alle.\nSamlet tid: ${totalTime}. ${automatic?'Utvalget ble oppdatert automatisk. ':''}${cacheNote}\n\n${reports.join('\n')}`;
   }catch(error){if(result&&token===surfaceLoadToken)result.textContent=`Slitelagsgeometri ble ikke vist: ${error?.message||String(error)}${reports.length?`\n\n${reports.join('\n')}`:''}`;}
   finally{
    surfaceLoading=false;

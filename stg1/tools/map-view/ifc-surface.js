@@ -2,6 +2,7 @@ const WEB_IFC_VERSION='0.0.77';
 const WEB_IFC_BASE=`https://cdn.jsdelivr.net/npm/web-ifc@${WEB_IFC_VERSION}/`;
 export const MAX_WEAR_TRIANGLES=120000;
 let webIfcPromise=null;
+let webIfcApiPromise=null;
 
 function loadWebIfc(){
  if(window.WebIFC?.IfcAPI)return Promise.resolve(window.WebIFC);
@@ -48,13 +49,24 @@ function modelLineIds(api,modelId){
  throw Error('IFC-leseren returnerte ikke en lesbar objektliste.');
 }
 
+async function getWebIfcApi(){
+ if(!webIfcApiPromise){
+  webIfcApiPromise=(async()=>{
+   const WebIFC=await loadWebIfc();
+   const api=new WebIFC.IfcAPI();
+   api.SetWasmPath(WEB_IFC_BASE,true);
+   await api.Init();
+   return api;
+  })();
+  webIfcApiPromise.catch(()=>{webIfcApiPromise=null;});
+ }
+ return webIfcApiPromise;
+}
+
 export async function readWearSurface(buffer,onProgress=()=>{},triangleLimit=MAX_WEAR_TRIANGLES){
  if(!(buffer instanceof ArrayBuffer)||buffer.byteLength===0)throw Error('IFC-filen er tom eller ugyldig.');
  if(!Number.isInteger(triangleLimit)||triangleLimit<1||triangleLimit>MAX_WEAR_TRIANGLES)throw Error('Ugyldig trekantgrense for IFC-geometrien.');
- const WebIFC=await loadWebIfc();
- const api=new WebIFC.IfcAPI();
- api.SetWasmPath(WEB_IFC_BASE,true);
- await api.Init();
+ const api=await getWebIfcApi();
  let modelId=null;
  try{
   modelId=api.OpenModel(new Uint8Array(buffer),{COORDINATE_TO_ORIGIN:false});
