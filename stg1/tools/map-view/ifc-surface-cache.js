@@ -3,7 +3,7 @@ const DB_VERSION=2;
 const STORE_NAME='surfaces';
 const OBJECT_STORE_NAME='object-layers';
 export const WEAR_SURFACE_PROCESSOR_VERSION='wear-reader-v1';
-export const IFC_OBJECT_LAYER_PROCESSOR_VERSION='ifc-object-reader-v2';
+export const IFC_OBJECT_LAYER_PROCESSOR_VERSION='ifc-object-reader-v3';
 
 let databasePromise=null;
 
@@ -56,8 +56,10 @@ function expandObjectRecord(record){
  const triangles=new Array(record.triangleCount);let offset=0;
  for(let index=0;index<triangles.length;index++)triangles[index]=[[coordinates[offset++],coordinates[offset++],coordinates[offset++]],[coordinates[offset++],coordinates[offset++],coordinates[offset++]],[coordinates[offset++],coordinates[offset++],coordinates[offset++]]];
  const colors=Array.isArray(record.colors)?record.colors:[];
- if(colors.length!==record.triangleCount)return null;
- return{triangles,colors,labels:Array.isArray(record.labels)?record.labels:[],candidateCount:Number(record.candidateCount)||0,truncated:Boolean(record.truncated),colorDiagnostics:record.colorDiagnostics||null};
+ const triangleObjectIds=Array.isArray(record.triangleObjectIds)?record.triangleObjectIds:[];
+ const objects=Array.isArray(record.objects)?record.objects:[];
+ if(colors.length!==record.triangleCount||triangleObjectIds.length!==record.triangleCount)return null;
+ return{triangles,colors,triangleObjectIds,objects,labels:Array.isArray(record.labels)?record.labels:[],candidateCount:Number(record.candidateCount)||0,truncated:Boolean(record.truncated),colorDiagnostics:record.colorDiagnostics||null};
 }
 
 export async function readIfcObjectLayerCache(key){
@@ -74,7 +76,7 @@ export async function writeIfcObjectLayerCache(projectId,file,key,model){
  if(!key||!projectId||!file?.id||!file?.versionId||!model?.triangles?.length||model.colors?.length!==model.triangles.length)return false;
  const database=await openDatabase(),coordinates=new Float64Array(model.triangles.length*9);let offset=0;
  for(const triangle of model.triangles)for(const point of triangle)for(const coordinate of point)coordinates[offset++]=coordinate;
- const record={key,owner:ownerKey(projectId,file.id),projectId:String(projectId),fileId:String(file.id),versionId:String(file.versionId),processorVersion:IFC_OBJECT_LAYER_PROCESSOR_VERSION,triangleCount:model.triangles.length,coordinates,colors:model.colors,labels:Array.isArray(model.labels)?model.labels:[],candidateCount:Number(model.candidateCount)||0,truncated:Boolean(model.truncated),colorDiagnostics:model.colorDiagnostics||null,savedAt:Date.now()};
+ const record={key,owner:ownerKey(projectId,file.id),projectId:String(projectId),fileId:String(file.id),versionId:String(file.versionId),processorVersion:IFC_OBJECT_LAYER_PROCESSOR_VERSION,triangleCount:model.triangles.length,coordinates,colors:model.colors,triangleObjectIds:Array.from(model.triangleObjectIds||[]),objects:Array.isArray(model.objects)?model.objects:[],labels:Array.isArray(model.labels)?model.labels:[],candidateCount:Number(model.candidateCount)||0,truncated:Boolean(model.truncated),colorDiagnostics:model.colorDiagnostics||null,savedAt:Date.now()};
  return new Promise((resolve,reject)=>{
   const transaction=database.transaction(OBJECT_STORE_NAME,'readwrite'),store=transaction.objectStore(OBJECT_STORE_NAME),cursor=store.index('owner').openCursor(IDBKeyRange.only(record.owner));
   cursor.onsuccess=()=>{const item=cursor.result;if(item){if(item.value.key!==key)item.delete();item.continue();}else store.put(record);};

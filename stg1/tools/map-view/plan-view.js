@@ -1,6 +1,6 @@
-import {readWearSurface,drawWearSurface,readIfcObjectLayer,drawIfcObjectLayer,MAX_WEAR_TRIANGLES,MAX_IFC_OBJECT_TRIANGLES} from './ifc-surface.js?v=2.05-preview.4-planview.6-ifc-read-test.6-2d-camera.2-wear-surface.6-multi-surface.2-hatch-cache.3-plan-performance.2-ifc-read-phases.2-yield-accounting.1-batched-yields.1-ifc-object-layer.9';
-import {normalizeIfcObjectLayer} from './ifc-object-layer-config.js?v=2.05-preview.4-planview.6-ifc-read-test.6-2d-camera.2-wear-surface.6-multi-surface.2-hatch-cache.3-plan-performance.2-ifc-read-phases.2-yield-accounting.1-batched-yields.1-ifc-object-layer.9';
-import {readWearSurfaceCache,writeWearSurfaceCache,wearSurfaceCacheKey,readIfcObjectLayerCache,writeIfcObjectLayerCache,ifcObjectLayerCacheKey} from './ifc-surface-cache.js?v=2.05-preview.4-planview.6-ifc-read-test.6-2d-camera.2-wear-surface.6-multi-surface.2-hatch-cache.3-plan-performance.2-ifc-read-phases.2-yield-accounting.1-batched-yields.1-ifc-object-layer.9';
+import {readWearSurface,drawWearSurface,readIfcObjectLayer,drawIfcObjectLayer,MAX_WEAR_TRIANGLES,MAX_IFC_OBJECT_TRIANGLES} from './ifc-surface.js?v=2.05-preview.4-planview.6-ifc-read-test.6-2d-camera.2-wear-surface.6-multi-surface.2-hatch-cache.3-plan-performance.2-ifc-read-phases.2-yield-accounting.1-batched-yields.1-ifc-object-layer.10';
+import {normalizeIfcObjectLayer} from './ifc-object-layer-config.js?v=2.05-preview.4-planview.6-ifc-read-test.6-2d-camera.2-wear-surface.6-multi-surface.2-hatch-cache.3-plan-performance.2-ifc-read-phases.2-yield-accounting.1-batched-yields.1-ifc-object-layer.10';
+import {readWearSurfaceCache,writeWearSurfaceCache,wearSurfaceCacheKey,readIfcObjectLayerCache,writeIfcObjectLayerCache,ifcObjectLayerCacheKey} from './ifc-surface-cache.js?v=2.05-preview.4-planview.6-ifc-read-test.6-2d-camera.2-wear-surface.6-multi-surface.2-hatch-cache.3-plan-performance.2-ifc-read-phases.2-yield-accounting.1-batched-yields.1-ifc-object-layer.10';
 const MAX_WIDTH=1600;
 const MAX_HEIGHT=1200;
 const WORLD=20037508.342789244;
@@ -82,6 +82,7 @@ function createPlanView({store}){
   const toggle=root?.querySelector('[data-ifc-object-visible]'),readButton=root?.querySelector('[data-ifc-object-read]');
   if(toggle){toggle.disabled=!ifcObjectLayerConfig.enabled;toggle.checked=objectLayerVisible;}
   if(readButton)readButton.disabled=!ifcObjectLayerConfig.enabled||!ifcObjectLayerConfig.colorRules.some(rule=>rule.property)||objectLayerLoading||!window.DocLibLegacyBridge.listSelectedIfcFiles().length;
+  renderLegend();
   if(configChanged&&ifcObjectLayerConfig.enabled)scheduleIfcObjectLayerAutoLoad();
   refresh();
  };
@@ -190,7 +191,7 @@ function createPlanView({store}){
       for(let pointIndex=0;pointIndex<3;pointIndex++){const point=triangle[pointIndex],xy=projectModelPoint(proj4,point[0],point[1]);points[pointIndex]=[xy[0],xy[1],point[2]];}
       triangles[index]=points;
      }
-     projected={triangles,colors:model.colors};cache.set(key,projected);if(cache.size>4)cache.delete(cache.keys().next().value);cacheMisses++;
+     projected={triangles,colors:model.colors,triangleObjectIds:model.triangleObjectIds,objects:model.objects,fileId:model.fileId,fileName:model.fileName};cache.set(key,projected);if(cache.size>4)cache.delete(cache.keys().next().value);cacheMisses++;
     }
     surfaces.push(projected);
    }
@@ -236,6 +237,7 @@ function createPlanView({store}){
    empty.className='plan-empty';
    empty.textContent='Ingen tematiske WMS-overlegg er konfigurert. En administrator kan legge dem til i «Innstillinger (felles)».';
    list.append(empty);
+   renderLegend();
    return;
   }
   for(const layer of layers){
@@ -247,6 +249,7 @@ function createPlanView({store}){
    input.addEventListener('change',()=>{
     if(input.checked)visible.add(layer.id);
     else visible.delete(layer.id);
+    renderLegend();
     refresh();
    });
    const name=document.createElement('span');
@@ -255,7 +258,45 @@ function createPlanView({store}){
    label.append(input,name);
    list.append(label);
   }
+  renderLegend();
  };
+ function renderLegend(){
+  const legend=root?.querySelector('[data-plan-legend]');
+  if(!legend)return;
+  legend.replaceChildren();
+  const add=(label,color,extra='',legendImageUrl='')=>{
+   const item=document.createElement('div');item.className='plan-legend-item';
+   const swatch=document.createElement('span');swatch.className='plan-legend-swatch';
+   if(color)swatch.style.background=color;
+   if(legendImageUrl){const image=document.createElement('img');image.className='plan-legend-wms-image';image.alt='';image.src=legendImageUrl;image.onerror=()=>{image.remove();const note=document.createElement('small');note.className='plan-legend-extra';note.textContent='Tjenesten tilbyr ikke et lesbart legendebilde.';item.append(note);};item.append(image);}
+   else item.append(swatch);
+   const name=document.createElement('span');name.textContent=label;item.append(name);
+   if(extra){const note=document.createElement('small');note.className='plan-legend-extra';note.textContent=extra;item.append(note);}
+   legend.append(item);
+  };
+  const wmsLegendUrl=(sourceUrl,layerName)=>{try{const url=new URL(sourceUrl);url.searchParams.set('SERVICE','WMS');url.searchParams.set('REQUEST','GetLegendGraphic');url.searchParams.set('VERSION','1.1.1');url.searchParams.set('FORMAT','image/png');url.searchParams.set('LAYER',layerName);return url.href;}catch{return'';}};
+  if(baseMap!=='none'){
+   const definition=BASEMAPS[baseMap]||BASEMAPS.flyfoto;
+   const baseLegend=definition.type==='wms'?wmsLegendUrl(definition.url,definition.layer):'';
+   add(`Bakgrunn · ${definition.label}`,null,definition.attribution||'',baseLegend);
+  }
+  for(const layer of layers){
+   if(!visible.has(layer.id))continue;
+   const legendImageUrl=wmsLegendUrl(layer.url,layer.layer);
+   add(`WMS · ${layer.name}`,null,layer.attribution||layer.layer,legendImageUrl);
+  }
+  if(wearSurfaceActive&&projectedWearSurface)add('IFC · slitelagsflate','#e85223','Oransje skravur');
+  if(objectLayerVisible&&projectedObjectLayer){
+   add('IFC · objektslag',null,`${projectedObjectLayer.triangleCount.toLocaleString('nb-NO')} oppovervendte trekanter`);
+   for(const model of objectLayerModels){
+    const diagnostics=model.colorDiagnostics||{};
+    for(const item of diagnostics.matchedValues||[])add(`Regel · ${item.value}`,item.color,`${model.fileName||'IFC'} · ${item.property} · ${item.count} objekt(er)`);
+    for(const item of diagnostics.nativeColorValues||[])add('IFC-materialfarge',item.color,`${model.fileName||'IFC'} · ${item.count} geometri(er)`);
+    if(diagnostics.fallbackColorGeometries)add('Reservefarge','#e85223',`${model.fileName||'IFC'} · ${diagnostics.fallbackColorGeometries} geometri(er)`);
+   }
+  }
+  if(!legend.childElementCount){const empty=document.createElement('p');empty.className='plan-empty';empty.textContent='Slå på et kartlag for å se tegnforklaringen.';legend.append(empty);}
+ }
  function drawBase(container,bounds,cssWidth,cssHeight,pixelWidth,pixelHeight){
   container.replaceChildren();
   const definition=BASEMAPS[baseMap]||BASEMAPS.flyfoto;
@@ -369,18 +410,49 @@ function createPlanView({store}){
  }
  function moveStart(event){
   if(event.button!==0||event.target.closest('button'))return;
-  drag={x:event.clientX,y:event.clientY,centerX:center.x,centerY:center.y};
+  drag={x:event.clientX,y:event.clientY,centerX:center.x,centerY:center.y,moved:false};
   root.querySelector('[data-plan-map]').setPointerCapture(event.pointerId);
  }
  function move(event){
   if(!drag)return;
   const rect=root.querySelector('[data-plan-map]').getBoundingClientRect();
+  if(Math.hypot(event.clientX-drag.x,event.clientY-drag.y)>4)drag.moved=true;
   const scale=span/rect.width;
   center.x=clamp(drag.centerX-(event.clientX-drag.x)*scale,-WORLD,WORLD);
   center.y=clamp(drag.centerY+(event.clientY-drag.y)*scale,-WORLD,WORLD);
   refresh();
  }
- function moveEnd(){drag=null;}
+ function moveEnd(event){const previous=drag;drag=null;if(event?.type==='pointerup'&&previous&&!previous.moved)identifyIfcAt(event);}
+ function pointInTriangle(px,py,a,b,c){const sign=(p1,p2,p3)=>(p1[0]-p3[0])*(p2[1]-p3[1])-(p2[0]-p3[0])*(p1[1]-p3[1]);const d1=sign([px,py],a,b),d2=sign([px,py],b,c),d3=sign([px,py],c,a),negative=d1<0||d2<0||d3<0,positive=d1>0||d2>0||d3>0;return!(negative&&positive);}
+ function showIfcObject(surface,object){
+  const panel=root?.querySelector('[data-ifc-object-properties]');if(!panel)return;
+  panel.replaceChildren();const heading=document.createElement('h3');heading.textContent=object.name||`IFC-objekt ${object.expressId}`;panel.append(heading);
+  const details=document.createElement('p');details.textContent=[surface.fileName||'IFC-modell',object.ifcType||'IFC-objekt',`ExpressID ${object.expressId}`,object.globalId?`GUID ${object.globalId}`:''].filter(Boolean).join(' · ');panel.append(details);
+  const table=document.createElement('table'),body=document.createElement('tbody');
+  const standard=[['IFC.Name',object.name],['IFC.GlobalId',object.globalId],['IFC.Type',object.ifcType]].filter(([,value])=>value);
+  for(const[key,value]of [...standard,...Object.entries(object.properties||{})].slice(0,120)){
+   const row=document.createElement('tr'),name=document.createElement('th'),content=document.createElement('td');name.scope='row';name.textContent=key;content.textContent=Array.isArray(value)?value.join(' · '):String(value??'');row.append(name,content);body.append(row);
+  }
+  if(body.childElementCount){table.append(body);panel.append(table);}else{const empty=document.createElement('p');empty.textContent='Ingen IFC-egenskaper kunne leses for objektet.';panel.append(empty);}
+ }
+ function identifyIfcAt(event){
+  if(!objectLayerVisible||!projectedObjectLayer)return;
+  const rect=root.querySelector('[data-plan-map]').getBoundingClientRect();
+  const x=center.x+(event.clientX-rect.left-rect.width/2)*span/rect.width,y=center.y-(event.clientY-rect.top-rect.height/2)*span/rect.width;
+  for(let surfaceIndex=projectedObjectLayer.surfaces.length-1;surfaceIndex>=0;surfaceIndex--){
+   const surface=projectedObjectLayer.surfaces[surfaceIndex],colors=surface.colors||[];
+   const drawColorOrder=[...new Set(colors.map(color=>color||'#e85223'))];
+   for(let colorIndex=drawColorOrder.length-1;colorIndex>=0;colorIndex--){
+    const color=drawColorOrder[colorIndex];
+    for(let index=surface.triangles.length-1;index>=0;index--){
+     if((colors[index]||'#e85223')!==color)continue;
+     const triangle=surface.triangles[index];if(!pointInTriangle(x,y,triangle[0],triangle[1],triangle[2]))continue;
+     const objectIndex=surface.triangleObjectIds?.[index],object=surface.objects?.[objectIndex];if(object){showIfcObject(surface,object);return;}
+    }
+   }
+  }
+  const panel=root.querySelector('[data-ifc-object-properties]');panel?.replaceChildren(Object.assign(document.createElement('h3'),{textContent:'Objektegenskaper'}),Object.assign(document.createElement('p'),{textContent:'Ingen IFC-flate traff klikkpunktet. Prøv å zoome inn eller slå på IFC-objektslaget.'}));
+ }
  function zoomWheel(event){
   const map=root?.querySelector('[data-plan-map]');
   if(!map)return;
@@ -434,6 +506,8 @@ function createPlanView({store}){
   if(!sameIfcSelection(files,objectLayerFileIds)){
    objectLayerLoadToken++;objectLayerFileIds=files.map(selectionKey);objectLayerModels=[];projectedObjectLayer=null;
    const objectStatus=root.querySelector('[data-ifc-object-status]');if(objectStatus)objectStatus.textContent=files.length?'IFC-utvalget ble endret. IFC-objektslaget oppdateres automatisk.':'Velg IFC-modeller; objektslaget lastes automatisk når modeller er valgt.';
+   const properties=root.querySelector('[data-ifc-object-properties]');if(properties)properties.replaceChildren(Object.assign(document.createElement('h3'),{textContent:'Objektegenskaper'}),Object.assign(document.createElement('p'),{textContent:'Klikk på en synlig IFC-flate i kartet for å vise egenskapene.'}));
+   renderLegend();
    if(files.length)scheduleIfcObjectLayerAutoLoad();else{clearTimeout(objectLayerAutoTimer);objectLayerAutoTimer=0;objectLayerAutoPending=false;}
    refresh();
   }
@@ -444,7 +518,7 @@ function createPlanView({store}){
   surfaceLoadToken++;
   surfaceFileIds=files.map(selectionKey);
   if(hadPreview){
-   showMemorySelection(files);
+   showMemorySelection(files);renderLegend();
    const surfaceResult=root.querySelector('[data-ifc-surface-result]');
    if(surfaceResult)surfaceResult.textContent=files.length?'IFC-utvalget ble endret. Leser hurtigbuffer og behandler bare manglende filer …':'Ingen IFC-modeller valgt; slitelagsflaten er skjult.';
    if(files.length){
@@ -452,7 +526,7 @@ function createPlanView({store}){
     else void runIfcSurfacePreview(surfaceButton,true);
    }
   }else if(hadDisplayed){
-   wearSurfaces=[];projectWearSurface();
+   wearSurfaces=[];projectWearSurface();renderLegend();
    const surfaceResult=root.querySelector('[data-ifc-surface-result]');if(surfaceResult)surfaceResult.textContent='Slitelagsflatene ble skjult fordi IFC-utvalget ble endret.';
    refresh();
   }
@@ -495,7 +569,7 @@ function createPlanView({store}){
       if(key)try{await writeIfcObjectLayerCache(projectId,file,key,model);source='nybehandlet og lagret lokalt';}catch(error){reports.push(`${file.name}: IFC-objektslaget kunne ikke lagres lokalt (${error?.message||String(error)}).`);}
      }
      if(!selectionIsCurrent())return;
-     const count=Math.min(model.triangles.length,modelLimit,remaining),displayModel={...model,triangles:model.triangles.slice(0,count),colors:model.colors.slice(0,count),geometrySource:model,fileId:file.id,fileName:file.name};
+     const count=Math.min(model.triangles.length,modelLimit,remaining),displayModel={...model,triangles:model.triangles.slice(0,count),colors:model.colors.slice(0,count),triangleObjectIds:model.triangleObjectIds.slice(0,count),geometrySource:model,fileId:file.id,fileName:file.name};
      if(count)models.push(displayModel);remaining-=count;
      const truncated=model.truncated||count<model.triangles.length;
      const diagnostics=model.colorDiagnostics;
@@ -510,7 +584,7 @@ function createPlanView({store}){
    if(!models.length)throw Error('Ingen valgte IFC-modeller ga oppovervendt geometri for dette objektslaget.');
    objectLayerModels=models;objectLayerFileIds=keys;const projection=projectIfcObjectLayer();
    if(!projectedObjectLayer)throw Error('IFC-objektgeometrien kunne ikke konverteres til valgt CRS.');
-   objectLayerVisible=true;const toggle=root.querySelector('[data-ifc-object-visible]');if(toggle)toggle.checked=true;
+   objectLayerVisible=true;const toggle=root.querySelector('[data-ifc-object-visible]');if(toggle)toggle.checked=true;renderLegend();
    const drawWait=waitForWearDraw();refresh();const drawMs=await drawWait;
    if(result)result.textContent=`Viser ${projectedObjectLayer.triangleCount.toLocaleString('nb-NO')} trekanter fra ${models.reduce((sum,model)=>sum+model.candidateCount,0)} objekt(er) i ${models.length} av ${files.length} IFC-modell(er). ${projection.cacheHits} projiseringscachetreff, ${projection.cacheMisses} nye projiseringer; tegning ${formatSeconds(drawMs)}. IFC-ens materialfarger brukes som grunnlag, fargeregler overstyrer dem, og reservefargen brukes bare når IFC-farge mangler.\n${reports.join('\n')}`;
   }catch(error){if(result&&token===objectLayerLoadToken)result.textContent=`IFC-objektslaget ble ikke vist: ${error?.message||String(error)}${reports.length?`\n${reports.join('\n')}`:''}`;}
@@ -607,6 +681,7 @@ function createPlanView({store}){
    const projectionCache=projectWearSurface();
    const projectionMs=performance.now()-projectionStarted;
    if(!projectedWearSurface||!wearSurfaceExtent)throw Error('Geometrien kunne ikke konverteres til valgt CRS.');
+   renderLegend();
    const drawWait=waitForWearDraw();
    refresh();
    const drawMs=await drawWait;
@@ -631,20 +706,21 @@ function createPlanView({store}){
   style.textContent=`
   .plan-view{display:flex;flex-direction:column;min-width:0;min-height:0;height:100%;background:#f7f8fa;color:#172033;font:14px/1.45 Arial,sans-serif}
   .plan-coordinates{position:absolute;z-index:4;left:50%;bottom:8px;transform:translateX(-50%);max-width:calc(100% - 24px);padding:5px 9px;border:1px solid rgba(255,255,255,.35);border-radius:5px;background:rgba(15,23,42,.84);color:#fff;font:12px/1.3 Arial,sans-serif;font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;pointer-events:none;box-shadow:0 1px 4px rgba(0,0,0,.25)}
-  .plan-head{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 16px;border-bottom:1px solid #dce2ea;background:#fff}.plan-head h2{margin:0;font-size:18px}.plan-body{display:grid;grid-template-columns:minmax(0,1fr) 250px;gap:0;flex:1;min-height:0}.plan-map{position:relative;overflow:hidden;min-width:0;min-height:280px;background:#e9eef2;touch-action:none;cursor:grab}.plan-map:active{cursor:grabbing}.plan-base{position:absolute;inset:0;z-index:0;overflow:hidden}.plan-base-tile,.plan-base-image{position:absolute;max-width:none;pointer-events:none}.plan-base-image{inset:0;width:100%;height:100%;object-fit:fill}.plan-map-image{position:absolute;z-index:1;inset:0;width:100%;height:100%;object-fit:fill;pointer-events:none}.plan-wear-surface{position:absolute;z-index:2;inset:0;pointer-events:none}.plan-tools{position:absolute;z-index:4;left:12px;top:12px;display:grid;gap:6px}.plan-tools button{width:38px;height:38px;border:1px solid #b9c4d0;border-radius:6px;background:#fff;color:#172033;font-size:20px;cursor:pointer}.plan-layers-panel{overflow:auto;padding:14px;background:#fff;border-left:1px solid #dce2ea}.plan-layers-panel h3{margin:0 0 8px;font-size:15px}.plan-basemap-summary{padding:8px;margin:0 0 12px;border-radius:5px;background:#f1f5f9;color:#334155;font-size:12px}.plan-layer-toggle{display:flex;align-items:flex-start;gap:8px;padding:8px 2px;border-bottom:1px solid #edf0f3;overflow-wrap:anywhere}.plan-layer-toggle input{margin-top:3px;accent-color:#1764df}.plan-empty{color:#566273;font-size:13px}.plan-crs-label{display:grid;gap:5px;font-size:12px;color:#334155}.plan-crs-label select{width:100%;min-height:34px;padding:5px;border:1px solid #b9c4d0;border-radius:5px;background:#fff}.plan-camera-status{margin:7px 0 14px;padding:7px;border-radius:5px;background:#f1f5f9;color:#334155;font-size:11px;overflow-wrap:anywhere}.plan-camera-status[data-error=true]{color:#9f2533;background:#fff1f2}.plan-status{position:absolute;z-index:3;left:62px;bottom:10px;max-width:calc(100% - 170px);padding:6px 9px;border-radius:5px;background:#ffffffdf;color:#334155;font-size:12px;pointer-events:none}.plan-status[data-error=true]{color:#9f2533}.plan-attribution{position:absolute;z-index:3;right:4px;bottom:3px;padding:3px 5px;border-radius:3px;background:#ffffffd9;color:#334155;font-size:10px;pointer-events:auto}.plan-attribution a{color:inherit}.plan-actions{display:flex;gap:6px}.plan-actions button{min-height:34px;padding:6px 10px;border:1px solid #cbd5e1;border-radius:5px;background:#fff;cursor:pointer}.plan-actions button:hover{background:#f1f5f9}@media(max-width:720px){.plan-body{grid-template-columns:minmax(0,1fr)}.plan-layers-panel{max-height:180px;border-left:0;border-top:1px solid #dce2ea}.plan-map{min-height:320px}.plan-status{max-width:calc(100% - 24px);bottom:26px}}
+  .plan-head{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 16px;border-bottom:1px solid #dce2ea;background:#fff}.plan-head h2{margin:0;font-size:18px}.plan-body{display:grid;grid-template-columns:minmax(0,1fr) minmax(300px,340px);gap:0;flex:1;min-height:0}.plan-map{position:relative;overflow:hidden;min-width:0;min-height:280px;background:#e9eef2;touch-action:none;cursor:grab}.plan-map:active{cursor:grabbing}.plan-base{position:absolute;inset:0;z-index:0;overflow:hidden}.plan-base-tile,.plan-base-image{position:absolute;max-width:none;pointer-events:none}.plan-base-image{inset:0;width:100%;height:100%;object-fit:fill}.plan-map-image{position:absolute;z-index:1;inset:0;width:100%;height:100%;object-fit:fill;pointer-events:none}.plan-wear-surface{position:absolute;z-index:2;inset:0;pointer-events:none}.plan-tools{position:absolute;z-index:4;left:12px;top:12px;display:grid;gap:6px}.plan-tools button{width:38px;height:38px;border:1px solid #b9c4d0;border-radius:6px;background:#fff;color:#172033;font-size:20px;cursor:pointer}.plan-layers-panel{overflow:auto;padding:14px;background:#fff;border-left:1px solid #dce2ea}.plan-layers-panel h3{margin:0 0 8px;font-size:15px}.plan-layers-panel section{margin:0 0 18px;padding:0 0 14px;border-bottom:1px solid #e8edf2}.plan-legend-item{display:grid;grid-template-columns:38px minmax(0,1fr);gap:8px;align-items:center;padding:5px 0;font-size:12px;overflow-wrap:anywhere}.plan-legend-swatch{display:block;width:32px;height:18px;border:1px solid #94a3b8;border-radius:3px;object-fit:contain;background:#f8fafc}.plan-legend-wms-image{grid-column:1/-1;max-width:100%;max-height:90px;object-fit:contain;object-position:left center}.plan-legend-extra{grid-column:2;color:#64748b;font-size:11px}.plan-object-properties{margin:10px 0;padding:10px;border:1px solid #dce2ea;border-radius:6px;background:#fff}.plan-object-properties h3{margin:0 0 6px}.plan-object-properties table{width:100%;border-collapse:collapse;font-size:11px;table-layout:fixed}.plan-object-properties th,.plan-object-properties td{padding:4px;border-top:1px solid #edf0f3;text-align:left;vertical-align:top;overflow-wrap:anywhere}.plan-object-properties th{width:42%;color:#526173}.plan-ifc-object-controls details{margin-top:7px;font-size:11px}.plan-ifc-object-controls summary{cursor:pointer;color:#334155}.plan-ifc-object-controls small{white-space:pre-wrap;overflow-wrap:anywhere}.plan-basemap-summary{padding:8px;margin:0 0 12px;border-radius:5px;background:#f1f5f9;color:#334155;font-size:12px}.plan-layer-toggle{display:flex;align-items:flex-start;gap:8px;padding:8px 2px;border-bottom:1px solid #edf0f3;overflow-wrap:anywhere}.plan-layer-toggle input{margin-top:3px;accent-color:#1764df}.plan-empty{color:#566273;font-size:13px}.plan-crs-label{display:grid;gap:5px;font-size:12px;color:#334155}.plan-crs-label select{width:100%;min-height:34px;padding:5px;border:1px solid #b9c4d0;border-radius:5px;background:#fff}.plan-camera-status{margin:7px 0 14px;padding:7px;border-radius:5px;background:#f1f5f9;color:#334155;font-size:11px;overflow-wrap:anywhere}.plan-camera-status[data-error=true]{color:#9f2533;background:#fff1f2}.plan-status{position:absolute;z-index:3;left:62px;bottom:10px;max-width:calc(100% - 170px);padding:6px 9px;border-radius:5px;background:#ffffffdf;color:#334155;font-size:12px;pointer-events:none}.plan-status[data-error=true]{color:#9f2533}.plan-attribution{position:absolute;z-index:3;right:4px;bottom:3px;padding:3px 5px;border-radius:3px;background:#ffffffd9;color:#334155;font-size:10px;pointer-events:auto}.plan-attribution a{color:inherit}.plan-actions{display:flex;gap:6px}.plan-actions button{min-height:34px;padding:6px 10px;border:1px solid #cbd5e1;border-radius:5px;background:#fff;cursor:pointer}.plan-actions button:hover{background:#f1f5f9}@media(max-width:720px){.plan-body{grid-template-columns:minmax(0,1fr)}.plan-layers-panel{max-height:180px;border-left:0;border-top:1px solid #dce2ea}.plan-map{min-height:320px}.plan-status{max-width:calc(100% - 24px);bottom:26px}}
   `;
   root=document.createElement('section');
   root.className='plan-view';
-  root.innerHTML='<header class="plan-head"><h2>Planvisning · 2D</h2><div class="plan-actions"><label>Bakgrunn <select data-plan-basemap aria-label="Velg bakgrunnskart" style="max-width:220px;min-height:34px"><option value="flyfoto">Flyfoto</option><option value="vektorkart">Vektorkart (OpenStreetMap)</option><option value="grunnkart">Grunnkart (Geonorge)</option><option value="none">Ingen bakgrunn</option></select></label><button type="button" data-zoom-out aria-label="Zoom ut">−</button><button type="button" data-zoom-in aria-label="Zoom inn">+</button></div></header><div class="plan-body"><div class="plan-map" data-plan-map role="application" aria-label="2D-kartvisning. Dra for å flytte kartet. Bruk musehjulet for å zoome."><div class="plan-base" data-plan-base></div><canvas class="plan-wear-surface" data-plan-wear-surface aria-label="2D-projisert slitelagsflate"></canvas><div class="plan-tools"><button type="button" data-zoom-in aria-label="Zoom inn">+</button><button type="button" data-zoom-out aria-label="Zoom ut">−</button></div><div class="plan-status" data-plan-status role="status" aria-live="polite"></div><div class="plan-attribution" data-plan-attribution></div><div class="plan-coordinates" data-plan-coordinates role="status" aria-live="off">Flytt musepekeren over kartet for koordinater</div></div><aside class="plan-layers-panel"><h3>Posisjon og koordinatsystem</h3><label class="plan-crs-label">Modellens CRS<select data-plan-crs aria-label="Velg koordinatsystem for modellkamera"></select></label><p data-plan-camera-status class="plan-camera-status" role="status" aria-live="polite">Venter på kamerakoordinater …</p><h3>Bakgrunnskart</h3><div class="plan-basemap-summary" data-plan-basemap-label></div><h3>Kartlag</h3><div data-plan-layers></div><h3>Valgte IFC-modeller</h3><p data-ifc-selection-summary style="font-size:12px;color:#526173"></p><ul data-ifc-selection-list aria-label="Valgte IFC-filer fra treet" style="font-size:11px;padding-left:18px;max-height:130px;overflow:auto"></ul><button type="button" data-ifc-read disabled style="min-height:34px;padding:6px 10px;margin:6px 0">Test metadata for valgte</button><p data-ifc-result role="status" aria-live="polite" style="font-size:11px;color:#526173;white-space:pre-wrap;overflow-wrap:anywhere"></p><button type="button" data-ifc-surface disabled style="min-height:34px;padding:6px 10px;margin:6px 0">Vis slitelag fra valgte IFC-er</button><button type="button" data-ifc-focus hidden style="min-height:34px;padding:6px 10px;margin:6px 0">Zoom til slitelaget</button><p data-ifc-surface-result role="status" aria-live="polite" style="font-size:11px;color:#526173;white-space:pre-wrap;overflow-wrap:anywhere">Velg én eller flere IFC-er for å vise slitelagsflater samtidig. Filene behandles én om gangen; samlet grense er 120 000 trekanter.</p><p style="font-size:11px;color:#526173">Kartposisjonen følger Trimble-prosjektviserens kamerakoordinater. Velg IFC-er i treet til venstre for metadata-test. Dette verktøyet viser kun 2D-kart; IFC-geometri tegnes ikke i kartet.</p><pre data-ifc-result role="status" aria-live="polite" style="white-space:pre-wrap;overflow-wrap:anywhere;font:12px/1.45 Arial,sans-serif;color:#334155"></pre></aside></div>';
+  root.innerHTML='<header class="plan-head"><h2>Planvisning · 2D</h2><div class="plan-actions"><label>Bakgrunn <select data-plan-basemap aria-label="Velg bakgrunnskart" style="max-width:220px;min-height:34px"><option value="flyfoto">Flyfoto</option><option value="vektorkart">Vektorkart (OpenStreetMap)</option><option value="grunnkart">Grunnkart (Geonorge)</option><option value="none">Ingen bakgrunn</option></select></label><button type="button" data-zoom-out aria-label="Zoom ut">−</button><button type="button" data-zoom-in aria-label="Zoom inn">+</button></div></header><div class="plan-body"><div class="plan-map" data-plan-map role="application" aria-label="2D-kartvisning. Dra for å flytte kartet. Bruk musehjulet for å zoome."><div class="plan-base" data-plan-base></div><canvas class="plan-wear-surface" data-plan-wear-surface aria-label="2D-projisert slitelagsflate"></canvas><div class="plan-tools"><button type="button" data-zoom-in aria-label="Zoom inn">+</button><button type="button" data-zoom-out aria-label="Zoom ut">−</button></div><div class="plan-status" data-plan-status role="status" aria-live="polite"></div><div class="plan-attribution" data-plan-attribution></div><div class="plan-coordinates" data-plan-coordinates role="status" aria-live="off">Flytt musepekeren over kartet for koordinater</div></div><aside class="plan-layers-panel"><h3>Posisjon og koordinatsystem</h3><label class="plan-crs-label">Modellens CRS<select data-plan-crs aria-label="Velg koordinatsystem for modellkamera"></select></label><p data-plan-camera-status class="plan-camera-status" role="status" aria-live="polite">Venter på kamerakoordinater …</p><h3>Bakgrunnskart</h3><div class="plan-basemap-summary" data-plan-basemap-label></div><h3>Kartlag</h3><div data-plan-layers></div><h3>Tegnforklaring</h3><div data-plan-legend aria-live="polite"></div><h3>Valgte IFC-modeller</h3><p data-ifc-selection-summary style="font-size:12px;color:#526173"></p><ul data-ifc-selection-list aria-label="Valgte IFC-filer fra treet" style="font-size:11px;padding-left:18px;max-height:130px;overflow:auto"></ul><button type="button" data-ifc-read disabled style="min-height:34px;padding:6px 10px;margin:6px 0">Test metadata for valgte</button><p data-ifc-result role="status" aria-live="polite" style="font-size:11px;color:#526173;white-space:pre-wrap;overflow-wrap:anywhere"></p><button type="button" data-ifc-surface disabled style="min-height:34px;padding:6px 10px;margin:6px 0">Vis slitelag fra valgte IFC-er</button><button type="button" data-ifc-focus hidden style="min-height:34px;padding:6px 10px;margin:6px 0">Zoom til slitelaget</button><p data-ifc-surface-result role="status" aria-live="polite" style="font-size:11px;color:#526173;white-space:pre-wrap;overflow-wrap:anywhere">Velg én eller flere IFC-er for å vise slitelagsflater samtidig. Filene behandles én om gangen; samlet grense er 120 000 trekanter.</p><p style="font-size:11px;color:#526173">Kartposisjonen følger Trimble-prosjektviserens kamerakoordinater. Velg IFC-er i treet til venstre for metadata-test. Dette verktøyet viser kun 2D-kart; IFC-geometri tegnes ikke i kartet.</p><pre data-ifc-result role="status" aria-live="polite" style="white-space:pre-wrap;overflow-wrap:anywhere;font:12px/1.45 Arial,sans-serif;color:#334155"></pre></aside></div>';
   root.prepend(style);
   const mapCanvas=root.querySelector('[data-plan-wear-surface]'),objectCanvas=document.createElement('canvas');
   objectCanvas.className='plan-object-layer';objectCanvas.dataset.planObjectLayer='';objectCanvas.setAttribute('aria-label','Fargelagt IFC-objektslag');objectCanvas.hidden=true;objectCanvas.style.cssText='position:absolute;z-index:3;inset:0;pointer-events:none';mapCanvas.after(objectCanvas);
   const objectControls=document.createElement('fieldset');objectControls.className='plan-ifc-object-controls';objectControls.style.cssText='margin:14px 0;padding:10px;border:1px solid #dce2ea;border-radius:6px';
-  objectControls.innerHTML='<legend>IFC-objektslag</legend><label style="display:flex;gap:7px;align-items:center"><input type="checkbox" data-ifc-object-visible disabled> Vis objektslag</label><button type="button" data-ifc-object-read disabled style="margin-top:8px">Oppdater objektslag</button><small data-ifc-object-status role="status" aria-live="polite" style="display:block;margin-top:7px;color:#526173">Laget oppdateres automatisk fra fellesinnstillingene når IFC-modeller velges. Knappen kan brukes til manuell oppdatering.</small>';
-  root.querySelector('.plan-layers-panel').append(objectControls);
-  root.querySelector('[data-ifc-object-visible]').addEventListener('change',event=>{objectLayerVisible=event.target.checked;if(objectLayerVisible&&!projectedObjectLayer)root.querySelector('[data-ifc-object-status]').textContent='IFC-objektslaget lastes automatisk når det er aktivert og modeller er valgt.';refresh();});
+  objectControls.innerHTML='<legend>IFC-objektslag</legend><label style="display:flex;gap:7px;align-items:center"><input type="checkbox" data-ifc-object-visible disabled> Vis objektslag</label><button type="button" data-ifc-object-read disabled style="margin-top:8px">Oppdater objektslag</button><details><summary>Status og leserapport</summary><small data-ifc-object-status role="status" aria-live="polite" style="display:block;margin-top:7px;color:#526173">Laget oppdateres automatisk fra fellesinnstillingene når IFC-modeller velges. Knappen kan brukes til manuell oppdatering.</small></details>';
+  const layerPanel=root.querySelector('.plan-layers-panel');layerPanel.insertBefore(objectControls,layerPanel.querySelector('[data-ifc-selection-summary]'));
+  const objectProperties=document.createElement('section');objectProperties.className='plan-object-properties';objectProperties.dataset.ifcObjectProperties='';objectProperties.setAttribute('aria-live','polite');objectProperties.innerHTML='<h3>Objektegenskaper</h3><p>Klikk på en synlig IFC-flate i kartet for å vise tilgjengelige IFC-egenskaper.</p>';layerPanel.insertBefore(objectProperties,layerPanel.querySelector('[data-ifc-selection-summary]'));
+  root.querySelector('[data-ifc-object-visible]').addEventListener('change',event=>{objectLayerVisible=event.target.checked;if(objectLayerVisible&&!projectedObjectLayer)root.querySelector('[data-ifc-object-status]').textContent='IFC-objektslaget lastes automatisk når det er aktivert og modeller er valgt.';renderLegend();refresh();});
   root.querySelector('[data-ifc-object-read]').addEventListener('click',event=>runIfcObjectLayerPreview(event.currentTarget,true));
-  root.querySelector('[data-plan-basemap]').addEventListener('change',event=>{baseMap=event.target.value;userBaseMapSelected=true;const summary=root.querySelector('[data-plan-basemap-label]');if(summary)summary.textContent=`Prosjektstandard: ${BASEMAPS[sharedBaseMap].label} · Ditt valg: ${BASEMAPS[baseMap].label}`;refresh();});
+  root.querySelector('[data-plan-basemap]').addEventListener('change',event=>{baseMap=event.target.value;userBaseMapSelected=true;const summary=root.querySelector('[data-plan-basemap-label]');if(summary)summary.textContent=`Prosjektstandard: ${BASEMAPS[sharedBaseMap].label} · Ditt valg: ${BASEMAPS[baseMap].label}`;renderLegend();refresh();});
   const crsSelect=root.querySelector('[data-plan-crs]');
   crsSelect.replaceChildren(...MODEL_CRS.map(({code,label})=>{const option=document.createElement('option');option.value=code;option.textContent=`${label} (${code})`;return option;}));
   crsSelect.value=currentModelCRS;

@@ -1,4 +1,4 @@
-import {normalizeIfcObjectLayer,matchIfcObjectColor} from './ifc-object-layer-config.js?v=2.05-preview.4-planview.6-ifc-read-test.6-2d-camera.2-wear-surface.6-multi-surface.2-hatch-cache.3-plan-performance.2-ifc-read-phases.2-yield-accounting.1-batched-yields.1-ifc-object-layer.9';
+import {normalizeIfcObjectLayer,matchIfcObjectColor} from './ifc-object-layer-config.js?v=2.05-preview.4-planview.6-ifc-read-test.6-2d-camera.2-wear-surface.6-multi-surface.2-hatch-cache.3-plan-performance.2-ifc-read-phases.2-yield-accounting.1-batched-yields.1-ifc-object-layer.10';
 const WEB_IFC_VERSION='0.0.77';
 const WEB_IFC_BASE=`https://cdn.jsdelivr.net/npm/web-ifc@${WEB_IFC_VERSION}/`;
 export const MAX_WEAR_TRIANGLES=120000;
@@ -215,8 +215,7 @@ function propertyValues(property){
  }
  return values;
 }
-function readConfiguredProperties(api,modelId,entityId,rules){
- const wanted=new Set(rules.map(rule=>String(rule.property).toLocaleLowerCase('nb-NO')));
+function readConfiguredProperties(api,modelId,entityId){
  const result={};
  const psets=[];
  // IsDefinedBy and IsTypedBy are inverse attributes in IFC. WebIFC omits them unless inverse lookup is explicitly enabled.
@@ -240,9 +239,10 @@ function readConfiguredProperties(api,modelId,entityId,rules){
    const property=api.GetLine(modelId,propertyId);
    const propertyName=String(unwrapIfc(property?.Name)||'').trim();
    const key=`${psetName}::${propertyName}`;
-   if(!propertyName||!wanted.has(key.toLocaleLowerCase('nb-NO')))continue;
-   const configured=rules.find(rule=>rule.property.toLocaleLowerCase('nb-NO')===key.toLocaleLowerCase('nb-NO'));
-   if(configured)result[configured.property]=[...(result[configured.property]||[]),...propertyValues(property)];
+   if(!propertyName)continue;
+   const values=propertyValues(property);
+   if(!values.length)continue;
+   result[key]=[...(result[key]||[]),...values];
   }
  }
  return result;
@@ -268,8 +268,12 @@ export async function readIfcObjectLayer(buffer,rawConfig,onProgress=()=>{},tria
    if(Number.isInteger(expressId)){
     const entity=api.GetLine(modelId,expressId);
     const name=String(unwrapIfc(entity?.Name)||'').trim();
-    const properties=readConfiguredProperties(api,modelId,expressId,rules);
-    if(Object.keys(properties).length){
+    const globalId=String(unwrapIfc(entity?.GlobalId)||'').trim();
+    const lineType=typeof api.GetLineType==='function'?api.GetLineType(modelId,expressId):null;
+    const ifcType=typeof api.GetNameFromTypeCode==='function'?String(api.GetNameFromTypeCode(lineType)||''):'';
+    const properties=readConfiguredProperties(api,modelId,expressId);
+    const hasConfiguredProperty=rules.some(rule=>Object.keys(properties).some(key=>key.toLocaleLowerCase('nb-NO')===rule.property.toLocaleLowerCase('nb-NO')));
+    if(hasConfiguredProperty){
      const match=matchIfcObjectColor(properties,rules,config.defaultColor);
      if(match.matched){
       mappedObjects++;const key=JSON.stringify([match.property,match.value,match.color]);const current=matchedValues.get(key);
@@ -282,7 +286,7 @@ export async function readIfcObjectLayer(buffer,rawConfig,onProgress=()=>{},tria
        for(const value of samples){const key=JSON.stringify([rule.property,String(value).slice(0,100)]),current=unmatchedValues.get(key);if(current)current.count++;else if(unmatchedValues.size<8)unmatchedValues.set(key,{property:rule.property,value:String(value).slice(0,100),count:1});}
       }
      }
-     candidates.push({expressId,name:name||`IFC-objekt ${expressId}`,properties,match});
+     candidates.push({expressId,name:name||`IFC-objekt ${expressId}`,globalId,ifcType,properties,match});
     }
    }
    const processed=index+1,chunk=processed-scanChunkStart,check=processed%SCAN_YIELD_TIME_CHECK_ITEMS===0;
@@ -295,10 +299,11 @@ export async function readIfcObjectLayer(buffer,rawConfig,onProgress=()=>{},tria
   }
   timings.lineScan+=performance.now()-scanStarted;
   if(!candidates.length)throw Error('Fant ingen IFC-objekter med minst én av de valgte egenskapene.');
-  const triangles=[],colors=[],labels=[],nativeColors=new Map();
+  const triangles=[],colors=[],triangleObjectIds=[],labels=[],objects=[],nativeColors=new Map();
   let objectStarted=performance.now(),objectChunkStart=0,truncated=false,overriddenGeometries=0,nativeColorGeometries=0,fallbackColorGeometries=0;
   for(let itemIndex=0;itemIndex<candidates.length;itemIndex++){
-   const candidate=candidates[itemIndex],meshStarted=performance.now();
+   const candidate=candidates[itemIndex],meshStarted=performance.now(),objectIndex=objects.length;
+   objects.push({expressId:candidate.expressId,name:candidate.name,globalId:candidate.globalId||'',ifcType:candidate.ifcType||'',properties:candidate.properties});
    const flat=api.GetFlatMesh(modelId,candidate.expressId),placedGeometries=vectorItems(flat?.geometries);
    timings.meshExtract+=performance.now()-meshStarted;
    for(const placed of placedGeometries){
@@ -331,7 +336,7 @@ export async function readIfcObjectLayer(buffer,rawConfig,onProgress=()=>{},tria
       const abx=bx-ax,aby=by-ay,abz=bz-az,acx=cx-ax,acy=cy-ay,acz=cz-az;
       const normalZ=abx*acy-aby*acx,normalX=aby*acz-abz*acy,normalY=abz*acx-abx*acz,normalLength=Math.hypot(normalZ,normalX,normalY);
       if(normalLength>1e-10&&normalZ/normalLength>0.72){
-       triangles.push([[ax,ay,az],[bx,by,bz],[cx,cy,cz]]);colors.push(displayColor);
+       triangles.push([[ax,ay,az],[bx,by,bz],[cx,cy,cz]]);colors.push(displayColor);triangleObjectIds.push(objectIndex);
        if(triangles.length>=triangleLimit){truncated=offset+3<indices.length||itemIndex+1<candidates.length;break;}
       }
       const processedTriangles=offset/3+1;
@@ -354,7 +359,7 @@ export async function readIfcObjectLayer(buffer,rawConfig,onProgress=()=>{},tria
    if(triangles.length>=triangleLimit)break;
   }
   if(!triangles.length)throw Error(`Fant ${candidates.length} objekt(er) med valgte egenskaper, men ingen oppovervendte flater kunne leses.`);
-  return{triangles,colors,labels,candidateCount:candidates.length,truncated,timings,colorDiagnostics:{mappedObjects,defaultObjects,overriddenGeometries,nativeColorGeometries,fallbackColorGeometries,nativeColorValues:[...nativeColors.values()],matchedValues:[...matchedValues.values()],unmatchedValues:[...unmatchedValues.values()]}};
+  return{triangles,colors,triangleObjectIds,objects,labels,candidateCount:candidates.length,truncated,timings,colorDiagnostics:{mappedObjects,defaultObjects,overriddenGeometries,nativeColorGeometries,fallbackColorGeometries,nativeColorValues:[...nativeColors.values()],matchedValues:[...matchedValues.values()],unmatchedValues:[...unmatchedValues.values()]}};
  }finally{if(modelId!==null)api.CloseModel(modelId);}
 }
 
