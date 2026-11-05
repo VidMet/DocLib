@@ -1,6 +1,6 @@
 import {WMS_CATALOG} from './wms-catalog.js?v=2.05-preview.4-planview.5';
-import {DEFAULT_IFC_OBJECT_LAYER,normalizeIfcObjectLayer} from './ifc-object-layer-config.js?v=2.05-preview.7.3';
-import {readIfcPropertyCatalog} from './ifc-surface.js?v=2.05-preview.7.3';
+import {DEFAULT_IFC_OBJECT_LAYER,normalizeIfcObjectLayer} from './ifc-object-layer-config.js?v=2.05-preview.7.4';
+import {readIfcPropertyCatalog} from './ifc-surface.js?v=2.05-preview.7.4';
 const MAX_LAYERS=20;
 const CATALOG_IDS=new Set(WMS_CATALOG.map(item=>item.id));
 const BASEMAPS=Object.freeze([
@@ -84,7 +84,6 @@ export function mountPlanSettings(host,config,doc=document){
    if(rule.property&&!propertyNames.includes(rule.property))propertyNames.unshift(rule.property);
    for(const property of propertyNames){const option=doc.createElement('option');option.value=property;option.textContent=property;propertySelect.append(option);}
    propertySelect.value=rule.property||'';
-   propertySelect.addEventListener('focus',()=>{if(!Object.keys(propertyCatalog).length&&!catalogLoading)scanButton.click();});
    propertySelect.addEventListener('change',()=>{rule.property=propertySelect.value;const oldValues=new Map(rule.values.map(item=>[item.value.toLocaleLowerCase('nb-NO'),item]));rule.values=(propertyCatalog[rule.property]||[]).slice(0,40).map((value,valueIndex)=>oldValues.get(value.toLocaleLowerCase('nb-NO'))||{value,color:palette[(valueIndex+index)%palette.length]});renderIfcObjectSettings();});
    propertyLabel.append(propertySelect);group.append(propertyLabel);
    const valuesTitle=doc.createElement('p');valuesTitle.style.cssText='margin:10px 0 4px';valuesTitle.textContent='Verdier som skal få egen farge';group.append(valuesTitle);
@@ -104,14 +103,19 @@ export function mountPlanSettings(host,config,doc=document){
   const sync=()=>{scanButton.disabled=catalogLoading;defaultInput.disabled=false;onlyMatched.disabled=false;for(const input of rulesHost.querySelectorAll('input,select,button'))input.disabled=false;};
   enabled.addEventListener('change',()=>{ifcObjectLayer.enabled=enabled.checked;sync();});
   scanButton.addEventListener('click',async()=>{
+   if(catalogLoading)return;
    catalogAutoStarted=true;
-   const files=window.DocLibLegacyBridge?.listSelectedIfcFiles?.()||[];
+   const bridge=window.DocLibLegacyBridge;
+   if(typeof bridge?.listSelectedIfcFiles!=='function'||typeof bridge?.downloadIfcForSurface!=='function'){catalogStatusText='IFC-henting er ikke tilgjengelig her. Åpne Planvisning i Trimble Connect og prøv igjen.';scanStatus.textContent=catalogStatusText;return;}
+   let files=[];
+   try{files=bridge.listSelectedIfcFiles()||[];}catch(error){catalogStatusText=`IFC-utvalget kunne ikke leses: ${error?.message||String(error)}`;scanStatus.textContent=catalogStatusText;return;}
    if(!files.length){catalogStatusText='Velg IFC-modeller i filtreet først.';scanStatus.textContent=catalogStatusText;return;}
-   catalogLoading=true;scanButton.disabled=true;const merged={};
+   catalogLoading=true;catalogStatusText=`Starter egenskapsskanning av ${files.length} IFC-modell(er) …`;scanStatus.textContent=catalogStatusText;scanButton.disabled=true;const merged={};
    try{
+    await new Promise(resolve=>setTimeout(resolve,0));
     for(let fileIndex=0;fileIndex<files.length;fileIndex++){
      catalogStatusText=`Henter egenskaper fra ${fileIndex+1} av ${files.length}: ${files[fileIndex].name} …`;scanStatus.textContent=catalogStatusText;
-     const buffer=await window.DocLibLegacyBridge.downloadIfcForSurface(files[fileIndex].id);
+     const buffer=await bridge.downloadIfcForSurface(files[fileIndex].id);
      const catalog=await readIfcPropertyCatalog(buffer,message=>{catalogStatusText=`${files[fileIndex].name} · ${message}`;scanStatus.textContent=catalogStatusText;});
      for(const [property,values] of Object.entries(catalog)){const target=merged[property]||(merged[property]=[]);for(const value of values)if(target.length<200&&!target.some(item=>item.toLocaleLowerCase('nb-NO')===value.toLocaleLowerCase('nb-NO')))target.push(value);}
     }

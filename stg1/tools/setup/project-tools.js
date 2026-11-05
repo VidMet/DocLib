@@ -1,6 +1,6 @@
 import {normalizeIfcRequirement} from './ifc-schema.js?v=2.04-preview.7';
 import {normalizeColumns,normalizeDefinitions} from '../explorer/columns.js?v=2.04-preview.7';
-import {normalizeIfcObjectLayer} from '../map-view/ifc-object-layer-config.js?v=2.05-preview.7.3';
+import {normalizeIfcObjectLayer} from '../map-view/ifc-object-layer-config.js?v=2.05-preview.7.4';
 export const FILE_NAME='doclib.tools.json';
 export const TOOL_IDS=Object.freeze(['validation','quantity-summary','control-plan','todos','plan']);
 export const DEFAULT_CONFIG=Object.freeze({schema:'DocLibProjectTools',schemaVersion:1,tools:Object.freeze(Object.fromEntries(TOOL_IDS.map(id=>[id,Object.freeze({enabled:true})])))});

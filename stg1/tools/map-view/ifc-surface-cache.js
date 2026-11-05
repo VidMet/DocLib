@@ -3,7 +3,7 @@ const DB_VERSION=2;
 const STORE_NAME='surfaces';
 const OBJECT_STORE_NAME='object-layers';
 export const WEAR_SURFACE_PROCESSOR_VERSION='wear-reader-v1';
-export const IFC_OBJECT_LAYER_PROCESSOR_VERSION='ifc-object-reader-v5';
+export const IFC_OBJECT_LAYER_PROCESSOR_VERSION='ifc-object-reader-v6';
 
 let databasePromise=null;
 

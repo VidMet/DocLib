@@ -1,4 +1,4 @@
-import {normalizeIfcObjectLayer,matchIfcObjectColor} from './ifc-object-layer-config.js?v=2.05-preview.7.3';
+import {normalizeIfcObjectLayer,matchIfcObjectColor} from './ifc-object-layer-config.js?v=2.05-preview.7.4';
 const WEB_IFC_VERSION='0.0.77';
 const WEB_IFC_BASE=`https://cdn.jsdelivr.net/npm/web-ifc@${WEB_IFC_VERSION}/`;
 export const MAX_WEAR_TRIANGLES=120000;
@@ -329,7 +329,7 @@ export async function readIfcObjectLayer(buffer,rawConfig,onProgress=()=>{},tria
   }
   timings.lineScan+=performance.now()-scanStarted;
   if(!candidates.length)throw Error(config.onlyMatched?'Fant ingen IFC-objekter med en eksplisitt fargeregel.':'Fant ingen IFC-objekter med 2D-representasjon å vise.');
-  const triangles=[],colors=[],triangleObjectIds=[],labels=[],objects=[],nativeColors=new Map(),typeLegend=new Map();
+  const triangles=[],colors=[],triangleObjectIds=[],labels=[],objects=[],nativeColors=new Map(),valueLegend=new Map(),defaultLegendObjects=new Set();
   let objectStarted=performance.now(),objectChunkStart=0,truncated=false,overriddenGeometries=0,nativeColorGeometries=0,fallbackColorGeometries=0;
   for(let itemIndex=0;itemIndex<candidates.length;itemIndex++){
    const candidate=candidates[itemIndex],meshStarted=performance.now(),objectIndex=objects.length;
@@ -367,7 +367,7 @@ export async function readIfcObjectLayer(buffer,rawConfig,onProgress=()=>{},tria
       const normalZ=abx*acy-aby*acx,normalX=aby*acz-abz*acy,normalY=abz*acx-abx*acz,normalLength=Math.hypot(normalZ,normalX,normalY);
       if(normalLength>1e-10&&normalZ/normalLength>0.72){
        triangles.push([[ax,ay,az],[bx,by,bz],[cx,cy,cz]]);colors.push(displayColor);triangleObjectIds.push(objectIndex);
-       const typeName=candidate.ifcType||'IFC-objekt';let typeEntry=typeLegend.get(typeName);if(!typeEntry){typeEntry={ifcType:typeName,objectIds:new Set(),colors:new Set()};typeLegend.set(typeName,typeEntry);}typeEntry.objectIds.add(candidate.expressId);typeEntry.colors.add(displayColor);
+       if(candidate.match.matched){const legendKey=JSON.stringify([candidate.match.property,candidate.match.value,displayColor]);let entry=valueLegend.get(legendKey);if(!entry){entry={property:candidate.match.property,value:candidate.match.value,color:displayColor,objectIds:new Set()};valueLegend.set(legendKey,entry);}entry.objectIds.add(candidate.expressId);}else defaultLegendObjects.add(candidate.expressId);
        if(triangles.length>=triangleLimit){truncated=offset+3<indices.length||itemIndex+1<candidates.length;break;}
       }
       const processedTriangles=offset/3+1;
@@ -390,7 +390,7 @@ export async function readIfcObjectLayer(buffer,rawConfig,onProgress=()=>{},tria
    if(triangles.length>=triangleLimit)break;
   }
   if(!triangles.length)throw Error(`Fant ${candidates.length} objekt(er) med valgte egenskaper, men ingen oppovervendte flater kunne leses.`);
-  return{triangles,colors,triangleObjectIds,objects,labels,candidateCount:candidates.length,truncated,timings,colorDiagnostics:{mappedObjects,defaultObjects,overriddenGeometries,nativeColorGeometries,fallbackColorGeometries,nativeColorValues:[...nativeColors.values()],matchedValues:[...matchedValues.values()],unmatchedValues:[...unmatchedValues.values()],typeLegend:[...typeLegend.values()].map(item=>({ifcType:item.ifcType,objectCount:item.objectIds.size,colors:[...item.colors]}))}};
+  return{triangles,colors,triangleObjectIds,objects,labels,candidateCount:candidates.length,truncated,timings,colorDiagnostics:{mappedObjects,defaultObjects,overriddenGeometries,nativeColorGeometries,fallbackColorGeometries,nativeColorValues:[...nativeColors.values()],matchedValues:[...matchedValues.values()],unmatchedValues:[...unmatchedValues.values()],valueLegend:[...valueLegend.values()].map(item=>({property:item.property,value:item.value,color:item.color,objectCount:item.objectIds.size})),defaultLegend:defaultLegendObjects.size?{label:'Øvrige objekter',color:config.defaultColor,objectCount:defaultLegendObjects.size}:null}};
  }finally{if(modelId!==null)api.CloseModel(modelId);}
 }
 
