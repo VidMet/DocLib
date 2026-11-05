@@ -6,12 +6,13 @@ export const DEFAULT_IFC_OBJECT_LAYER=Object.freeze({
 
 const COLOR=/^#[0-9a-f]{6}$/i;
 const cleanText=(value,max)=>String(value??'').trim().slice(0,max);
+const cleanProperty=value=>cleanText(value,200).replace(/\s*:+\s*/,'::');
 
 export function normalizeIfcObjectLayer(raw){
  const colorRules=[];
  for(const source of Array.isArray(raw?.colorRules)?raw.colorRules:[]){
   if(colorRules.length>=3)break;
-  const property=cleanText(source?.property,200);
+  const property=cleanProperty(source?.property);
   if(!property)continue;
   const values=[];
   const seen=new Set();
