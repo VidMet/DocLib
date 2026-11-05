@@ -6,6 +6,7 @@ export const DEFAULT_IFC_OBJECT_LAYER=Object.freeze({
 
 const COLOR=/^#[0-9a-f]{6}$/i;
 const cleanText=(value,max)=>String(value??'').trim().slice(0,max);
+const normalizeDisplayValue=value=>String(value??'').normalize('NFC').replace(/\s+/gu,' ').trim();
 const cleanProperty=value=>cleanText(value,200).replace(/\s*:+\s*/,'::');
 
 export function normalizeIfcObjectLayer(raw){
@@ -20,7 +21,7 @@ export function normalizeIfcObjectLayer(raw){
    if(values.length>=40)break;
    const value=cleanText(mapping?.value,120);
    const color=String(mapping?.color??'').trim();
-   const key=value.toLocaleLowerCase('nb-NO');
+   const key=normalizeDisplayValue(value).toLocaleLowerCase('nb-NO');
    if(!value||!COLOR.test(color)||seen.has(key))continue;
    seen.add(key);
    values.push({value,color:color.toLowerCase()});
@@ -40,9 +41,9 @@ export function resolveIfcObjectColor(properties,rules,defaultColor){
   const values=properties?.[rule.property];
   const candidates=Array.isArray(values)?values:[values];
   for(const candidate of candidates){
-   const value=String(candidate??'').trim();
+   const value=normalizeDisplayValue(candidate);
    if(!value)continue;
-   const mapping=(rule.values||[]).find(item=>String(item.value).toLocaleLowerCase('nb-NO')===value.toLocaleLowerCase('nb-NO'));
+   const mapping=(rule.values||[]).find(item=>normalizeDisplayValue(item.value).toLocaleLowerCase('nb-NO')===value.toLocaleLowerCase('nb-NO'));
    if(mapping)return mapping.color;
   }
  }
