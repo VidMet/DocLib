@@ -1,4 +1,4 @@
-import {FILE_NAME,normalizeProjectTools} from './project-tools.js?v=2.05-preview.4-planview.6-ifc-read-test.6-2d-camera.2-wear-surface.6-multi-surface.2-hatch-cache.3-plan-performance.2-ifc-read-phases.2-yield-accounting.1-batched-yields.1-ifc-object-layer.10';
+import {FILE_NAME,normalizeProjectTools} from './project-tools.js?v=2.05-preview.4-planview.6-ifc-read-test.6-2d-camera.2-wear-surface.6-multi-surface.2-hatch-cache.3-plan-performance.2-ifc-read-phases.2-yield-accounting.1-batched-yields.1-ifc-object-layer.11';
 const items=data=>Array.isArray(data)?data:(data?.items||[]);
 const isFolder=item=>String(item?.type||item?.itemType||'').toLowerCase().includes('folder');
 const nameOf=item=>String(item?.name||'');
