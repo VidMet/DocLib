@@ -142,6 +142,11 @@ export function createFileTree(context) {
         if (selectedIfcIds.has(id) !== checked) ifcChanged = true;
         if (checked) selectedIfcIds.add(id);
         else selectedIfcIds.delete(id);
+        if (context.workspaceMode !== 'plan') {
+          if (scope.has(rawId) !== checked) workspaceChanged = true;
+          if (checked) scope.add(rawId);
+          else scope.delete(rawId);
+        }
       } else if (context.workspaceMode !== 'plan') {
         if (scope.has(rawId) !== checked) workspaceChanged = true;
         if (checked) scope.add(rawId);
