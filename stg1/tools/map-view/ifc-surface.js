@@ -1,4 +1,4 @@
-import {normalizeIfcObjectLayer,matchIfcObjectColor} from './ifc-object-layer-config.js?v=2.05-preview.7.6';
+import {normalizeIfcObjectLayer,matchIfcObjectColor} from './ifc-object-layer-config.js?v=2.05-preview.7.7';
 const WEB_IFC_VERSION='0.0.77';
 const WEB_IFC_BASE=`https://cdn.jsdelivr.net/npm/web-ifc@${WEB_IFC_VERSION}/`;
 export const MAX_WEAR_TRIANGLES=120000;
@@ -284,7 +284,7 @@ export async function readIfcPropertyCatalog(buffer,onProgress=()=>{}){
  }finally{if(modelId!==null)api.CloseModel(modelId);}
 }
 
-export async function readIfcObjectLayer(buffer,rawConfig,onProgress=()=>{},triangleLimit=MAX_IFC_OBJECT_TRIANGLES){
+export async function readIfcObjectLayer(buffer,rawConfig,onProgress=()=>{},triangleLimit=MAX_IFC_OBJECT_TRIANGLES,onPartial=()=>{}){
  if(!(buffer instanceof ArrayBuffer)||buffer.byteLength===0)throw Error('IFC-filen er tom eller ugyldig.');
  if(!Number.isInteger(triangleLimit)||triangleLimit<1||triangleLimit>MAX_IFC_OBJECT_TRIANGLES)throw Error('Ugyldig trekantgrense for IFC-objektslaget.');
  const config=normalizeIfcObjectLayer(rawConfig);
@@ -303,13 +303,14 @@ export async function readIfcObjectLayer(buffer,rawConfig,onProgress=()=>{},tria
    const expressId=Number(unwrap(ids[index]));
    if(Number.isInteger(expressId)){
     const entity=api.GetLine(modelId,expressId);
-    const name=String(unwrapIfc(entity?.Name)||'').trim();
     const globalId=String(unwrapIfc(entity?.GlobalId)||'').trim();
+    const productWithRepresentation=Boolean(globalId&&entity?.Representation);
+    if(productWithRepresentation){
+    const name=String(unwrapIfc(entity?.Name)||'').trim();
     const lineType=typeof api.GetLineType==='function'?api.GetLineType(modelId,expressId):null;
     const ifcType=typeof api.GetNameFromTypeCode==='function'?String(api.GetNameFromTypeCode(lineType)||''):'';
     const properties=rules.length?readConfiguredProperties(api,modelId,expressId):{};
     const hasConfiguredProperty=rules.some(rule=>Object.keys(properties).some(key=>key.toLocaleLowerCase('nb-NO')===rule.property.toLocaleLowerCase('nb-NO')));
-    const productWithRepresentation=Boolean(unwrapIfc(entity?.GlobalId)&&entity?.Representation);
     const match=matchIfcObjectColor(properties,rules,config.defaultColor,config.defaultTransparency);
     if((config.onlyMatched&&hasConfiguredProperty&&match.matched)||(!config.onlyMatched&&productWithRepresentation)){
      if(match.matched){
@@ -325,6 +326,7 @@ export async function readIfcObjectLayer(buffer,rawConfig,onProgress=()=>{},tria
      }
      candidates.push({expressId,name:name||`IFC-objekt ${expressId}`,globalId,ifcType,properties,match});
     }
+    }
    }
    const processed=index+1,chunk=processed-scanChunkStart,check=processed%SCAN_YIELD_TIME_CHECK_ITEMS===0;
    if(chunk>=SCAN_YIELD_MAX_ITEMS||(check&&performance.now()-scanStarted>=YIELD_MAX_WORK_MS)){
@@ -337,7 +339,9 @@ export async function readIfcObjectLayer(buffer,rawConfig,onProgress=()=>{},tria
   timings.lineScan+=performance.now()-scanStarted;
   if(!candidates.length)throw Error(config.onlyMatched?'Fant ingen IFC-objekter med en eksplisitt fargeregel.':'Fant ingen IFC-objekter med 2D-representasjon å vise.');
   const triangles=[],colors=[],triangleObjectIds=[],labels=[],objects=[],nativeColors=new Map(),valueLegend=new Map(),defaultLegendObjects=new Set();
-  let objectStarted=performance.now(),objectChunkStart=0,truncated=false,overriddenGeometries=0,nativeColorGeometries=0,fallbackColorGeometries=0;
+  let objectStarted=performance.now(),objectChunkStart=0,truncated=false,overriddenGeometries=0,nativeColorGeometries=0,fallbackColorGeometries=0,nextPartialCount=Math.min(1200,triangleLimit);
+  const makePartial=()=>({triangles:triangles.slice(),colors:colors.slice(),triangleObjectIds:triangleObjectIds.slice(),objects:objects.slice(),labels:labels.slice(),candidateCount:candidates.length,truncated:false,colorDiagnostics:{mappedObjects,defaultObjects,overriddenGeometries,nativeColorGeometries,fallbackColorGeometries,nativeColorValues:[...nativeColors.values()],matchedValues:[...matchedValues.values()],unmatchedValues:[...unmatchedValues.values()],valueLegend:[...valueLegend.values()].map(item=>({property:item.property,value:item.value,color:item.color,objectCount:item.objectIds.size})),defaultLegend:defaultLegendObjects.size?{label:'Øvrige objekter',color:config.defaultColor,objectCount:defaultLegendObjects.size}:null}});
+  const publishPartial=async()=>{if(typeof onPartial!=='function'||triangles.length<nextPartialCount)return;await onPartial(makePartial());nextPartialCount=triangles.length+4000;};
   for(let itemIndex=0;itemIndex<candidates.length;itemIndex++){
    const candidate=candidates[itemIndex],meshStarted=performance.now(),objectIndex=objects.length;
    objects.push({expressId:candidate.expressId,name:candidate.name,globalId:candidate.globalId||'',ifcType:candidate.ifcType||'',properties:candidate.properties});
@@ -381,6 +385,7 @@ export async function readIfcObjectLayer(buffer,rawConfig,onProgress=()=>{},tria
       if(processedTriangles%TRIANGLE_YIELD_CHECK_COUNT===0&&performance.now()-objectStarted>=YIELD_MAX_WORK_MS){
        timings.objectProcessing+=performance.now()-objectStarted;
        await yieldToUi(timings,'objectYield');
+       await publishPartial();
        objectStarted=performance.now();objectChunkStart=itemIndex+1;
       }
      }
@@ -389,6 +394,7 @@ export async function readIfcObjectLayer(buffer,rawConfig,onProgress=()=>{},tria
     if(triangles.length>=triangleLimit)break;
    }
    labels.push(candidate.name);
+   await publishPartial();
    onProgress(`Leser IFC-objekt ${itemIndex+1} av ${candidates.length} …`);
    const processed=itemIndex+1,hasMore=processed<candidates.length&&triangles.length<triangleLimit,work=performance.now()-objectStarted;
    if(hasMore&&(processed-objectChunkStart>=OBJECT_YIELD_MAX_ITEMS||work>=YIELD_MAX_WORK_MS)){

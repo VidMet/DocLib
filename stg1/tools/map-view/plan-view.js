@@ -1,6 +1,6 @@
-import {readWearSurface,drawWearSurface,readIfcObjectLayer,drawIfcObjectLayer,MAX_WEAR_TRIANGLES,MAX_IFC_OBJECT_TRIANGLES} from './ifc-surface.js?v=2.05-preview.7.6';
-import {normalizeIfcObjectLayer} from './ifc-object-layer-config.js?v=2.05-preview.7.6';
-import {readWearSurfaceCache,writeWearSurfaceCache,wearSurfaceCacheKey,readIfcObjectLayerCache,writeIfcObjectLayerCache,ifcObjectLayerCacheKey} from './ifc-surface-cache.js?v=2.05-preview.7.6';
+import {readWearSurface,drawWearSurface,readIfcObjectLayer,drawIfcObjectLayer,MAX_WEAR_TRIANGLES,MAX_IFC_OBJECT_TRIANGLES} from './ifc-surface.js?v=2.05-preview.7.7';
+import {normalizeIfcObjectLayer} from './ifc-object-layer-config.js?v=2.05-preview.7.7';
+import {readWearSurfaceCache,writeWearSurfaceCache,wearSurfaceCacheKey,readIfcObjectLayerCache,writeIfcObjectLayerCache,ifcObjectLayerCacheKey} from './ifc-surface-cache.js?v=2.05-preview.7.7';
 const MAX_WIDTH=1600;
 const MAX_HEIGHT=1200;
 const WORLD=20037508.342789244;
@@ -529,8 +529,17 @@ function createPlanView({store}){
   if(surfaceButton)surfaceButton.disabled=!files.length||surfaceLoading;
   const objectReadButton=root.querySelector('[data-ifc-object-read]');if(objectReadButton)objectReadButton.disabled=!files.length||objectLayerLoading||!ifcObjectLayerConfig.enabled||(ifcObjectLayerConfig.onlyMatched&&!ifcObjectLayerConfig.colorRules.some(rule=>rule.property));
   if(!sameIfcSelection(files,objectLayerFileIds)){
-   objectLayerLoadToken++;objectLayerFileIds=files.map(selectionKey);objectLayerModels=[];projectedObjectLayer=null;
-   const objectStatus=root.querySelector('[data-ifc-object-status]');if(objectStatus)objectStatus.textContent=files.length?'IFC-utvalget ble endret. IFC-objektslaget oppdateres automatisk.':'Velg IFC-modeller; objektslaget lastes automatisk når modeller er valgt.';
+   objectLayerLoadToken++;
+   const previous=new Map(objectLayerModels.map(model=>[model.selectionKey||JSON.stringify([String(model.fileId),String(model.versionId||'')]),model]));
+   const perModelLimit=files.length?Math.ceil(MAX_IFC_OBJECT_TRIANGLES/files.length):0;let remaining=MAX_IFC_OBJECT_TRIANGLES;
+   objectLayerModels=[];
+   for(const file of files){
+    const key=selectionKey(file),old=previous.get(key);if(!old||remaining<1)continue;
+    const source=old.geometrySource||old,count=Math.min(source.triangles.length,perModelLimit,remaining);if(count<1)continue;
+    objectLayerModels.push({...old,selectionKey:key,versionId:String(file.versionId||''),triangles:source.triangles.slice(0,count),colors:source.colors.slice(0,count),triangleObjectIds:source.triangleObjectIds.slice(0,count),geometrySource:source});remaining-=count;
+   }
+   objectLayerFileIds=files.map(selectionKey);projectedObjectLayer=null;if(objectLayerModels.length)projectIfcObjectLayer();
+   const objectStatus=root.querySelector('[data-ifc-object-status]');if(objectStatus)objectStatus.textContent=files.length?`${objectLayerModels.length?`Beholder ${objectLayerModels.length} innlastet modell(er) synlig mens nye modeller hentes. `:''}IFC-utvalget ble endret; manglende modeller lastes automatisk.`:'Velg IFC-modeller; objektslaget lastes automatisk når modeller er valgt.';
    const properties=root.querySelector('[data-ifc-object-properties]');if(properties)properties.replaceChildren(Object.assign(document.createElement('h3'),{textContent:'Objektegenskaper'}),Object.assign(document.createElement('p'),{textContent:'Klikk på en synlig IFC-flate i kartet for å vise egenskapene.'}));
    renderLegend();
    if(files.length)scheduleIfcObjectLayerAutoLoad();else{clearTimeout(objectLayerAutoTimer);objectLayerAutoTimer=0;objectLayerAutoPending=false;}
@@ -572,15 +581,17 @@ function createPlanView({store}){
   if((ifcObjectLayerConfig.onlyMatched&&!ifcObjectLayerConfig.colorRules.some(rule=>rule.property))){if(result)result.textContent='«Bare treff» krever minst én IFC-egenskap med fargeregler i «Innstillinger (felles)».';return;}
   if(!files.length){if(result)result.textContent='Velg én eller flere IFC-modeller fra treet først.';return;}
   if(objectLayerLoading)return;
-  const token=++objectLayerLoadToken,keys=files.map(selectionKey),configKey=JSON.stringify(ifcObjectLayerConfig),projectId=String(window.DocLibLegacyBridge.getProject()?.id||''),models=[],reports=[];
-  let remaining=MAX_IFC_OBJECT_TRIANGLES;objectLayerLoading=true;button.disabled=true;
+  const token=++objectLayerLoadToken,keys=files.map(selectionKey),configKey=JSON.stringify(ifcObjectLayerConfig),projectId=String(window.DocLibLegacyBridge.getProject()?.id||''),models=forceRefresh?[]:objectLayerModels.filter(model=>keys.includes(model.selectionKey)),reports=[];
+  let remaining=Math.max(0,MAX_IFC_OBJECT_TRIANGLES-models.reduce((sum,model)=>sum+model.triangles.length,0));const perModelLimit=Math.max(1,Math.ceil(MAX_IFC_OBJECT_TRIANGLES/files.length));objectLayerLoading=true;button.disabled=true;
   const selectionIsCurrent=()=>token===objectLayerLoadToken&&sameIfcSelection(window.DocLibLegacyBridge.listSelectedIfcFiles(),keys);
   const formatSeconds=ms=>`${(ms/1000).toFixed(2).replace('.',',')} s`;
   try{
    for(let index=0;index<files.length;index++){
     if(!selectionIsCurrent())return;
-    if(remaining<1){reports.push(`${files[index].name}: hoppet over fordi grensen på ${MAX_IFC_OBJECT_TRIANGLES.toLocaleString('nb-NO')} trekanter er nådd.`);continue;}
-    const file=files[index],filesLeft=files.length-index,modelLimit=Math.max(1,Math.ceil(remaining/filesLeft)),key=ifcObjectLayerCacheKey(projectId,file,configKey),memoryKey=key||JSON.stringify([String(file.id),String(file.versionId||''),configKey]),started=performance.now();let model=forceRefresh?null:memoryObjectLayerCache.get(memoryKey),source=model?'minnecache':forceRefresh?'ny behandling (manuell)':'ny behandling';
+    const file=files[index],selectionId=keys[index];
+    if(models.some(model=>model.selectionKey===selectionId&&model.complete))continue;
+    if(remaining<1){reports.push(`${file.name}: hoppet over fordi grensen på ${MAX_IFC_OBJECT_TRIANGLES.toLocaleString('nb-NO')} trekanter er nådd.`);continue;}
+    const modelLimit=Math.min(perModelLimit,remaining),key=ifcObjectLayerCacheKey(projectId,file,configKey),memoryKey=key||JSON.stringify([String(file.id),String(file.versionId||''),configKey]),started=performance.now();let model=forceRefresh?null:memoryObjectLayerCache.get(memoryKey),source=model?'minnecache':forceRefresh?'ny behandling (manuell)':'ny behandling';
     try{
      if(!model&&key&&!forceRefresh){
       try{model=await readIfcObjectLayerCache(key);if(model)source='lokal cache';}catch(error){reports.push(`${file.name}: lokal objektslags-cache kunne ikke leses (${error?.message||String(error)}); bruker originalfilen.`);}
@@ -589,14 +600,22 @@ function createPlanView({store}){
      if(!model){
       if(result)result.textContent=`Henter og leser IFC ${index+1} av ${files.length}: ${file.name} …`;
       const buffer=await window.DocLibLegacyBridge.downloadIfcForSurface(file.id);if(!selectionIsCurrent())return;
-      model=await readIfcObjectLayer(buffer,ifcObjectLayerConfig,message=>{if(result&&selectionIsCurrent())result.textContent=`${file.name} · ${message}`;},modelLimit);
+      model=await readIfcObjectLayer(buffer,ifcObjectLayerConfig,message=>{if(result&&selectionIsCurrent())result.textContent=`${file.name} · ${message}`;},modelLimit,async partial=>{
+       if(!selectionIsCurrent())throw new DOMException('IFC-utvalget ble endret.','AbortError');
+       const count=Math.min(partial.triangles.length,modelLimit,remaining);if(!count)return;
+       const display={...partial,triangles:partial.triangles.slice(0,count),colors:partial.colors.slice(0,count),triangleObjectIds:partial.triangleObjectIds.slice(0,count),geometrySource:partial,fileId:file.id,fileName:file.name,versionId:String(file.versionId||''),selectionKey:selectionId,complete:false};
+       const existing=models.findIndex(item=>item.selectionKey===selectionId);if(existing>=0)models[existing]=display;else models.push(display);
+       objectLayerModels=models.slice();objectLayerFileIds=keys;projectIfcObjectLayer();if(!projectedObjectLayer)throw Error('Delresultatet fra IFC-modellen kunne ikke konverteres til valgt CRS.');
+       objectLayerVisible=true;const visibleToggle=root.querySelector('[data-ifc-object-visible]');if(visibleToggle)visibleToggle.checked=true;renderLegend();const drawWait=waitForWearDraw();refresh();await drawWait;
+       if(result)result.textContent=`Viser foreløpig delresultat fra ${file.name} (${projectedObjectLayer.triangleCount.toLocaleString('nb-NO')} trekanter); leser videre …`;
+      });
       source='ny behandling';memoryObjectLayerCache.set(memoryKey,model);if(memoryObjectLayerCache.size>12)memoryObjectLayerCache.delete(memoryObjectLayerCache.keys().next().value);
       if(key)try{await writeIfcObjectLayerCache(projectId,file,key,model);source='nybehandlet og lagret lokalt';}catch(error){reports.push(`${file.name}: IFC-objektslaget kunne ikke lagres lokalt (${error?.message||String(error)}).`);}
      }
      if(!selectionIsCurrent())return;
-     const count=Math.min(model.triangles.length,modelLimit,remaining),displayModel={...model,triangles:model.triangles.slice(0,count),colors:model.colors.slice(0,count),triangleObjectIds:model.triangleObjectIds.slice(0,count),geometrySource:model,fileId:file.id,fileName:file.name};
+     const count=Math.min(model.triangles.length,modelLimit,remaining),displayModel={...model,triangles:model.triangles.slice(0,count),colors:model.colors.slice(0,count),triangleObjectIds:model.triangleObjectIds.slice(0,count),geometrySource:model,fileId:file.id,fileName:file.name,versionId:String(file.versionId||''),selectionKey:selectionId,complete:true};
      if(count){
-      models.push(displayModel);objectLayerModels=models.slice();objectLayerFileIds=keys;
+      const existing=models.findIndex(item=>item.selectionKey===selectionId);if(existing>=0)models[existing]=displayModel;else models.push(displayModel);objectLayerModels=models.slice();objectLayerFileIds=keys;
       const partialProjection=projectIfcObjectLayer();
       if(!projectedObjectLayer)throw Error('Delresultatet fra IFC-modellen kunne ikke konverteres til valgt CRS.');
       objectLayerVisible=true;const visibleToggle=root.querySelector('[data-ifc-object-visible]');if(visibleToggle)visibleToggle.checked=true;

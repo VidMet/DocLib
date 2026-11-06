@@ -1,32 +1,290 @@
-// Shared tree: independent of the active tool, with separate workspace selections.
-export function createFileTree(context){
-const state={};
-state.makeNode = (function(id,name,path,parent=null){return{id,name,path,parent,folders:[],files:[]}});
+// Shared tree: keeps IFC and workspace selections in sync across active tools.
+export function createFileTree(context) {
+  const state = {};
+  let controller = null;
+  let lastFileAnchorId = null;
+  let pendingShiftRange = null;
 
-state.scanFolder = (async function(id,name,path,parent){const node=state.makeNode(id,name,path,parent),r=await context.req(`${context.CORE}/folders/${id}/items`);if(!r.ok)throw Error('Mappen '+(path||'/')+' kunne ikke leses (HTTP '+r.status+').');const data=r.data,its=Array.isArray(data)?data:data?.items,folders=[];if(!Array.isArray(its))throw Error('Ukjent mappelisteformat for '+(path||'/'));if(r.status===206||data?.nextPageToken||data?.nextLink||data?.['@odata.nextLink']||(data?.total!==undefined&&Number(data.total)!==its.length))throw Error('Ufullstendig mappeliste for '+(path||'/'));for(const x of its){if(x.type==='FILE'){x.folderId=id;x.folderPath=path;x.format=context.fileExt(x.name);node.files.push(x)}else if(x.type==='FOLDER'){const hidden=path===''&&['extensionconfig','projectconfig'].includes(context.norm(x.name));if(!hidden)folders.push(x)}}node.folders=await Promise.all(folders.map(x=>state.scanFolder(x.id,x.name,`${path}/${x.name}`,node)));return node});
+  state.makeNode = (id, name, path, parent = null) => ({
+    id,
+    name,
+    path,
+    parent,
+    folders: [],
+    files: [],
+  });
 
-state.flatten = (function(node,out=[]){for(const f of node.files)out.push(f);for(const n of node.folders)state.flatten(n,out);return out});
+  state.scanFolder = async (id, name, path, parent) => {
+    const node = state.makeNode(id, name, path, parent);
+    const response = await context.req(`${context.CORE}/folders/${id}/items`);
+    if (!response.ok) {
+      throw Error(`Mappen ${path || '/'} kunne ikke leses (HTTP ${response.status}).`);
+    }
 
-state.descendants = (function(node,out=[]){for(const f of node.files)out.push(f.id);for(const n of node.folders)state.descendants(n,out);return out});
+    const data = response.data;
+    const items = Array.isArray(data) ? data : data?.items;
+    if (!Array.isArray(items)) {
+      throw Error(`Ukjent mappelisteformat for ${path || '/'}`);
+    }
+    if (
+      response.status === 206 ||
+      data?.nextPageToken ||
+      data?.nextLink ||
+      data?.['@odata.nextLink'] ||
+      (data?.total !== undefined && Number(data.total) !== items.length)
+    ) {
+      throw Error(`Ufullstendig mappeliste for ${path || '/'}`);
+    }
 
-state.findNode = (function(node,id){if(node.id===id)return node;for(const n of node.folders){const x=state.findNode(n,id);if(x)return x}return null});
+    const folders = [];
+    for (const item of items) {
+      if (item.type === 'FILE') {
+        item.folderId = id;
+        item.folderPath = path;
+        node.files.push(item);
+      } else if (item.type === 'FOLDER') {
+        const hiddenAtRoot =
+          path === '' &&
+          ['extensionconfig', 'projectconfig'].includes(context.norm(item.name));
+        if (!hiddenAtRoot) folders.push(item);
+      }
+    }
 
-state.renderTree = (function(){if(!context.treeRoot)return;const scope=context.workspaceScope(),treeScrollTop=context.$('tree').scrollTop,planMode=context.workspaceMode==='plan',ifcIds=new Set(context.listIfcFiles().map(file=>String(file.id))),planSelected=new Set(context.listSelectedIfcFiles().map(file=>String(file.id)));function fileHtml(f){return `<div class="node-row ws-file" title="${context.esc(f.folderPath||'/')} / ${context.esc(f.name)}"><span class="twisty"></span><input type="checkbox" data-scope-file="${context.esc(f.id)}" aria-label="${planMode?'Velg IFC-modell':'Velg fil'} ${context.esc(f.name)}" ${(ifcIds.has(String(f.id))?planSelected.has(String(f.id)):scope.has(f.id))?'checked':''} ${planMode&&!ifcIds.has(String(f.id))?'disabled':''}><span aria-hidden="true">📄</span><span class="ws-name">${context.esc(f.name)}</span><span class="format">${context.esc(f.format||'')}</span></div>`}function nodeHtml(n){const open=state.expanded.has(n.id),allIds=[...new Set(state.descendants(n,[]))],ids=planMode?allIds.filter(id=>ifcIds.has(String(id))):allIds,selected={has:id=>ifcIds.has(String(id))?planSelected.has(String(id)):scope.has(id)},checked=ids.length>0&&ids.every(id=>selected.has(String(id))),some=ids.some(id=>selected.has(String(id)));return `<div class="node"><div class="node-row"><button type="button" class="twisty ws-toggle" data-toggle="${context.esc(n.id)}" aria-label="Utvid eller skjul ${context.esc(n.name)}" aria-expanded="${open}">${open?'▼':'▶'}</button><input type="checkbox" data-folder-check="${context.esc(n.id)}" aria-label="${planMode?'Velg IFC-modellene i mappen':'Velg mappe'} ${context.esc(n.name)} med undermapper" ${checked?'checked':''} ${some&&!checked?'data-indeterminate="1"':''} ${!ids.length?'disabled':''}><button type="button" class="ws-folder-name" data-toggle="${context.esc(n.id)}" title="${context.esc(n.path)}">📁 ${context.esc(n.name)}</button><span class="count">(${ids.length})</span></div>${open?`<div class="children">${n.folders.map(nodeHtml).join('')}${n.files.map(fileHtml).join('')}</div>`:''}</div>`}context.$('tree').innerHTML=context.treeRoot.folders.map(nodeHtml).join('')+context.treeRoot.files.map(fileHtml).join('');context.$('tree').scrollTop=treeScrollTop;if(!context.$('tree').innerHTML)context.$('tree').textContent='Ingen tilgjengelige mapper eller filer.';context.$('tree').querySelectorAll('[data-indeterminate]').forEach(x=>x.indeterminate=true);context.workspaceModeUI()});
-state.currentFolder = ('__ALL__');
-state.expanded = (new Set(['__ROOT__']));
-state.folderFilters = (new Set());
-state.allExpanded = (false);
-let controller=null;
-return Object.freeze({port:Object.freeze({makeNode:(...args)=>state.makeNode(...args),
-scanFolder:(...args)=>state.scanFolder(...args),
-flatten:(...args)=>state.flatten(...args),
-descendants:(...args)=>state.descendants(...args),
-findNode:(...args)=>state.findNode(...args),
-renderTree:(...args)=>state.renderTree(...args),
-get currentFolder(){return state.currentFolder;},set currentFolder(value){state.currentFolder=value;},
-get expanded(){return state.expanded;},set expanded(value){state.expanded=value;},
-get folderFilters(){return state.folderFilters;},set folderFilters(value){state.folderFilters=value;},
-get allExpanded(){return state.allExpanded;},set allExpanded(value){state.allExpanded=value;}}),
- mount(){if(controller)return;controller=new AbortController();context.$('expandAll').addEventListener('click',()=>{state.allExpanded=!state.allExpanded;state.expanded.clear();if(state.allExpanded&&context.treeRoot){(function add(n){state.expanded.add(n.id);n.folders.forEach(add)})(context.treeRoot)}else state.expanded.add('__ROOT__');state.renderTree();},{signal:controller.signal});context.$('tree').addEventListener('click',event=>{const button=event.target.closest('[data-toggle]');if(!button)return;const id=button.dataset.toggle;if(state.expanded.has(id))state.expanded.delete(id);else state.expanded.add(id);state.renderTree();},{signal:controller.signal});context.$('tree').addEventListener('change',event=>{const input=event.target;if(input.matches('[data-scope-file]')){const id=String(input.dataset.scopeFile),ifcIds=new Set(context.listIfcFiles().map(file=>String(file.id)));if(ifcIds.has(id)){const selected=new Set(context.listSelectedIfcFiles().map(file=>String(file.id)));if(input.checked)selected.add(id);else selected.delete(id);context.setSelectedIfcFiles([...selected]);}else{const scope=context.workspaceScope();if(input.checked)scope.add(id);else scope.delete(id);context.workspaceSelectionChanged();}return;}if(input.matches('[data-folder-check]')){const node=context.findNode(context.treeRoot,input.dataset.folderCheck);if(!node)return;const allIds=[...new Set(state.descendants(node,[]))],ifcIds=new Set(context.listIfcFiles().map(file=>String(file.id))),selected=new Set(context.listSelectedIfcFiles().map(file=>String(file.id))),scope=context.workspaceScope();for(const rawId of allIds){const id=String(rawId);if(ifcIds.has(id)){if(input.checked)selected.add(id);else selected.delete(id);}else if(context.workspaceMode!=='plan'){if(input.checked)scope.add(rawId);else scope.delete(rawId);}}context.setSelectedIfcFiles([...selected]);context.workspaceSelectionChanged();}},{signal:controller.signal});},
- destroy(){controller?.abort();controller=null;context.$('tree').replaceChildren();}
-});}
+    node.folders = await Promise.all(
+      folders.map((folder) =>
+        state.scanFolder(folder.id, folder.name, `${path}/${folder.name}`, node),
+      ),
+    );
+    return node;
+  };
+
+  state.flatten = (node, output = []) => {
+    for (const file of node.files) output.push(file);
+    for (const folder of node.folders) state.flatten(folder, output);
+    return output;
+  };
+
+  state.descendants = (node, output = []) => {
+    for (const file of node.files) output.push(file.id);
+    for (const folder of node.folders) state.descendants(folder, output);
+    return output;
+  };
+
+  state.findNode = (node, id) => {
+    if (node.id === id) return node;
+    for (const folder of node.folders) {
+      const found = state.findNode(folder, id);
+      if (found) return found;
+    }
+    return null;
+  };
+
+  state.renderTree = () => {
+    if (!context.treeRoot) return;
+
+    const tree = context.$('tree');
+    const scope = context.workspaceScope();
+    const scrollTop = tree.scrollTop;
+    const planMode = context.workspaceMode === 'plan';
+    const ifcIds = new Set(context.listIfcFiles().map((file) => String(file.id)));
+    const selectedIfcIds = new Set(
+      context.listSelectedIfcFiles().map((file) => String(file.id)),
+    );
+
+    const selected = (id) =>
+      ifcIds.has(String(id)) ? selectedIfcIds.has(String(id)) : scope.has(id);
+
+    const fileHtml = (file) => {
+      const id = String(file.id);
+      const isIfc = ifcIds.has(id);
+      const checked = isIfc ? selectedIfcIds.has(id) : scope.has(file.id);
+      const disabled = planMode && !isIfc;
+      return `<div class="node-row ws-file" title="${context.esc(file.folderPath || '/')} / ${context.esc(file.name)}"><span class="twisty"></span><input type="checkbox" data-scope-file="${context.esc(id)}" aria-label="${planMode ? 'Velg IFC-modell' : 'Velg fil'} ${context.esc(file.name)}" ${checked ? 'checked' : ''} ${disabled ? 'disabled' : ''}><span aria-hidden="true">📄</span><span class="ws-name">${context.esc(file.name)}</span><span class="format">${context.esc(file.format || '')}</span></div>`;
+    };
+
+    const nodeHtml = (node) => {
+      const open = state.expanded.has(node.id);
+      const allIds = [...new Set(state.descendants(node, []))];
+      const ids = planMode ? allIds.filter((id) => ifcIds.has(String(id))) : allIds;
+      const checked = ids.length > 0 && ids.every((id) => selected(id));
+      const some = ids.some((id) => selected(id));
+      const children = open
+        ? `<div class="children">${node.folders.map(nodeHtml).join('')}${node.files.map(fileHtml).join('')}</div>`
+        : '';
+
+      return `<div class="node"><div class="node-row"><button type="button" class="twisty ws-toggle" data-toggle="${context.esc(node.id)}" aria-label="Utvid eller skjul ${context.esc(node.name)}" aria-expanded="${open}">${open ? '▼' : '▶'}</button><input type="checkbox" data-folder-check="${context.esc(node.id)}" aria-label="${planMode ? 'Velg IFC-modellene i mappen' : 'Velg mappe'} ${context.esc(node.name)} med undermapper" ${checked ? 'checked' : ''} ${some && !checked ? 'data-indeterminate="1"' : ''} ${ids.length ? '' : 'disabled'}><button type="button" class="ws-folder-name" data-toggle="${context.esc(node.id)}" title="${context.esc(node.path)}">📁 ${context.esc(node.name)}</button><span class="count">(${ids.length})</span></div>${children}</div>`;
+    };
+
+    tree.innerHTML =
+      context.treeRoot.folders.map(nodeHtml).join('') +
+      context.treeRoot.files.map(fileHtml).join('');
+    tree.scrollTop = scrollTop;
+    if (!tree.innerHTML) tree.textContent = 'Ingen tilgjengelige mapper eller filer.';
+    tree.querySelectorAll('[data-indeterminate]').forEach((input) => {
+      input.indeterminate = true;
+    });
+    context.workspaceModeUI();
+  };
+
+  const applyFileSelection = (ids, checked) => {
+    const ifcIds = new Set(context.listIfcFiles().map((file) => String(file.id)));
+    const selectedIfcIds = new Set(
+      context.listSelectedIfcFiles().map((file) => String(file.id)),
+    );
+    const scope = context.workspaceScope();
+    let ifcChanged = false;
+    let workspaceChanged = false;
+
+    for (const rawId of ids) {
+      const id = String(rawId);
+      if (ifcIds.has(id)) {
+        if (selectedIfcIds.has(id) !== checked) ifcChanged = true;
+        if (checked) selectedIfcIds.add(id);
+        else selectedIfcIds.delete(id);
+      } else if (context.workspaceMode !== 'plan') {
+        if (scope.has(rawId) !== checked) workspaceChanged = true;
+        if (checked) scope.add(rawId);
+        else scope.delete(rawId);
+      }
+    }
+
+    if (ifcChanged) context.setSelectedIfcFiles([...selectedIfcIds]);
+    if (workspaceChanged) context.workspaceSelectionChanged();
+    if (!ifcChanged && !workspaceChanged) state.renderTree();
+  };
+
+  state.currentFolder = '__ALL__';
+  state.expanded = new Set(['__ROOT__']);
+  state.folderFilters = new Set();
+  state.allExpanded = false;
+
+  return Object.freeze({
+    port: Object.freeze({
+      makeNode: (...args) => state.makeNode(...args),
+      scanFolder: (...args) => state.scanFolder(...args),
+      flatten: (...args) => state.flatten(...args),
+      descendants: (...args) => state.descendants(...args),
+      findNode: (...args) => state.findNode(...args),
+      renderTree: (...args) => state.renderTree(...args),
+      get currentFolder() {
+        return state.currentFolder;
+      },
+      set currentFolder(value) {
+        state.currentFolder = value;
+      },
+      get expanded() {
+        return state.expanded;
+      },
+      set expanded(value) {
+        state.expanded = value;
+      },
+      get folderFilters() {
+        return state.folderFilters;
+      },
+      set folderFilters(value) {
+        state.folderFilters = value;
+      },
+      get allExpanded() {
+        return state.allExpanded;
+      },
+      set allExpanded(value) {
+        state.allExpanded = value;
+      },
+    }),
+    mount() {
+      if (controller) return;
+      controller = new AbortController();
+      const signal = controller.signal;
+      const tree = context.$('tree');
+
+      context.$('expandAll').addEventListener(
+        'click',
+        () => {
+          state.allExpanded = !state.allExpanded;
+          state.expanded.clear();
+          if (state.allExpanded && context.treeRoot) {
+            (function add(node) {
+              state.expanded.add(node.id);
+              node.folders.forEach(add);
+            })(context.treeRoot);
+          } else {
+            state.expanded.add('__ROOT__');
+          }
+          state.renderTree();
+        },
+        { signal },
+      );
+
+      tree.addEventListener(
+        'click',
+        (event) => {
+          const fileInput = event.target.closest('[data-scope-file]');
+          if (fileInput) {
+            const id = String(fileInput.dataset.scopeFile);
+            if (event.shiftKey && lastFileAnchorId) {
+              pendingShiftRange = { id, checked: fileInput.checked };
+            } else {
+              lastFileAnchorId = id;
+              pendingShiftRange = null;
+            }
+            return;
+          }
+
+          const toggle = event.target.closest('[data-toggle]');
+          if (!toggle) return;
+          const id = toggle.dataset.toggle;
+          if (state.expanded.has(id)) state.expanded.delete(id);
+          else state.expanded.add(id);
+          state.renderTree();
+        },
+        { signal },
+      );
+
+      tree.addEventListener(
+        'change',
+        (event) => {
+          const input = event.target;
+          if (input.matches('[data-scope-file]')) {
+            const id = String(input.dataset.scopeFile);
+            if (pendingShiftRange?.id === id && lastFileAnchorId) {
+              const files = [...tree.querySelectorAll('[data-scope-file]:not(:disabled)')];
+              const anchorIndex = files.findIndex(
+                (file) => String(file.dataset.scopeFile) === lastFileAnchorId,
+              );
+              const targetIndex = files.indexOf(input);
+              const range =
+                anchorIndex >= 0 && targetIndex >= 0
+                  ? files
+                      .slice(Math.min(anchorIndex, targetIndex), Math.max(anchorIndex, targetIndex) + 1)
+                      .map((file) => String(file.dataset.scopeFile))
+                  : [id];
+              const checked = pendingShiftRange.checked;
+              pendingShiftRange = null;
+              applyFileSelection(range, checked);
+              return;
+            }
+            applyFileSelection([id], input.checked);
+            return;
+          }
+
+          if (!input.matches('[data-folder-check]')) return;
+          const node = state.findNode(context.treeRoot, input.dataset.folderCheck);
+          if (!node) return;
+          const ifcIds = new Set(context.listIfcFiles().map((file) => String(file.id)));
+          const ids = [...new Set(state.descendants(node, []))].filter(
+            (id) => context.workspaceMode !== 'plan' || ifcIds.has(String(id)),
+          );
+          applyFileSelection(ids, input.checked);
+        },
+        { signal },
+      );
+    },
+    destroy() {
+      controller?.abort();
+      controller = null;
+      lastFileAnchorId = null;
+      pendingShiftRange = null;
+      context.$('tree').replaceChildren();
+    },
+  });
+}
