@@ -1,6 +1,6 @@
 import {WMS_CATALOG} from './wms-catalog.js?v=2.05-preview.4-planview.5';
-import {DEFAULT_IFC_OBJECT_LAYER,normalizeIfcObjectLayer} from './ifc-object-layer-config.js?v=2.05-preview.7.9';
-import {readIfcPropertyCatalog} from './ifc-surface.js?v=2.05-preview.7.9';
+import {DEFAULT_IFC_OBJECT_LAYER,normalizeIfcObjectLayer} from './ifc-object-layer-config.js?v=2.05-preview.7.11';
+import {readIfcPropertyCatalog} from './ifc-surface.js?v=2.05-preview.7.11';
 const MAX_LAYERS=20;
 const CATALOG_IDS=new Set(WMS_CATALOG.map(item=>item.id));
 const BASEMAPS=Object.freeze([

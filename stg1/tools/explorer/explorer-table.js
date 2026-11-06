@@ -50,7 +50,7 @@ state.renderDynamicHeaders = (function(){const tr=context.$('explorerContent').q
 
 state.wireHeaders = (function(){context.$('explorerContent').querySelectorAll('[data-col]').forEach(th=>{const sh=th.querySelector('.sort-hit'),fb=th.querySelector('.filter-btn');if(sh)sh.onclick=()=>state.setSort(th.dataset.col);if(fb)fb.onclick=e=>{e.stopPropagation();state.renderColumnFilter(th.dataset.col,e.currentTarget)}})});
 
-state.updateSelection = (function(){const count=context.rows.filter(r=>r.file.format==='ifc'&&state.selected.has(r.file.id)).length;context.$('selectionCount').textContent=`${count} IFC-modeller valgt for 3D`});
+state.updateSelection = (function(){const count=window.DocLibLegacyBridge?.listSelectedIfcFiles?.().length||0;context.$('selectionCount').textContent=`${count} IFC-modeller valgt for 3D`});
 }
 export function initialize(state,context){
 state.selected = (new Set());

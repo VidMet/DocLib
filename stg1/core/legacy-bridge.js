@@ -1,4 +1,5 @@
 'use strict';
+const selectedIfcFileIds=new Set();
 window.DocLibLegacyBridge=Object.freeze({
  getColumnPropertyCatalog:()=>[...propertiesPort.propertyCatalog.values()].map(x=>({...x})),
  start:()=>init(),getProject:()=>project?{id:project.id}:null,getMode:()=>workspaceMode,
@@ -8,17 +9,15 @@ window.DocLibLegacyBridge=Object.freeze({
  setSelectedIfcFiles(fileIds){
   const allowed=new Set(this.listIfcFiles().map(file=>file.id));
   const requested=new Set((Array.isArray(fileIds)?fileIds:[]).map(String).filter(id=>allowed.has(id)));
-  const selected=explorerPort.selected;
-  for(const row of rows){const file=row?.file;if(file?.id&&(String(file.format||'').toLowerCase()==='ifc'||String(file.name||'').toLowerCase().endsWith('.ifc')))selected.delete(String(file.id));}
-  for(const id of requested)selected.add(id);
+  selectedIfcFileIds.clear();
+  for(const id of requested)selectedIfcFileIds.add(id);
   explorerPort.updateSelection();treePort.renderTree();explorerPort.renderTable();
   window.dispatchEvent(new CustomEvent('doclib:explorer-selection-change'));
   return this.listSelectedIfcFiles();
  },
  listSelectedIfcFiles(){
-  const selected=explorerPort?.selectedRows?.()||[];
-  const seen=new Set();
-  return selected.map(row=>row?.file).filter(file=>file?.id&&(String(file.format||'').toLowerCase()==='ifc'||String(file.name||'').toLowerCase().endsWith('.ifc'))&&!seen.has(String(file.id))&&seen.add(String(file.id))).map(file=>({id:String(file.id),name:String(file.name||'IFC-fil'),folderPath:String(file.folderPath||'/'),versionId:file.versionId?String(file.versionId):''})).sort((a,b)=>`${a.folderPath}/${a.name}`.localeCompare(`${b.folderPath}/${b.name}`,'no',{sensitivity:'base'}));
+  const byId=new Map(this.listIfcFiles().map(file=>[file.id,file]));
+  return [...selectedIfcFileIds].map(id=>byId.get(id)).filter(Boolean).sort((a,b)=>`${a.folderPath}/${a.name}`.localeCompare(`${b.folderPath}/${b.name}`,'no',{sensitivity:'base'}));
  },
  buildSelectedIfcViewerUrl(){
   const selectedIds=new Set(this.listSelectedIfcFiles().map(file=>file.id));
@@ -111,6 +110,7 @@ window.DocLibLegacyBridge=Object.freeze({
    treeRoot=tree;const ids=new Set(files.map(f=>f.id));
    for(const set of Object.values(workspaceScopes))for(const id of set)if(!ids.has(id))set.delete(id);
    for(const id of explorerPort.selected)if(!ids.has(id))explorerPort.selected.delete(id);
+   for(const id of selectedIfcFileIds)if(!ids.has(id))selectedIfcFileIds.delete(id);
    explorerPort.allFormats=new Set(files.map(f=>f.format));explorerPort.formatFilters=new Set(explorerPort.allFormats);
    explorerPort.renderFormats();explorerPort.updateSelection();
   },
