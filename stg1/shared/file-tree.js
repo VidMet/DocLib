@@ -41,6 +41,7 @@ export function createFileTree(context) {
       if (item.type === 'FILE') {
         item.folderId = id;
         item.folderPath = path;
+        item.format = String(item.format || context.fileExt(item.name) || '').toLowerCase();
         node.files.push(item);
       } else if (item.type === 'FOLDER') {
         const hiddenAtRoot =
